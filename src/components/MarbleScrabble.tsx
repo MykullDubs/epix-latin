@@ -3,7 +3,7 @@ import {
   Trophy, Clock, CheckCircle2, FastForward, ArrowDownToLine,
   Star, Users, User, MessageSquare, Shuffle, Loader2,
   AlertTriangle, Rocket, RefreshCw, ZoomIn, ZoomOut,
-  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen
+  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -11,7 +11,6 @@ import {
 // ─────────────────────────────────────────────
 const BOARD_SIZE = 15;
 
-// CEFR-style difficulty tiers based on word length + letter rarity
 const TIERS: Record<number, { label: string; color: string; bg: string; border: string; points: number }> = {
   1: { label: 'A1 — Basic',    color: '#16a34a', bg: 'rgba(22,163,74,0.12)',    border: 'rgba(22,163,74,0.35)',   points: 1 },
   2: { label: 'A2 — Elementary', color: '#2563eb', bg: 'rgba(37,99,235,0.12)', border: 'rgba(37,99,235,0.35)',   points: 1.5 },
@@ -61,10 +60,8 @@ const getSquareType = (r: number, c: number) => {
   if (tl.some(([tr,tc])=>tr===r&&tc===c)) return 'TL';
   const dl = [[0,3],[0,11],[2,6],[2,8],[3,0],[3,7],[3,14],[6,2],[6,6],[6,8],[6,12],[7,3],[7,11],[8,2],[8,6],[8,8],[8,12],[11,0],[11,7],[11,14],[12,6],[12,8],[14,3],[14,11]];
   if (dl.some(([tr,tc])=>tr===r&&tc===c)) return 'DL';
-  
   const dpPoints = [[1,7], [7,1], [7,13], [13,7]];
   if (dpPoints.some(([tr, tc]) => tr === r && tc === c)) return 'DP';
-
   return null;
 };
 
@@ -120,11 +117,15 @@ const WordCard = ({ entry }: any) => {
   return (
     <div style={{
       background: tier.bg, border: `1px solid ${tier.border}`,
-      borderRadius: 12, padding: '10px 14px', marginBottom: 8
+      borderRadius: 12, padding: '10px 14px', marginBottom: 8, position: 'relative', overflow: 'hidden'
     }}>
+      {entry.isStanza && (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#d946ef' }} />
+      )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: '#f8fafc', letterSpacing: 1 }}>
+        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: '#f8fafc', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
           {entry.word}
+          {entry.isStanza && <Layers size={14} style={{ color: '#d946ef' }} title="Stanza Stack" />}
         </span>
         <span style={{
           fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
@@ -145,11 +146,6 @@ const WordCard = ({ entry }: any) => {
       <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, margin: 0 }}>
         {entry.def}
       </p>
-      {entry.example && (
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', marginTop: 4, lineHeight: 1.4 }}>
-          "{entry.example}"
-        </p>
-      )}
     </div>
   );
 };
@@ -219,7 +215,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 90;
   const [selectedTime, setSelectedTime] = useState(90);
 
-  // Inject fonts
   useEffect(() => {
     if (!document.getElementById('wf-fonts')) {
       const s = document.createElement('style');
@@ -236,7 +231,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   }, []);
 
-  // ── State ──
   const gameStatus = liveState?.gameStatus;
   const players: Record<string, any> = liveState?.players || {};
   const teams: Record<string, any> = liveState?.teams || {};
@@ -258,7 +252,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const myTeamId = myTeamEntry?.id;
   const isMyTurn = myTeamId === activeTeam?.id && gameStatus === 'playing';
 
-  // ── Timer ──
   const [timeLeft, setTimeLeft] = useState(0);
   useEffect(() => {
     if (isTimerPaused) { setTimeLeft(remainingPausedTime); return; }
@@ -271,7 +264,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     return () => clearInterval(iv);
   }, [turnEndTime, isProjector, gameStatus, isTimerPaused, remainingPausedTime]);
 
-  // ── Board / Rack ──
   const [localBoard, setLocalBoard] = useState<any[]>(Array(BOARD_SIZE * BOARD_SIZE).fill(null));
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
   const [targetSquare, setTargetSquare] = useState<number | null>(null);
@@ -280,7 +272,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [selectedRack, setSelectedRack] = useState<number | null>(null);
   const [hasDrawn, setHasDrawn] = useState(false);
 
-  // ── Validation ──
   const [isValidating, setIsValidating] = useState(false);
   const [invalidWords, setInvalidWords] = useState<string[]>([]);
   const [pendingSentence, setPendingSentence] = useState(false);
@@ -288,11 +279,9 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [currentWords, setCurrentWords] = useState<any[]>([]);
   const [currentScore, setCurrentScore] = useState(0);
 
-  // ── UI ──
   const [zoom, setZoom] = useState(1);
   const [showJournal, setShowJournal] = useState(false);
 
-  // ── Init projector ──
   useEffect(() => {
     if (isProjector && !liveState?.gameStatus) {
       onUpdateLiveState({
@@ -305,7 +294,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   }, [isProjector, liveState]);
 
-  // ── Sync board from global ──
   useEffect(() => {
     if (globalBoard) {
       setLocalBoard(globalBoard);
@@ -315,7 +303,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   }, [globalBoard]);
 
-  // ── Recall tiles when not my turn ──
   useEffect(() => {
     if (!isProjector && !isMyTurn) {
       let nr = [...rack], nb = [...localBoard], changed = false;
@@ -330,7 +317,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   }, [isMyTurn]);
 
-  // ── Draw tiles ──
   useEffect(() => {
     if (!isProjector && isMyTurn && !hasDrawn && globalBag?.length > 0) {
       let newBag = [...globalBag];
@@ -340,9 +326,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   }, [isMyTurn, hasDrawn, globalBag, isProjector]);
 
-  // ─────────────────────────────────────────────
-  // GAME ACTIONS
-  // ─────────────────────────────────────────────
   const joinLobby = () => {
     const name = (studentId.split('@')[0].replace(/[^a-zA-Z0-9]/g,' ')).trim();
     const display = name.charAt(0).toUpperCase() + name.slice(1);
@@ -407,59 +390,42 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     setRack(nr); setSelectedRack(null);
   };
 
-  // 🔥 UPDATED: DATA PURGE
   const handlePurge = () => {
     if (!isMyTurn || isValidating || isTimerPaused) return;
     if ((scores[myTeamId] || 0) < 10) return;
 
     let tilesToReturn: any[] = [];
     const newBoard = [...localBoard];
-    
     newBoard.forEach((tile: any, index: number) => {
         if (tile && !tile.isLocked) {
             tilesToReturn.push(tile);
             newBoard[index] = null;
         }
     });
-
-    rack.forEach(tile => {
-        if (tile) tilesToReturn.push(tile);
-    });
+    rack.forEach(tile => { if (tile) tilesToReturn.push(tile); });
 
     let newBag = [...(globalBag || []), ...tilesToReturn];
-    
     for (let i = newBag.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [newBag[i], newBag[j]] = [newBag[j], newBag[i]];
     }
 
     let newRack = Array(7).fill(null);
-    newRack = newRack.map(() => {
-        if (newBag.length > 0) return newBag.pop();
-        return null;
-    });
+    newRack = newRack.map(() => newBag.length > 0 ? newBag.pop() : null);
 
-    setRack(newRack);
-    setLocalBoard(newBoard);
-    setTargetSquare(null);
-    setLastPlaced(null);
-    setPlayDir(null);
-    setInvalidWords([]);
-    setSelectedRack(null);
+    setRack(newRack); setLocalBoard(newBoard);
+    setTargetSquare(null); setLastPlaced(null); setPlayDir(null);
+    setInvalidWords([]); setSelectedRack(null);
 
     const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) - 10 };
-    
     onUpdateLiveState({
-        bag: newBag,
-        scores: updatedScores,
+        bag: newBag, scores: updatedScores,
         activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
         turnEndTime: Date.now() + timeLimit * 1000,
-        isExtraTurn: false,
-        isTimerPaused: false
+        isExtraTurn: false, isTimerPaused: false
     });
   };
 
-  // ── Board click ──
   const handleBoardClick = (idx: number) => {
     if (!isMyTurn || isValidating || isTimerPaused) return;
     setSelectedRack(null); setInvalidWords([]);
@@ -477,7 +443,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     setTargetSquare(idx);
   };
 
-  // ── Rack click ──
   const handleRackClick = (idx: number) => {
     if (isValidating || isTimerPaused) return;
     setInvalidWords([]);
@@ -513,9 +478,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   };
 
-  // ─────────────────────────────────────────────
-  // VALIDATION & COMMIT
-  // ─────────────────────────────────────────────
+  // 🔥 STANZA STACK VALIDATION ENGINE
   const handleCommit = async () => {
     const placed = localBoard.reduce((acc: number[], t: any, i: number) => {
       if (t && !t.isLocked) acc.push(i); return acc;
@@ -555,47 +518,111 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       if (!touches) { setInvalidWords(['New tiles must connect to an existing word.']); setIsValidating(false); return; }
     }
 
-    // Scan words
-    const seen = new Set<string>();
-    const wordList: { word: string; rawSum: number; finalScore: number }[] = [];
+    // 🔥 1. Detect Main Axis Word
+    const isHorizPlay = cols.length > 1 || placed.length === 1;
+    let startIdx = placed[0];
+    let rMain = Math.floor(startIdx/BOARD_SIZE), cMain = startIdx%BOARD_SIZE;
+    let startM = isHorizPlay ? cMain : rMain;
+    while (startM > 0 && getTile(isHorizPlay?rMain:startM-1, isHorizPlay?startM-1:cMain)) startM--;
+    let endM = startM;
+    while (endM < BOARD_SIZE-1 && getTile(isHorizPlay?rMain:endM+1, isHorizPlay?endM+1:cMain)) endM++;
+
+    let mWord = '', mRaw = 0, mScored = 0, mMult = 1;
+    for (let i = startM; i <= endM; i++) {
+        const t = getTile(isHorizPlay?rMain:i, isHorizPlay?i:cMain)!;
+        mWord += t.letter; mRaw += t.value;
+        let lv = t.value;
+        if (!t.isLocked) {
+           const sq = getSquareType(isHorizPlay?rMain:i, isHorizPlay?i:cMain);
+           if (sq==='DL') lv*=2; if(sq==='TL') lv*=3;
+           if (sq==='DW'||sq==='CT') mMult*=2; if(sq==='TW') mMult*=3;
+        }
+        mScored += lv;
+    }
+    const mFinalScore = mScored * mMult;
+
+    // 🔥 2. Detect Adjacent Parallel Locked Words
+    let adjWords = new Set<string>();
+    for (let i = startM; i <= endM; i++) {
+        const tr = isHorizPlay ? rMain : i;
+        const tc = isHorizPlay ? i : cMain;
+        const neighbors = isHorizPlay ? [[tr-1,tc], [tr+1,tc]] : [[tr,tc-1], [tr,tc+1]];
+        neighbors.forEach(([nr, nc]) => {
+            if (getTile(nr, nc)?.isLocked) {
+                let nStart = isHorizPlay ? nc : nr;
+                while (nStart > 0 && getTile(isHorizPlay?nr:nStart-1, isHorizPlay?nStart-1:nc)) nStart--;
+                let nEnd = nStart;
+                while (nEnd < BOARD_SIZE-1 && getTile(isHorizPlay?nr:nEnd+1, isHorizPlay?nEnd+1:nc)) nEnd++;
+                let adjW = '';
+                for (let j = nStart; j <= nEnd; j++) adjW += getTile(isHorizPlay?nr:j, isHorizPlay?j:nc).letter;
+                if (adjW.length > 1) adjWords.add(adjW);
+            }
+        });
+    }
+
+    // 🔥 3. Stanza Rhyme Verification via Datamuse
+    let isStanza = false;
+    if (adjWords.size > 0 && mWord.length > 1) {
+        try {
+            const res = await fetch(`https://api.datamuse.com/words?rel_rhy=${mWord}`);
+            if (res.ok) {
+                const data = await res.json();
+                const rhymes = data.map((d:any) => d.word.toUpperCase());
+                for (let w of adjWords) {
+                    if (rhymes.includes(w.toUpperCase())) {
+                        isStanza = true;
+                        break;
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+
+    const wordList: { word: string; rawSum: number; finalScore: number; isStanza?: boolean }[] = [];
     let totalScore = 0;
 
-    placed.forEach(idx => {
-      const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
-      [[0,1,0],[1,0,1]].forEach(([dr,dc,axis]) => {
-        let start = axis === 0 ? c : r;
-        while (start > 0 && getTile(axis===0?r:start-1, axis===0?start-1:c)) start--;
-        let end = start;
-        while (end < BOARD_SIZE-1 && getTile(axis===0?r:end+1, axis===0?end+1:c)) end++;
-        if (end === start) return;
-        const key = `${axis}-${axis===0?r:c}-${start}-${end}`;
-        if (seen.has(key)) return; seen.add(key);
-        let word = '', raw = 0, scored = 0, mult = 1;
-        for (let i = start; i <= end; i++) {
-          const t = getTile(axis===0?r:i, axis===0?i:c)!;
-          word += t.letter;
-          let lv = t.value; raw += lv;
-          if (!t.isLocked) {
-            const sq = getSquareType(axis===0?r:i, axis===0?i:c);
-            if (sq === 'DL') lv *= 2;
-            if (sq === 'TL') lv *= 3;
-            if (sq === 'DW' || sq === 'CT') mult *= 2;
-            if (sq === 'TW') mult *= 3;
-          }
-          scored += lv;
-        }
-        const fs = scored * mult;
-        wordList.push({ word, rawSum: raw, finalScore: fs });
-        totalScore += fs;
-      });
-    });
+    if (isStanza) {
+        // 🔥 STANZA TRIGGERED! Skip cross-word validation, double the score.
+        wordList.push({ word: mWord, rawSum: mRaw, finalScore: mFinalScore * 2, isStanza: true });
+        totalScore = mFinalScore * 2;
+    } else {
+        // Standard Scrabble Extraction
+        const seen = new Set<string>();
+        placed.forEach(idx => {
+            const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
+            [[0,1,0],[1,0,1]].forEach(([dr,dc,axis]) => {
+                let start = axis === 0 ? c : r;
+                while (start > 0 && getTile(axis===0?r:start-1, axis===0?start-1:c)) start--;
+                let end = start;
+                while (end < BOARD_SIZE-1 && getTile(axis===0?r:end+1, axis===0?end+1:c)) end++;
+                if (end === start) return;
+                const key = `${axis}-${axis===0?r:c}-${start}-${end}`;
+                if (seen.has(key)) return; seen.add(key);
 
-    // Dictionary lookup with enriched data
+                let word = '', raw = 0, scored = 0, mult = 1;
+                for (let i = start; i <= end; i++) {
+                    const t = getTile(axis===0?r:i, axis===0?i:c)!;
+                    word += t.letter; raw += t.value;
+                    let lv = t.value;
+                    if (!t.isLocked) {
+                        const sq = getSquareType(axis===0?r:i, axis===0?i:c);
+                        if (sq==='DL') lv*=2; if(sq==='TL') lv*=3;
+                        if (sq==='DW'||sq==='CT') mult*=2; if(sq==='TW') mult*=3;
+                    }
+                    scored += lv;
+                }
+                const fs = scored * mult;
+                wordList.push({ word, rawSum: raw, finalScore: fs });
+                totalScore += fs;
+            });
+        });
+    }
+
     const validEntries: any[] = [], failed: string[] = [];
-    await Promise.all(wordList.map(async ({ word, rawSum, finalScore }) => {
+    await Promise.all(wordList.map(async ({ word, rawSum, finalScore, isStanza }) => {
       if (word.length < 2) return;
       const tier = assignTier(word, rawSum);
-      let entry: any = { word: word.toUpperCase(), tier, finalScore };
+      let entry: any = { word: word.toUpperCase(), tier, finalScore, isStanza };
       let found = false;
       try {
         const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
@@ -638,19 +665,16 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     let bonus = 0, sentencePayload = null;
     let triggeredDP = false;
 
-    // 🔥 DP CHECK
     localBoard.forEach((tile: any, idx: number) => {
       if (tile && !tile.isLocked) {
          const r = Math.floor(idx / BOARD_SIZE);
          const c = idx % BOARD_SIZE;
-         if (getSquareType(r, c) === 'DP') {
-             triggeredDP = true;
-         }
+         if (getSquareType(r, c) === 'DP') triggeredDP = true;
       }
     });
 
     if (withSentence && sentenceText.trim().length > 5) {
-      bonus = 5;
+      bonus = 10;
       sentencePayload = {
         playerName: myTeamEntry?.name || 'Explorer',
         text: sentenceText.trim(), bonusAmount: bonus, timestamp: Date.now()
@@ -783,7 +807,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             ))}
           </div>
 
-          {/* Show all word journals */}
           <div style={{ marginTop:48, maxWidth:800, width:'100%' }}>
             <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'rgba(255,255,255,0.3)', marginBottom:16 }}>Vocabulary Discovered This Session</p>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
@@ -807,7 +830,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
         {/* Board */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', position:'relative' }}>
-          {/* Turn banner */}
           <div style={{ marginBottom:16, display:'flex', alignItems:'center', gap:12 }}>
             <div style={{
               display:'flex', alignItems:'center', gap:10, padding:'8px 20px',
@@ -816,6 +838,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
               {activeTeam?.avatar && <img src={activeTeam.avatar} style={{width:28,height:28,borderRadius:'50%'}} />}
               <span style={{ fontWeight:600, color: activeTeam?.color?.bg||'#f8fafc', fontSize:14 }}>{activeTeam?.name || '—'}</span>
               <span style={{ color:'rgba(255,255,255,0.5)', fontSize:13 }}>is playing</span>
+              {isExtraTurn && <span style={{ background:'#d946ef', color:'white', fontSize:10, padding:'2px 6px', borderRadius:4, display:'flex', alignItems:'center', gap:4, marginLeft:8 }}><FastForward size={10}/> DOUBLE PLAY</span>}
             </div>
             <div style={{
               display:'flex', alignItems:'center', gap:8, padding:'8px 16px',
@@ -829,7 +852,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             </div>
           </div>
 
-          {/* Board grid */}
           <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:16, padding:10, border:'1px solid rgba(255,255,255,0.06)' }}>
             <div className="wf-board" style={{ width:660, height:660 }}>
               {(globalBoard||[]).map((tile: any, i: number) => {
@@ -850,7 +872,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             </div>
           </div>
 
-          {/* Instructor console */}
           <div style={{
             position:'absolute', bottom:0, left:0, display:'flex',
             background:'rgba(8,10,20,0.9)', border:'1px solid rgba(255,255,255,0.1)',
@@ -874,8 +895,13 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
         {/* Sidebar */}
         <div style={{ width:360, display:'flex', flexDirection:'column', gap:16, overflowY:'auto' }} className="wf-scroll">
+          
+          {latestDiscoveries.some((e: any) => e.isStanza) && (
+            <div style={{ background:'rgba(217,70,239,0.15)', border:'1px solid rgba(217,70,239,0.4)', borderRadius:16, padding:'16px', textAlign:'center', animation: 'pulse 2s infinite' }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: '#f8fafc', letterSpacing: 2 }}>STANZA STACK (2X)</span>
+            </div>
+          )}
 
-          {/* Leaderboard */}
           <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:20 }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, paddingBottom:12, borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
               <Trophy size={16} style={{color:'#f59e0b'}}/>
@@ -913,7 +939,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             })}
           </div>
 
-          {/* Latest discoveries */}
           {latestDiscoveries.length > 0 && (
             <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:20 }}>
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
@@ -924,7 +949,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             </div>
           )}
 
-          {/* Sentence bonus */}
           {latestSentence && (
             <div style={{ background:'rgba(245,208,90,0.06)', border:'1px solid rgba(245,208,90,0.2)', borderRadius:16, padding:20 }}>
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
@@ -950,7 +974,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   if (gameStatus === 'lobby_join') {
     const joined = !!players[studentId];
     return (
-      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32, textAlign:'center', color:'#f8fafc' }}>
+      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32, textAlign:'center', color:'#f8fafc' }}>
         <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:42, marginBottom:6 }}>WordForge</div>
         <p style={{ color:'rgba(255,255,255,0.3)', fontSize:12, letterSpacing:3, textTransform:'uppercase', marginBottom:40 }}>Vocabulary Discovery</p>
         {joined ? (
@@ -975,9 +999,9 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   }
 
   if (gameStatus === 'lobby_naming') {
-    if (!myTeamEntry) return <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:13 }}>Spectator mode</div>;
+    if (!myTeamEntry) return <div className="wf-root" style={{ ...bg, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:13 }}>Spectator mode</div>;
     return (
-      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc' }}>
+      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc' }}>
         <div style={{ padding:24, borderRadius:20, background:'rgba(255,255,255,0.04)', border:`1px solid ${myTeamEntry.color?.border||'rgba(255,255,255,0.1)'}`, display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', marginBottom:20 }}>
           {myTeamEntry.avatar && <img src={myTeamEntry.avatar} style={{width:64,height:64,borderRadius:'50%',marginBottom:12,background:'rgba(255,255,255,0.05)'}} />}
           <span style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:2, display:'block', marginBottom:4 }}>Your name</span>
@@ -1033,21 +1057,31 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
   // ── Sentence Bonus Screen ──
   if (isMyTurn && pendingSentence) {
+    const isStanzaBonus = currentWords.some(w => w.isStanza);
     return (
       <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }}>
+        {isStanzaBonus && (
+            <div style={{ background:'rgba(217,70,239,0.15)', border:'1px solid rgba(217,70,239,0.4)', borderRadius:12, padding:'12px', textAlign:'center', marginBottom:16 }}>
+                <span style={{ fontSize: 14, fontWeight: 900, color: '#f8fafc', letterSpacing: 2 }}>STANZA STACK (2X)</span>
+            </div>
+        )}
         <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:28, marginBottom:4 }}>Words found!</div>
-        <p style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginBottom:20 }}>Earn +5 points by writing a sentence using one of these words.</p>
+        <p style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginBottom:20 }}>
+            {isStanzaBonus 
+                ? "Write a rhyming couplet using your word at the end of the first line to earn +10 points." 
+                : "Earn +5 points by writing a sentence using one of these words."}
+        </p>
         <div style={{ marginBottom:20 }}>
           {currentWords.map((e,i) => <WordCard key={i} entry={e} />)}
         </div>
         <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:16, padding:16, border:'1px solid rgba(255,255,255,0.08)', marginBottom:16 }}>
           <label style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'rgba(255,255,255,0.3)', display:'block', marginBottom:10 }}>
-            Write a sentence using one of your words
+            {isStanzaBonus ? "Write your Rhyming Couplet" : "Write your sentence"}
           </label>
           <textarea
             value={sentenceText}
             onChange={e => setSentenceText(e.target.value)}
-            placeholder="e.g. The ancient temple was a remarkable structure..."
+            placeholder={isStanzaBonus ? "Line 1 ends with your word...\nLine 2 ends with a rhyme..." : "e.g. The ancient temple was a remarkable structure..."}
             style={{
               width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
               borderRadius:10, padding:'12px 14px', color:'#f8fafc', fontSize:14, fontFamily:"'DM Sans', sans-serif",
@@ -1067,7 +1101,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:8
           }}
         >
-          <MessageSquare size={16}/> Submit with bonus (+5)
+          <MessageSquare size={16}/> Submit with bonus (+{isStanzaBonus ? '10' : '5'})
         </button>
         <button onClick={() => commitTurn(false)} style={{
           padding:'13px 20px', borderRadius:12, fontSize:13, cursor:'pointer',
@@ -1187,7 +1221,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
           </span>
           <div style={{ display:'flex', gap:6 }}>
-            {/* 🔥 MULLIGAN / DATA PURGE BUTTON */}
             <button 
                 onClick={handlePurge} 
                 disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
