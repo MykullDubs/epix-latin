@@ -1,389 +1,414 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap, Rocket, BookOpen, RefreshCw, ZoomIn, ZoomOut, LocateFixed, Pause, Play, Power } from 'lucide-react';
+import {
+  Trophy, Clock, CheckCircle2, FastForward, ArrowDownToLine,
+  Star, Users, User, MessageSquare, Shuffle, Loader2,
+  AlertTriangle, Rocket, RefreshCw, ZoomIn, ZoomOut,
+  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen
+} from 'lucide-react';
 
-// ==========================================
-// GAME DATA & CONSTANTS
-// ==========================================
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
 const BOARD_SIZE = 15;
-const LETTER_DISTRIBUTIONS: Record<string, { count: number, value: number }> = {
-  A: { count: 9, value: 1 }, B: { count: 2, value: 3 }, C: { count: 2, value: 3 },
-  D: { count: 4, value: 2 }, E: { count: 12, value: 1 }, F: { count: 2, value: 4 },
-  G: { count: 3, value: 2 }, H: { count: 2, value: 4 }, I: { count: 9, value: 1 },
-  J: { count: 1, value: 8 }, K: { count: 1, value: 5 }, L: { count: 4, value: 1 },
-  M: { count: 2, value: 3 }, N: { count: 6, value: 1 }, O: { count: 8, value: 1 },
-  P: { count: 2, value: 3 }, Q: { count: 1, value: 10 }, R: { count: 6, value: 1 },
-  S: { count: 4, value: 1 }, T: { count: 6, value: 1 }, U: { count: 4, value: 1 },
-  V: { count: 2, value: 4 }, W: { count: 2, value: 4 }, X: { count: 1, value: 8 },
-  Y: { count: 2, value: 4 }, Z: { count: 1, value: 10 }
+
+// CEFR-style difficulty tiers based on word length + letter rarity
+const TIERS: Record<number, { label: string; color: string; bg: string; border: string; points: number }> = {
+  1: { label: 'A1 — Basic',    color: '#16a34a', bg: 'rgba(22,163,74,0.12)',    border: 'rgba(22,163,74,0.35)',   points: 1 },
+  2: { label: 'A2 — Elementary', color: '#2563eb', bg: 'rgba(37,99,235,0.12)', border: 'rgba(37,99,235,0.35)',   points: 1.5 },
+  3: { label: 'B1 — Intermediate', color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', border: 'rgba(124,58,237,0.35)', points: 2 },
+  4: { label: 'B2 — Upper Int.', color: '#c2410c', bg: 'rgba(194,65,12,0.12)',  border: 'rgba(194,65,12,0.35)',   points: 2.5 },
+  5: { label: 'C1 — Advanced',  color: '#9f1239', bg: 'rgba(159,18,57,0.12)',   border: 'rgba(159,18,57,0.35)',   points: 3 },
 };
 
-const INDIVIDUAL_COLORS = [
-  { color: "bg-indigo-500", textColor: "text-indigo-500" },
-  { color: "bg-rose-500", textColor: "text-rose-500" },
-  { color: "bg-amber-500", textColor: "text-amber-500" },
-  { color: "bg-emerald-500", textColor: "text-emerald-500" },
-  { color: "bg-blue-500", textColor: "text-blue-500" },
-  { color: "bg-fuchsia-500", textColor: "text-fuchsia-500" },
+function assignTier(word: string, rawLetterSum: number): number {
+  const len = word.length;
+  const avg = rawLetterSum / len;
+  if (len <= 3 && avg < 3) return 1;
+  if (len <= 4 && avg < 4) return 2;
+  if (len <= 6 && avg < 5) return 3;
+  if (len <= 8 && avg < 7) return 4;
+  return 5;
+}
+
+const LETTER_DATA: Record<string, { count: number; value: number }> = {
+  A:{count:9,value:1}, B:{count:2,value:3}, C:{count:2,value:3},
+  D:{count:4,value:2}, E:{count:12,value:1}, F:{count:2,value:4},
+  G:{count:3,value:2}, H:{count:2,value:4}, I:{count:9,value:1},
+  J:{count:1,value:8}, K:{count:1,value:5}, L:{count:4,value:1},
+  M:{count:2,value:3}, N:{count:6,value:1}, O:{count:8,value:1},
+  P:{count:2,value:3}, Q:{count:1,value:10}, R:{count:6,value:1},
+  S:{count:4,value:1}, T:{count:6,value:1}, U:{count:4,value:1},
+  V:{count:2,value:4}, W:{count:2,value:4}, X:{count:1,value:8},
+  Y:{count:2,value:4}, Z:{count:1,value:10}
+};
+
+const PLAYER_COLORS = [
+  { bg: '#4f46e5', muted: 'rgba(79,70,229,0.15)', border: 'rgba(79,70,229,0.4)' },
+  { bg: '#dc2626', muted: 'rgba(220,38,38,0.15)',  border: 'rgba(220,38,38,0.4)' },
+  { bg: '#d97706', muted: 'rgba(217,119,6,0.15)',  border: 'rgba(217,119,6,0.4)' },
+  { bg: '#059669', muted: 'rgba(5,150,105,0.15)',  border: 'rgba(5,150,105,0.4)' },
+  { bg: '#7c3aed', muted: 'rgba(124,58,237,0.15)', border: 'rgba(124,58,237,0.4)' },
+  { bg: '#0891b2', muted: 'rgba(8,145,178,0.15)',  border: 'rgba(8,145,178,0.4)' },
 ];
 
 const getSquareType = (r: number, c: number) => {
-  if ((r === 0 || r === 7 || r === 14) && (c === 0 || c === 7 || c === 14) && !(r === 7 && c === 7)) return 'TW';
   if (r === 7 && c === 7) return 'CT';
-  const dwDiagonals = [1, 2, 3, 4, 10, 11, 12, 13];
-  if (r === c && dwDiagonals.includes(r)) return 'DW';
-  if (14 - r === c && dwDiagonals.includes(r)) return 'DW';
-  const tlPoints = [[1,5], [1,9], [5,1], [5,5], [5,9], [5,13], [9,1], [9,5], [9,9], [9,13], [13,5], [13,9]];
-  if (tlPoints.some(([tr, tc]) => tr === r && tc === c)) return 'TL';
-  const dlPoints = [[0,3], [0,11], [2,6], [2,8], [3,0], [3,7], [3,14], [6,2], [6,6], [6,8], [6,12], [7,3], [7,11], [8,2], [8,6], [8,8], [8,12], [11,0], [11,7], [11,14], [12,6], [12,8], [14,3], [14,11]];
-  if (dlPoints.some(([tr, tc]) => tr === r && tc === c)) return 'DL';
+  if ((r === 0 || r === 7 || r === 14) && (c === 0 || c === 7 || c === 14) && !(r===7&&c===7)) return 'TW';
+  const dwD = [1,2,3,4,10,11,12,13];
+  if (r===c && dwD.includes(r)) return 'DW';
+  if (14-r===c && dwD.includes(r)) return 'DW';
+  const tl = [[1,5],[1,9],[5,1],[5,5],[5,9],[5,13],[9,1],[9,5],[9,9],[9,13],[13,5],[13,9]];
+  if (tl.some(([tr,tc])=>tr===r&&tc===c)) return 'TL';
+  const dl = [[0,3],[0,11],[2,6],[2,8],[3,0],[3,7],[3,14],[6,2],[6,6],[6,8],[6,12],[7,3],[7,11],[8,2],[8,6],[8,8],[8,12],[11,0],[11,7],[11,14],[12,6],[12,8],[14,3],[14,11]];
+  if (dl.some(([tr,tc])=>tr===r&&tc===c)) return 'DL';
   
   const dpPoints = [[1,7], [7,1], [7,13], [13,7]];
   if (dpPoints.some(([tr, tc]) => tr === r && tc === c)) return 'DP';
-  
+
   return null;
 };
 
-const createInitialBag = () => {
+const createBag = () => {
   let bag: any[] = [];
-  let idCounter = 0;
-  Object.entries(LETTER_DISTRIBUTIONS).forEach(([letter, data]) => {
-    for (let i = 0; i < data.count; i++) {
-      bag.push({ id: `tile_${idCounter++}`, letter, value: data.value });
-    }
+  let id = 0;
+  Object.entries(LETTER_DATA).forEach(([letter, d]) => {
+    for (let i = 0; i < d.count; i++) bag.push({ id: `t${id++}`, letter, value: d.value });
   });
-  for (let i = bag.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [bag[i], bag[j]] = [bag[j], bag[i]];
+  for (let i = bag.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [bag[i],bag[j]] = [bag[j],bag[i]];
   }
   return bag;
 };
 
-// ==========================================
-// ASTROGRAM DATA TILE COMPONENT
-// ==========================================
-const DataTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any) => {
+// ─────────────────────────────────────────────
+// TILE COMPONENT
+// ─────────────────────────────────────────────
+const Tile = ({ tile, selected, locked, onClick, size = 'md' }: any) => {
   if (!tile) return null;
+  const sz = size === 'sm' ? 'w-8 h-8 text-sm' : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
   return (
     <div
-      onClick={!isLocked ? onClick : undefined}
-      className={`relative flex items-center justify-center rounded-lg transition-all duration-300 data-tile select-none overflow-hidden ${
-        isSelected ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-900 scale-110 z-10 shadow-[0_0_20px_rgba(99,102,241,0.5)] cursor-pointer' 
-        : isLocked ? 'opacity-90 cursor-default' 
-        : 'hover:scale-105 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] cursor-pointer group'
-      } ${className}`}
+      onClick={!locked ? onClick : undefined}
+      style={{
+        background: selected ? 'rgba(245,208,90,0.2)' : 'rgba(255,255,255,0.06)',
+        border: selected ? '1.5px solid rgba(245,208,90,0.7)' : '1px solid rgba(255,255,255,0.12)',
+        boxShadow: selected ? '0 0 14px rgba(245,208,90,0.25)' : '0 2px 6px rgba(0,0,0,0.35)',
+        transform: selected ? 'translateY(-3px) scale(1.08)' : undefined,
+        cursor: locked ? 'default' : 'pointer',
+        fontFamily: "'DM Serif Display', serif",
+      }}
+      className={`${sz} relative flex items-center justify-center rounded-lg transition-all duration-150 select-none`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none mix-blend-overlay" />
-      <span className="magister-font font-black text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] text-xl relative z-10 mb-0.5 mr-0.5">
+      <span style={{ color: locked ? 'rgba(255,255,255,0.7)' : '#f8fafc', fontWeight: 700, lineHeight: 1 }}>
         {tile.letter}
       </span>
-      <div className="absolute bottom-0.5 right-0.5 bg-slate-950/90 rounded border border-slate-700/50 px-[3px] py-[1px] shadow-md z-20 flex items-center justify-center min-w-[14px]">
-        <span className="text-[10px] font-black font-mono text-amber-400 leading-none drop-shadow-sm">
-          {tile.value}
-        </span>
-      </div>
+      <span style={{
+        position: 'absolute', bottom: 1, right: 2,
+        fontSize: 8, fontWeight: 700, color: '#f59e0b',
+        fontFamily: 'monospace', lineHeight: 1
+      }}>{tile.value}</span>
     </div>
   );
 };
 
-// ==========================================
-// MAIN ASTROGRAM COMPONENT
-// ==========================================
-export default function MarbleScrabble({ block, isProjector, liveState, studentId, onUpdateLiveState }: any) {
-  const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 60;
-  const [selectedTime, setSelectedTime] = useState(60);
+// ─────────────────────────────────────────────
+// WORD DISCOVERY CARD
+// ─────────────────────────────────────────────
+const WordCard = ({ entry }: any) => {
+  const tier = TIERS[entry.tier] || TIERS[2];
+  return (
+    <div style={{
+      background: tier.bg, border: `1px solid ${tier.border}`,
+      borderRadius: 12, padding: '10px 14px', marginBottom: 8
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: '#f8fafc', letterSpacing: 1 }}>
+          {entry.word}
+        </span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
+          color: tier.color, background: `${tier.bg}`, border: `1px solid ${tier.border}`,
+          borderRadius: 6, padding: '2px 7px'
+        }}>{tier.label}</span>
+      </div>
+      {entry.phonetic && (
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 3 }}>
+          /{entry.phonetic}/
+        </span>
+      )}
+      {entry.pos && (
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic', display: 'block', marginBottom: 3 }}>
+          {entry.pos}
+        </span>
+      )}
+      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, margin: 0 }}>
+        {entry.def}
+      </p>
+      {entry.example && (
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', marginTop: 4, lineHeight: 1.4 }}>
+          "{entry.example}"
+        </p>
+      )}
+    </div>
+  );
+};
 
-  // SCIFI STYLES INJECTION
+// ─────────────────────────────────────────────
+// JOURNAL PANEL (student's personal word log)
+// ─────────────────────────────────────────────
+const JournalPanel = ({ words, onClose }: any) => {
+  const byTier = [5,4,3,2,1].map(t => ({
+    tier: t,
+    entries: words.filter((w: any) => w.tier === t)
+  })).filter(g => g.entries.length > 0);
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 100,
+      background: 'rgba(8,10,20,0.97)', overflowY: 'auto',
+      borderRadius: 16, padding: 20
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#f8fafc' }}>
+          Word Journal
+        </span>
+        <button onClick={onClose} style={{
+          background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 8, color: 'rgba(255,255,255,0.6)', padding: '4px 12px', cursor: 'pointer', fontSize: 12
+        }}>Close</button>
+      </div>
+      {words.length === 0 ? (
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, textAlign: 'center', marginTop: 40 }}>
+          No words yet. Play some tiles!
+        </p>
+      ) : byTier.map(({ tier, entries }) => (
+        <div key={tier} style={{ marginBottom: 20 }}>
+          <div style={{
+            fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5,
+            color: TIERS[tier].color, marginBottom: 8
+          }}>{TIERS[tier].label} — {entries.length} word{entries.length !== 1 ? 's' : ''}</div>
+          {entries.map((e: any, i: number) => <WordCard key={i} entry={e} />)}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// SQUARE STYLES
+// ─────────────────────────────────────────────
+const squareStyle = (r: number, c: number, targeted: boolean) => {
+  const type = getSquareType(r, c);
+  let bg = 'rgba(255,255,255,0.03)', border = 'rgba(255,255,255,0.07)';
+  if (type === 'TW') { bg = 'rgba(220,38,38,0.18)'; border = 'rgba(220,38,38,0.4)'; }
+  else if (type === 'DW') { bg = 'rgba(217,119,6,0.18)'; border = 'rgba(217,119,6,0.4)'; }
+  else if (type === 'TL') { bg = 'rgba(8,145,178,0.18)'; border = 'rgba(8,145,178,0.4)'; }
+  else if (type === 'DL') { bg = 'rgba(5,150,105,0.18)'; border = 'rgba(5,150,105,0.4)'; }
+  else if (type === 'CT') { bg = 'rgba(79,70,229,0.2)'; border = 'rgba(79,70,229,0.45)'; }
+  else if (type === 'DP') { bg = 'rgba(217,70,239,0.18)'; border = 'rgba(217,70,239,0.4)'; } // 🔥 Restored DP style
+
+  if (targeted) { bg = 'rgba(245,208,90,0.15)'; border = 'rgba(245,208,90,0.6)'; }
+  return { background: bg, border: `1px solid ${border}`, borderRadius: 4 };
+};
+
+// ─────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────
+export default function WordForge({ block, isProjector, liveState, studentId, onUpdateLiveState }: any) {
+  const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 90;
+  const [selectedTime, setSelectedTime] = useState(90);
+
+  // Inject fonts
   useEffect(() => {
-    if (!document.getElementById('marble-styles')) {
-      const style = document.createElement('style');
-      style.id = 'marble-styles';
-      style.innerHTML = `
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syncopate:wght@700&display=swap');
-        .magister-font { font-family: 'Syncopate', sans-serif; letter-spacing: -1px; }
-        .data-tile {
-          background-color: rgba(15, 23, 42, 0.8);
-          backdrop-filter: blur(8px);
-          box-shadow: inset 0 1px 1px rgba(255,255,255,0.2), inset 0 -1px 4px rgba(0,0,0,0.5), 0 4px 6px rgba(0,0,0,0.4);
-          border: 1px solid rgba(99, 102, 241, 0.3);
-        }
-        .data-text { color: #f8fafc; text-shadow: 0 0 10px rgba(255,255,255,0.6); }
-        .scifi-bg { 
-            background-color: #020617; 
-            background-image: 
-                radial-gradient(circle at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 70%), 
-                radial-gradient(circle at 100% 100%, rgba(217,70,239,0.1) 0%, transparent 50%); 
-        }
-        .board-grid { display: grid; grid-template-columns: repeat(${BOARD_SIZE}, minmax(0, 1fr)); gap: 3px; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    if (!document.getElementById('wf-fonts')) {
+      const s = document.createElement('style');
+      s.id = 'wf-fonts';
+      s.innerHTML = `
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap');
+        .wf-root { font-family: 'DM Sans', sans-serif; }
+        .wf-board { display: grid; grid-template-columns: repeat(${BOARD_SIZE}, 1fr); gap: 2px; }
+        .wf-scroll::-webkit-scrollbar { width: 4px; }
+        .wf-scroll::-webkit-scrollbar-track { background: transparent; }
+        .wf-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
       `;
-      document.head.appendChild(style);
+      document.head.appendChild(s);
     }
   }, []);
 
-  useEffect(() => {
-    if (isProjector && !liveState?.gameStatus) {
-      onUpdateLiveState({
-        gameStatus: 'lobby_join', 
-        players: {}, 
-        teams: {}, 
-        board: Array(BOARD_SIZE * BOARD_SIZE).fill(null),
-        bag: createInitialBag(),
-        scores: {},
-        teamWords: {}, 
-        latestDiscoveries: [], 
-        activeTeamIndex: 0,
-        turnEndTime: null,
-        isExtraTurn: false,
-        isTimerPaused: false,
-        remainingPausedTime: 0
-      });
-    }
-  }, [isProjector, liveState]);
-
+  // ── State ──
   const gameStatus = liveState?.gameStatus;
   const players: Record<string, any> = liveState?.players || {};
   const teams: Record<string, any> = liveState?.teams || {};
   const globalBoard = liveState?.board;
   const globalBag = liveState?.bag;
   const scores: Record<string, number> = liveState?.scores || {};
-  const teamWords: Record<string, string[]> = liveState?.teamWords || {}; 
-  const latestDiscoveries: {word: string, def: string}[] = liveState?.latestDiscoveries || [];
+  // journals: per-team array of WordCard-compatible entries
+  const journals: Record<string, any[]> = liveState?.journals || {};
+  const latestDiscoveries: any[] = liveState?.latestDiscoveries || [];
+  const latestSentence = liveState?.latestSentence;
   const activeTeamIndex = liveState?.activeTeamIndex || 0;
   const turnEndTime = liveState?.turnEndTime;
-  const latestSentence = liveState?.latestSentence;
-  const isExtraTurn = liveState?.isExtraTurn || false;
-  
-  // 🔥 TEACHER CONTROLS STATE
   const isTimerPaused = liveState?.isTimerPaused || false;
   const remainingPausedTime = liveState?.remainingPausedTime || 0;
-  
+  const isExtraTurn = liveState?.isExtraTurn || false;
+
   const teamArray = Object.values(teams).sort((a: any, b: any) => a.order - b.order);
   const activeTeam: any = teamArray[activeTeamIndex] || teamArray[0] || {};
-  
-  const myTeamEntry: any = Object.values(teams).find((t: any) => t.members.includes(studentId));
+  const myTeamEntry: any = Object.values(teams).find((t: any) => t.members?.includes(studentId));
   const myTeamId = myTeamEntry?.id;
   const isMyTurn = myTeamId === activeTeam?.id && gameStatus === 'playing';
 
+  // ── Timer ──
   const [timeLeft, setTimeLeft] = useState(0);
-
-  // TIMER LOGIC (UPDATED FOR PAUSING)
   useEffect(() => {
-    if (isTimerPaused) {
-        setTimeLeft(remainingPausedTime);
-        return;
-    }
+    if (isTimerPaused) { setTimeLeft(remainingPausedTime); return; }
     if (!turnEndTime) return;
-    
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((turnEndTime - Date.now()) / 1000));
-      setTimeLeft(remaining);
-      if (remaining === 0 && isProjector && gameStatus === 'playing') {
-        passTurn(); 
-      }
-    }, 1000);
-    return () => clearInterval(interval);
+    const iv = setInterval(() => {
+      const rem = Math.max(0, Math.floor((turnEndTime - Date.now()) / 1000));
+      setTimeLeft(rem);
+      if (rem === 0 && isProjector && gameStatus === 'playing') passTurn();
+    }, 500);
+    return () => clearInterval(iv);
   }, [turnEndTime, isProjector, gameStatus, isTimerPaused, remainingPausedTime]);
 
-  // ==========================================
-  // STUDENT INTERACTION STATE
-  // ==========================================
-  const [localBoard, setLocalBoard] = useState(globalBoard || Array(BOARD_SIZE * BOARD_SIZE).fill(null));
+  // ── Board / Rack ──
+  const [localBoard, setLocalBoard] = useState<any[]>(Array(BOARD_SIZE * BOARD_SIZE).fill(null));
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
   const [targetSquare, setTargetSquare] = useState<number | null>(null);
-  const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
-  const [playDirection, setPlayDirection] = useState<number | null>(null);
-  const [hasDrawnInitialHand, setHasDrawnInitialHand] = useState(false);
-  const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
-  
-  const [pendingSentence, setPendingSentence] = useState(false);
-  const [sentenceText, setSentenceText] = useState("");
+  const [lastPlaced, setLastPlaced] = useState<number | null>(null);
+  const [playDir, setPlayDir] = useState<number | null>(null);
+  const [selectedRack, setSelectedRack] = useState<number | null>(null);
+  const [hasDrawn, setHasDrawn] = useState(false);
+
+  // ── Validation ──
   const [isValidating, setIsValidating] = useState(false);
   const [invalidWords, setInvalidWords] = useState<string[]>([]);
-  const [currentTurnWords, setCurrentTurnWords] = useState<{word: string, def: string}[]>([]);
-  const [currentTurnScore, setCurrentTurnScore] = useState(0);
+  const [pendingSentence, setPendingSentence] = useState(false);
+  const [sentenceText, setSentenceText] = useState('');
+  const [currentWords, setCurrentWords] = useState<any[]>([]);
+  const [currentScore, setCurrentScore] = useState(0);
 
-  // TACTICAL HUD ZOOM STATE
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.2, 1.8));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.2, 0.6));
-  const handleZoomReset = () => setZoomLevel(1);
+  // ── UI ──
+  const [zoom, setZoom] = useState(1);
+  const [showJournal, setShowJournal] = useState(false);
 
+  // ── Init projector ──
+  useEffect(() => {
+    if (isProjector && !liveState?.gameStatus) {
+      onUpdateLiveState({
+        gameStatus: 'lobby_join',
+        players: {}, teams: {}, board: Array(BOARD_SIZE * BOARD_SIZE).fill(null),
+        bag: createBag(), scores: {}, journals: {},
+        latestDiscoveries: [], activeTeamIndex: 0,
+        turnEndTime: null, isTimerPaused: false, remainingPausedTime: 0, isExtraTurn: false
+      });
+    }
+  }, [isProjector, liveState]);
+
+  // ── Sync board from global ──
   useEffect(() => {
     if (globalBoard) {
       setLocalBoard(globalBoard);
-      setTargetSquare(null);
-      setLastPlacedIndex(null);
-      setPlayDirection(null);
-      setPendingSentence(false);
-      setSentenceText("");
-      setSelectedRackIndex(null);
-      setInvalidWords([]);
-      setCurrentTurnWords([]);
+      setTargetSquare(null); setLastPlaced(null); setPlayDir(null);
+      setPendingSentence(false); setSentenceText('');
+      setSelectedRack(null); setInvalidWords([]); setCurrentWords([]);
     }
   }, [globalBoard]);
 
+  // ── Recall tiles when not my turn ──
   useEffect(() => {
     if (!isProjector && !isMyTurn) {
-        let newRack = [...rack];
-        let newBoard = [...localBoard];
-        let recalled = false;
-        newBoard.forEach((tile: any, index: number) => {
-           if (tile && !tile.isLocked) {
-               const emptyIdx = newRack.findIndex((t: any) => t === null);
-               if (emptyIdx !== -1) {
-                   newRack[emptyIdx] = tile;
-                   newBoard[index] = null;
-                   recalled = true;
-               }
-           }
-        });
-        if (recalled) {
-            setRack(newRack);
-            setLocalBoard(newBoard);
+      let nr = [...rack], nb = [...localBoard], changed = false;
+      nb.forEach((tile, i) => {
+        if (tile && !tile.isLocked) {
+          const ei = nr.findIndex(t => t === null);
+          if (ei !== -1) { nr[ei] = tile; nb[i] = null; changed = true; }
         }
-        setTargetSquare(null);
-        setLastPlacedIndex(null);
-        setPlayDirection(null);
-        setSelectedRackIndex(null);
-        setInvalidWords([]);
+      });
+      if (changed) { setRack(nr); setLocalBoard(nb); }
+      setTargetSquare(null); setLastPlaced(null); setPlayDir(null); setSelectedRack(null);
     }
   }, [isMyTurn]);
 
+  // ── Draw tiles ──
   useEffect(() => {
-    if (!isProjector && isMyTurn && !hasDrawnInitialHand && globalBag?.length > 0) {
+    if (!isProjector && isMyTurn && !hasDrawn && globalBag?.length > 0) {
       let newBag = [...globalBag];
-      const newRack = rack.map((slot: any) => {
-        if (slot === null && newBag.length > 0) {
-          return newBag.pop();
-        }
-        return slot;
-      });
-      setRack(newRack);
-      setHasDrawnInitialHand(true);
+      const newRack = rack.map((s: any) => s === null && newBag.length > 0 ? newBag.pop() : s);
+      setRack(newRack); setHasDrawn(true);
       onUpdateLiveState({ bag: newBag });
     }
-  }, [isMyTurn, hasDrawnInitialHand, globalBag, isProjector]);
+  }, [isMyTurn, hasDrawn, globalBag, isProjector]);
 
-  const shuffleRack = () => {
-      let newRack = [...rack];
-      for (let i = newRack.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [newRack[i], newRack[j]] = [newRack[j], newRack[i]];
-      }
-      setRack(newRack);
-      setSelectedRackIndex(null);
+  // ─────────────────────────────────────────────
+  // GAME ACTIONS
+  // ─────────────────────────────────────────────
+  const joinLobby = () => {
+    const name = (studentId.split('@')[0].replace(/[^a-zA-Z0-9]/g,' ')).trim();
+    const display = name.charAt(0).toUpperCase() + name.slice(1);
+    const avatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${studentId}&backgroundColor=transparent`;
+    onUpdateLiveState({ players: { ...players, [studentId]: { id: studentId, name: display, avatar } } });
   };
 
-  const handleBoardClick = (index: number) => {
-    if (!isMyTurn || isValidating || isTimerPaused) return; 
-    setSelectedRackIndex(null); 
-    setInvalidWords([]); 
-
-    if (localBoard[index]?.isLocked) return; 
-    
-    if (localBoard[index] && !localBoard[index].isLocked) {
-      const emptyRackIndex = rack.findIndex((t: any) => t === null);
-      if (emptyRackIndex !== -1) {
-        const newRack = [...rack];
-        const newBoard = [...localBoard];
-        newRack[emptyRackIndex] = newBoard[index];
-        newBoard[index] = null;
-        setRack(newRack);
-        setLocalBoard(newBoard);
-        setTargetSquare(index); 
-        setLastPlacedIndex(null);
-        setPlayDirection(null);
-      }
-      return;
-    }
-    setTargetSquare(index);
+  const startFFA = () => {
+    const pIds = Object.keys(players);
+    const newTeams: any = {}, newScores: any = {}, newJournals: any = {};
+    pIds.forEach((pId, idx) => {
+      const tId = `p_${idx}`;
+      newTeams[tId] = {
+        id: tId, order: idx, name: players[pId].name, avatar: players[pId].avatar,
+        color: PLAYER_COLORS[idx % PLAYER_COLORS.length], members: [pId]
+      };
+      newScores[tId] = 0; newJournals[tId] = [];
+    });
+    onUpdateLiveState({ gameStatus: 'lobby_naming', teams: newTeams, scores: newScores, journals: newJournals, timeLimit: selectedTime });
   };
 
-  const handleRackClick = (idx: number) => {
-    if (isValidating || isTimerPaused) return;
-    setInvalidWords([]); 
-
-    if (targetSquare !== null) {
-      if (!isMyTurn) return;
-      if (!rack[idx]) return;
-
-      if (!localBoard[targetSquare]) {
-        const newBoard = [...localBoard];
-        const newRack = [...rack];
-        newBoard[targetSquare] = { ...newRack[idx], isLocked: false };
-        newRack[idx] = null;
-        setLocalBoard(newBoard);
-        setRack(newRack);
-
-        let currentDirection = playDirection;
-        if (lastPlacedIndex !== null) {
-            const delta = targetSquare - lastPlacedIndex;
-            if (delta === 1 || delta === BOARD_SIZE) {
-                currentDirection = delta;
-                setPlayDirection(delta);
-            } else {
-                currentDirection = null;
-                setPlayDirection(null);
-            }
-        }
-        setLastPlacedIndex(targetSquare);
-
-        if (currentDirection !== null) {
-            const nextSquare = targetSquare + currentDirection;
-            const isHorizontalValid = currentDirection === 1 && (targetSquare % BOARD_SIZE !== BOARD_SIZE - 1);
-            const isVerticalValid = currentDirection === BOARD_SIZE && (targetSquare + BOARD_SIZE < BOARD_SIZE * BOARD_SIZE);
-            if ((isHorizontalValid || isVerticalValid) && !newBoard[nextSquare]) {
-                setTargetSquare(nextSquare);
-            } else {
-                setTargetSquare(null);
-            }
-        } else {
-            setTargetSquare(null);
-        }
-      }
-      return;
-    }
-
-    if (selectedRackIndex === null) {
-        if (rack[idx]) {
-            setSelectedRackIndex(idx);
-        }
-    } else {
-        if (selectedRackIndex === idx) {
-            setSelectedRackIndex(null); 
-        } else {
-            const newRack = [...rack];
-            const temp = newRack[idx];
-            newRack[idx] = newRack[selectedRackIndex];
-            newRack[selectedRackIndex] = temp;
-            setRack(newRack);
-            setSelectedRackIndex(null);
-        }
-    }
+  const startGame = () => {
+    onUpdateLiveState({ gameStatus: 'playing', turnEndTime: Date.now() + timeLimit * 1000 });
   };
+
+  const passTurn = () => {
+    if (!isProjector) recallAll();
+    if (teamArray.length === 0) return;
+    onUpdateLiveState({
+      activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
+      turnEndTime: Date.now() + timeLimit * 1000,
+      isExtraTurn: false, isTimerPaused: false
+    });
+  };
+
+  const togglePause = () => {
+    isTimerPaused
+      ? onUpdateLiveState({ isTimerPaused: false, turnEndTime: Date.now() + remainingPausedTime * 1000 })
+      : onUpdateLiveState({ isTimerPaused: true, remainingPausedTime: timeLeft });
+  };
+
+  const forceEnd = () => onUpdateLiveState({ gameStatus: 'finished' });
 
   const recallAll = () => {
     if (isValidating || isTimerPaused) return;
-    const newRack = [...rack];
-    const newBoard = [...localBoard];
-    newBoard.forEach((tile: any, index: number) => {
+    const nr = [...rack], nb = [...localBoard];
+    nb.forEach((tile, i) => {
       if (tile && !tile.isLocked) {
-        const emptyIdx = newRack.findIndex((t: any) => t === null);
-        if (emptyIdx !== -1) {
-          newRack[emptyIdx] = tile;
-          newBoard[index] = null;
-        }
+        const ei = nr.findIndex(t => t === null);
+        if (ei !== -1) { nr[ei] = tile; nb[i] = null; }
       }
     });
-    setLocalBoard(newBoard);
-    setRack(newRack);
-    setTargetSquare(null);
-    setLastPlacedIndex(null);
-    setPlayDirection(null);
-    setInvalidWords([]);
+    setLocalBoard(nb); setRack(nr);
+    setTargetSquare(null); setLastPlaced(null); setPlayDir(null); setInvalidWords([]);
   };
 
+  const shuffleRack = () => {
+    let nr = [...rack];
+    for (let i = nr.length-1; i > 0; i--) {
+      const j = Math.floor(Math.random()*(i+1)); [nr[i],nr[j]] = [nr[j],nr[i]];
+    }
+    setRack(nr); setSelectedRack(null);
+  };
+
+  // 🔥 RESTORED DATA PURGE FUNCTION
   const handlePurge = () => {
     if (!isMyTurn || isValidating || isTimerPaused) return;
     if ((scores[myTeamId] || 0) < 10) return;
@@ -435,289 +460,186 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
-  // ==========================================
-  // MATCHMAKING & GAMEPLAY ACTIONS
-  // ==========================================
-  const joinLobby = () => {
-    const displayName = studentId.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ');
-    const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${studentId}&backgroundColor=transparent`;
-    const newPlayers = { 
-        ...players, 
-        [studentId]: { 
-            id: studentId, 
-            name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
-            avatar: avatarUrl 
-        } 
-    };
-    onUpdateLiveState({ players: newPlayers });
-  };
-
-  const initializeFFA = () => {
-    const playerIds = Object.keys(players);
-    const newTeams: any = {};
-    const newScores: any = {};
-
-    playerIds.forEach((pId, idx) => {
-        const tId = `p_${idx}`;
-        newTeams[tId] = {
-            id: tId,
-            order: idx,
-            name: players[pId].name, 
-            avatar: players[pId].avatar, 
-            color: INDIVIDUAL_COLORS[idx % INDIVIDUAL_COLORS.length].color,
-            textColor: INDIVIDUAL_COLORS[idx % INDIVIDUAL_COLORS.length].textColor,
-            members: [pId] 
-        };
-        newScores[tId] = 0;
-    });
-
-    onUpdateLiveState({ 
-        gameStatus: 'lobby_naming', 
-        teams: newTeams, 
-        scores: newScores,
-        timeLimit: selectedTime 
-    });
-  };
-
-  const submitTeamName = (name: string) => {
-    if (name.trim() && myTeamId) {
-        const updatedTeams = { ...teams };
-        updatedTeams[myTeamId].name = name;
-        onUpdateLiveState({ teams: updatedTeams });
-    }
-  };
-
-  const startGame = () => {
-    onUpdateLiveState({ gameStatus: 'playing', turnEndTime: Date.now() + timeLimit * 1000 });
-  };
-
-  const passTurn = () => {
-    if (!isProjector) recallAll(); 
-    if (teamArray.length === 0) return;
-    onUpdateLiveState({
-      activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
-      turnEndTime: Date.now() + timeLimit * 1000,
-      isExtraTurn: false,
-      isTimerPaused: false
-    });
-  };
-
-  // 🔥 TEACHER OVERRIDE COMMANDS
-  const togglePause = () => {
-      if (isTimerPaused) {
-          onUpdateLiveState({ isTimerPaused: false, turnEndTime: Date.now() + remainingPausedTime * 1000 });
-      } else {
-          onUpdateLiveState({ isTimerPaused: true, remainingPausedTime: timeLeft });
+  // ── Board click ──
+  const handleBoardClick = (idx: number) => {
+    if (!isMyTurn || isValidating || isTimerPaused) return;
+    setSelectedRack(null); setInvalidWords([]);
+    if (localBoard[idx]?.isLocked) return;
+    if (localBoard[idx] && !localBoard[idx].isLocked) {
+      const ei = rack.findIndex(t => t === null);
+      if (ei !== -1) {
+        const nr = [...rack], nb = [...localBoard];
+        nr[ei] = nb[idx]; nb[idx] = null;
+        setRack(nr); setLocalBoard(nb);
+        setTargetSquare(idx); setLastPlaced(null); setPlayDir(null);
       }
+      return;
+    }
+    setTargetSquare(idx);
   };
 
-  const forceEndGame = () => {
-      onUpdateLiveState({ gameStatus: 'finished' });
-  };
-
-  const handleInitiateCommit = async () => {
-    const placedIndices: number[] = [];
-    localBoard.forEach((tile: any, idx: number) => {
-      if (tile && !tile.isLocked) placedIndices.push(idx);
-    });
-
-    if (placedIndices.length === 0) return; 
-
-    setIsValidating(true);
+  // ── Rack click ──
+  const handleRackClick = (idx: number) => {
+    if (isValidating || isTimerPaused) return;
     setInvalidWords([]);
+    if (targetSquare !== null) {
+      if (!isMyTurn || !rack[idx]) return;
+      if (!localBoard[targetSquare]) {
+        const nb = [...localBoard], nr = [...rack];
+        nb[targetSquare] = { ...nr[idx], isLocked: false };
+        nr[idx] = null;
+        setLocalBoard(nb); setRack(nr);
+        let dir = playDir;
+        if (lastPlaced !== null) {
+          const d = targetSquare - lastPlaced;
+          if (d === 1 || d === BOARD_SIZE) { dir = d; setPlayDir(d); } else { dir = null; setPlayDir(null); }
+        }
+        setLastPlaced(targetSquare);
+        if (dir !== null) {
+          const next = targetSquare + dir;
+          const hv = dir === 1 && targetSquare % BOARD_SIZE !== BOARD_SIZE - 1;
+          const vv = dir === BOARD_SIZE && targetSquare + BOARD_SIZE < BOARD_SIZE * BOARD_SIZE;
+          if ((hv || vv) && !nb[next]) setTargetSquare(next); else setTargetSquare(null);
+        } else setTargetSquare(null);
+      }
+      return;
+    }
+    if (selectedRack === null) { if (rack[idx]) setSelectedRack(idx); }
+    else {
+      if (selectedRack === idx) { setSelectedRack(null); }
+      else {
+        const nr = [...rack]; [nr[idx], nr[selectedRack]] = [nr[selectedRack], nr[idx]];
+        setRack(nr); setSelectedRack(null);
+      }
+    }
+  };
 
-    const rows = Array.from(new Set(placedIndices.map((idx: number) => Math.floor(idx / BOARD_SIZE))));
-    const cols = Array.from(new Set(placedIndices.map((idx: number) => idx % BOARD_SIZE)));
-    
+  // ─────────────────────────────────────────────
+  // VALIDATION & COMMIT
+  // ─────────────────────────────────────────────
+  const handleCommit = async () => {
+    const placed = localBoard.reduce((acc: number[], t: any, i: number) => {
+      if (t && !t.isLocked) acc.push(i); return acc;
+    }, []);
+    if (placed.length === 0) return;
+
+    setIsValidating(true); setInvalidWords([]);
+
+    const rows = [...new Set(placed.map(i => Math.floor(i/BOARD_SIZE)))];
+    const cols = [...new Set(placed.map(i => i % BOARD_SIZE))];
     if (rows.length > 1 && cols.length > 1) {
-        setInvalidWords(["Tiles must be placed in a single row or column."]);
-        setIsValidating(false);
-        return;
+      setInvalidWords(['Tiles must be in one row or column.']); setIsValidating(false); return;
     }
 
-    const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
+    const getTile = (r: number, c: number) =>
+      r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r*BOARD_SIZE+c] : null;
 
-    let hasGap = false;
+    let gap = false;
     if (rows.length === 1) {
-        const r = rows[0];
-        const minC = Math.min(...cols);
-        const maxC = Math.max(...cols);
-        for (let c = minC; c <= maxC; c++) {
-            if (!getTile(r, c)) hasGap = true;
-        }
-    } else if (cols.length === 1) {
-        const c = cols[0];
-        const minR = Math.min(...rows);
-        const maxR = Math.max(...rows);
-        for (let r = minR; r <= maxR; r++) {
-            if (!getTile(r, c)) hasGap = true;
-        }
-    }
-
-    if (hasGap) {
-        setInvalidWords(["Tiles must form a contiguous word without gaps."]);
-        setIsValidating(false);
-        return;
-    }
-
-    const isFirstTurn = !localBoard.some((t: any) => t && t.isLocked);
-    if (isFirstTurn) {
-        if (!placedIndices.includes(112)) { 
-            setInvalidWords(["The first word must cover the center star."]);
-            setIsValidating(false);
-            return;
-        }
-        if (placedIndices.length < 2) {
-            setInvalidWords(["The first word must be at least 2 letters long."]);
-            setIsValidating(false);
-            return;
-        }
+      const r = rows[0], mn = Math.min(...cols), mx = Math.max(...cols);
+      for (let c = mn; c <= mx; c++) if (!getTile(r,c)) gap = true;
     } else {
-        let touchesLocked = false;
-        placedIndices.forEach((idx: number) => {
-            const r = Math.floor(idx / BOARD_SIZE);
-            const c = idx % BOARD_SIZE;
-            if (getTile(r-1, c)?.isLocked || getTile(r+1, c)?.isLocked || getTile(r, c-1)?.isLocked || getTile(r, c+1)?.isLocked) {
-                touchesLocked = true;
-            }
-        });
-        if (!touchesLocked) {
-            setInvalidWords(["New tiles must connect to an existing word."]);
-            setIsValidating(false);
-            return;
-        }
+      const c = cols[0], mn = Math.min(...rows), mx = Math.max(...rows);
+      for (let r = mn; r <= mx; r++) if (!getTile(r,c)) gap = true;
+    }
+    if (gap) { setInvalidWords(['No gaps allowed between tiles.']); setIsValidating(false); return; }
+
+    const isFirst = !localBoard.some((t: any) => t?.isLocked);
+    if (isFirst) {
+      if (!placed.includes(112)) { setInvalidWords(['First word must cover the center star.']); setIsValidating(false); return; }
+      if (placed.length < 2) { setInvalidWords(['First word must be 2+ letters.']); setIsValidating(false); return; }
+    } else {
+      const touches = placed.some(idx => {
+        const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
+        return [[-1,0],[1,0],[0,-1],[0,1]].some(([dr,dc]) => getTile(r+dr,c+dc)?.isLocked);
+      });
+      if (!touches) { setInvalidWords(['New tiles must connect to an existing word.']); setIsValidating(false); return; }
     }
 
-    const scannedWords = new Set<string>();
-    const foundWordsList: { word: string; score: number }[] = [];
-    let totalCalculatedScore = 0;
+    // Scan words
+    const seen = new Set<string>();
+    const wordList: { word: string; rawSum: number; finalScore: number }[] = [];
+    let totalScore = 0;
 
-    placedIndices.forEach((idx: number) => {
-        const r = Math.floor(idx / BOARD_SIZE);
-        const c = idx % BOARD_SIZE;
-
-        let left = c, right = c;
-        while (left > 0 && getTile(r, left - 1)) left--;
-        while (right < BOARD_SIZE - 1 && getTile(r, right + 1)) right++;
-        if (right > left) {
-            const wordKey = `H-${r}-${left}-${right}`;
-            if (!scannedWords.has(wordKey)) {
-                scannedWords.add(wordKey);
-                let wordStr = '';
-                let wordScore = 0;
-                let wordMult = 1;
-
-                for (let i = left; i <= right; i++) {
-                    const t = getTile(r, i);
-                    let lVal = t.value;
-                    if (!t.isLocked) { 
-                        const sq = getSquareType(r, i);
-                        if (sq === 'DL') lVal *= 2;
-                        if (sq === 'TL') lVal *= 3;
-                        if (sq === 'DW' || sq === 'CT') wordMult *= 2;
-                        if (sq === 'TW') wordMult *= 3;
-                    }
-                    wordScore += lVal;
-                    wordStr += t.letter;
-                }
-                foundWordsList.push({ word: wordStr, score: wordScore * wordMult });
-                totalCalculatedScore += (wordScore * wordMult);
-            }
+    placed.forEach(idx => {
+      const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
+      [[0,1,0],[1,0,1]].forEach(([dr,dc,axis]) => {
+        let start = axis === 0 ? c : r;
+        while (start > 0 && getTile(axis===0?r:start-1, axis===0?start-1:c)) start--;
+        let end = start;
+        while (end < BOARD_SIZE-1 && getTile(axis===0?r:end+1, axis===0?end+1:c)) end++;
+        if (end === start) return;
+        const key = `${axis}-${axis===0?r:c}-${start}-${end}`;
+        if (seen.has(key)) return; seen.add(key);
+        let word = '', raw = 0, scored = 0, mult = 1;
+        for (let i = start; i <= end; i++) {
+          const t = getTile(axis===0?r:i, axis===0?i:c)!;
+          word += t.letter;
+          let lv = t.value; raw += lv;
+          if (!t.isLocked) {
+            const sq = getSquareType(axis===0?r:i, axis===0?i:c);
+            if (sq === 'DL') lv *= 2;
+            if (sq === 'TL') lv *= 3;
+            if (sq === 'DW' || sq === 'CT') mult *= 2;
+            if (sq === 'TW') mult *= 3;
+          }
+          scored += lv;
         }
-
-        let top = r, bottom = r;
-        while (top > 0 && getTile(top - 1, c)) top--;
-        while (bottom < BOARD_SIZE - 1 && getTile(bottom + 1, c)) bottom++;
-        if (bottom > top) {
-            const wordKey = `V-${c}-${top}-${bottom}`;
-            if (!scannedWords.has(wordKey)) {
-                scannedWords.add(wordKey);
-                let wordStr = '';
-                let wordScore = 0;
-                let wordMult = 1;
-
-                for (let i = top; i <= bottom; i++) {
-                    const t = getTile(i, c);
-                    let lVal = t.value;
-                    if (!t.isLocked) {
-                        const sq = getSquareType(i, c);
-                        if (sq === 'DL') lVal *= 2;
-                        if (sq === 'TL') lVal *= 3;
-                        if (sq === 'DW' || sq === 'CT') wordMult *= 2;
-                        if (sq === 'TW') wordMult *= 3;
-                    }
-                    wordScore += lVal;
-                    wordStr += t.letter;
-                }
-                foundWordsList.push({ word: wordStr, score: wordScore * wordMult });
-                totalCalculatedScore += (wordScore * wordMult);
-            }
-        }
+        const fs = scored * mult;
+        wordList.push({ word, rawSum: raw, finalScore: fs });
+        totalScore += fs;
+      });
     });
 
-    const extractedWords = foundWordsList.map(w => w.word);
-    
-    const validWordsData: {word: string, def: string}[] = [];
-    const failedWords: string[] = [];
-    
-    await Promise.all(extractedWords.map(async (word) => {
-        if (word.length < 2) return; 
-        
-        let foundDefinition = false;
-
+    // Dictionary lookup with enriched data
+    const validEntries: any[] = [], failed: string[] = [];
+    await Promise.all(wordList.map(async ({ word, rawSum, finalScore }) => {
+      if (word.length < 2) return;
+      const tier = assignTier(word, rawSum);
+      let entry: any = { word: word.toUpperCase(), tier, finalScore };
+      let found = false;
+      try {
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data[0]) {
+            const d0 = data[0];
+            const m0 = d0.meanings?.[0];
+            const def0 = m0?.definitions?.[0];
+            entry.def = def0?.definition || 'Definition found.';
+            entry.example = def0?.example || null;
+            entry.pos = m0?.partOfSpeech || null;
+            entry.phonetic = d0.phonetic || d0.phonetics?.[0]?.text || null;
+            found = true;
+          }
+        }
+      } catch {}
+      if (!found) {
         try {
-            const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-            const data = await res.json();
-            
-            if (res.ok && Array.isArray(data)) {
-                let def = data[0]?.meanings?.[0]?.definitions?.[0]?.definition || "Definition acquired.";
-                validWordsData.push({ word: word.toUpperCase(), def });
-                foundDefinition = true;
-            }
-        } catch (err) {
-            console.warn("Primary Dictionary API failed for", word, err);
-        }
-
-        if (!foundDefinition) {
-            try {
-                const res2 = await fetch(`https://api.datamuse.com/words?sp=${word}&md=d&max=1`);
-                const data2 = await res2.json();
-                
-                if (data2 && data2.length > 0 && data2[0].word.toLowerCase() === word.toLowerCase()) {
-                    let def = "Definition securely archived.";
-                    if (data2[0].defs && data2[0].defs.length > 0) {
-                        def = data2[0].defs[0].split('\t').pop() || def;
-                    }
-                    validWordsData.push({ word: word.toUpperCase(), def });
-                    foundDefinition = true;
-                }
-            } catch (err) {
-                console.warn("Fallback Datamuse API failed for", word, err);
-            }
-        }
-
-        if (!foundDefinition) {
-            failedWords.push(word.toUpperCase());
-        }
+          const r2 = await fetch(`https://api.datamuse.com/words?sp=${word}&md=d&max=1`);
+          const d2 = await r2.json();
+          if (d2?.[0]?.word?.toLowerCase() === word.toLowerCase()) {
+            entry.def = d2[0].defs?.[0]?.split('\t').pop() || 'Definition secured.';
+            entry.pos = d2[0].defs?.[0]?.split('\t')[0] || null;
+            found = true;
+          }
+        } catch {}
+      }
+      if (found) validEntries.push(entry);
+      else failed.push(word.toUpperCase());
     }));
 
     setIsValidating(false);
+    if (failed.length > 0) { setInvalidWords(failed); return; }
 
-    if (failedWords.length > 0) {
-        setInvalidWords(failedWords);
-        return; 
-    }
-
-    setCurrentTurnScore(totalCalculatedScore);
-    setCurrentTurnWords(validWordsData);
-    setPendingSentence(true);
+    setCurrentWords(validEntries); setCurrentScore(totalScore); setPendingSentence(true);
   };
 
   const commitTurn = (withSentence: boolean) => {
-    let bonus = 0;
-    let sentencePayload = null;
+    let bonus = 0, sentencePayload = null;
     let triggeredDP = false;
 
+    // 🔥 RESTORED DP CHECK
     localBoard.forEach((tile: any, idx: number) => {
       if (tile && !tile.isLocked) {
          const r = Math.floor(idx / BOARD_SIZE);
@@ -728,310 +650,293 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       }
     });
 
-    if (withSentence && sentenceText.trim().length > 3) {
-        bonus = 5;
-        sentencePayload = {
-            playerName: myTeamEntry?.name || players[studentId]?.name || "Explorer",
-            text: sentenceText.trim(),
-            timestamp: Date.now(),
-            bonusAmount: bonus
-        };
+    if (withSentence && sentenceText.trim().length > 5) {
+      bonus = 5;
+      sentencePayload = {
+        playerName: myTeamEntry?.name || 'Explorer',
+        text: sentenceText.trim(), bonusAmount: bonus, timestamp: Date.now()
+      };
     }
-
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
-    const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + currentTurnScore + bonus };
-    
-    const currentTeamWordsLog = teamWords[myTeamId] || [];
-    const extractedWordStrings = currentTurnWords.map(w => w.word);
-    const updatedTeamWords = { ...teamWords, [myTeamId]: [...currentTeamWordsLog, ...extractedWordStrings] };
+    const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId]||0) + currentScore + bonus };
+    const myJournal = [...(journals[myTeamId]||[]), ...currentWords];
+    const updatedJournals = { ...journals, [myTeamId]: myJournal };
 
-    let newBag = [...(globalBag || [])];
-    let newRack = rack.map((slot: any) => {
-      if (slot === null && newBag.length > 0) {
-        return newBag.pop();
-      }
-      return slot;
-    });
+    let newBag = [...(globalBag||[])];
+    let newRack = rack.map((s: any) => s === null && newBag.length > 0 ? newBag.pop() : s);
     setRack(newRack);
 
     const payload: any = {
-      board: lockedBoard,
-      scores: updatedScores,
-      teamWords: updatedTeamWords, 
-      latestDiscoveries: currentTurnWords, 
-      bag: newBag, 
-      activeTeamIndex: triggeredDP ? activeTeamIndex : (teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0),
+      board: lockedBoard, scores: updatedScores, journals: updatedJournals,
+      latestDiscoveries: currentWords, bag: newBag,
+      activeTeamIndex: triggeredDP ? activeTeamIndex : (activeTeamIndex + 1) % teamArray.length,
       turnEndTime: Date.now() + timeLimit * 1000,
-      isExtraTurn: triggeredDP,
-      isTimerPaused: false
+      isExtraTurn: triggeredDP, isTimerPaused: false
     };
-
-    if (sentencePayload) {
-        payload.latestSentence = sentencePayload;
-    }
-
+    if (sentencePayload) payload.latestSentence = sentencePayload;
     onUpdateLiveState(payload);
-    
-    setPendingSentence(false);
-    setSentenceText("");
-    setCurrentTurnWords([]);
-    setCurrentTurnScore(0);
+    setPendingSentence(false); setSentenceText(''); setCurrentWords([]); setCurrentScore(0);
   };
 
-  const getSquareClasses = (r: number, c: number, tile: any, isTargeted: boolean) => {
-      const type = getSquareType(r, c);
-      let base = "bg-slate-800/40 border-slate-700/50"; 
-      
-      if (type === 'TW') base = "bg-rose-500/20 border-rose-500/40 shadow-[inset_0_0_15px_rgba(244,63,94,0.3)]";
-      else if (type === 'DW') base = "bg-amber-500/20 border-amber-500/40 shadow-[inset_0_0_15px_rgba(245,158,11,0.3)]";
-      else if (type === 'TL') base = "bg-cyan-500/20 border-cyan-500/40 shadow-[inset_0_0_15px_rgba(6,182,212,0.3)]";
-      else if (type === 'DL') base = "bg-emerald-500/20 border-emerald-500/40 shadow-[inset_0_0_15px_rgba(16,185,129,0.3)]";
-      else if (type === 'CT') base = "bg-indigo-500/20 border-indigo-500/40 shadow-[inset_0_0_15px_rgba(99,102,241,0.3)]";
-      else if (type === 'DP') base = "bg-fuchsia-500/20 border-fuchsia-500/40 shadow-[inset_0_0_15px_rgba(217,70,239,0.3)]";
-
-      if (isTargeted) return `${base} ring-2 ring-inset ring-amber-400 z-20 bg-amber-500/20 shadow-[inset_0_0_20px_rgba(245,158,11,0.4)]`;
-      return base;
-  };
-
-  // ==========================================
-  // RENDER: PROJECTOR VIEW
-  // ==========================================
+  // ─────────────────────────────────────────────
+  // PROJECTOR VIEWS
+  // ─────────────────────────────────────────────
   if (isProjector) {
+    const bg = { background: '#08090f', minHeight: '100%' };
+
+    // LOBBY
     if (gameStatus === 'lobby_join') {
-      const joinedCount = Object.keys(players).length;
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-12 scifi-bg text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-overlay" />
-          <h1 className="text-[10vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 mb-4 drop-shadow-2xl">ASTROGRAM</h1>
-          
-          <div className="flex items-center gap-4 text-4xl font-black mb-12 text-slate-300 relative z-10">
-             <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} {joinedCount === 1 ? 'Explorer' : 'Explorers'} Connected
+        <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding: 48, color:'#f8fafc' }}>
+          <div style={{ fontFamily:"'DM Serif Display', serif", fontSize: 72, lineHeight: 1, marginBottom: 8, background: 'linear-gradient(135deg,#f8fafc,#94a3b8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
+            WordForge
           </div>
-
-          <div className="mb-12 flex flex-col items-center animate-in slide-in-from-bottom-4 relative z-10">
-             <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Set Turn Duration</p>
-             <div className="flex gap-4">
-                 {[
-                     { label: '1 Min', val: 60 },
-                     { label: '2 Min', val: 120 },
-                     { label: '5 Min', val: 300 },
-                     { label: '10 Min', val: 600 }
-                 ].map((t: any) => (
-                     <button 
-                         key={t.val} 
-                         onClick={() => setSelectedTime(t.val)}
-                         className={`px-8 py-3 rounded-2xl font-black text-lg transition-all border border-slate-700/50 backdrop-blur-md ${
-                             selectedTime === t.val 
-                             ? 'bg-indigo-500/20 text-indigo-300 shadow-[inset_0_0_20px_rgba(99,102,241,0.5)] ring-2 ring-indigo-400 scale-105' 
-                             : 'bg-slate-900/50 text-slate-500 hover:text-indigo-300'
-                         }`}
-                     >
-                         {t.label}
-                     </button>
-                 ))}
-             </div>
+          <p style={{ color:'rgba(255,255,255,0.35)', fontSize:14, letterSpacing:3, textTransform:'uppercase', marginBottom:48 }}>
+            Vocabulary Discovery Game
+          </p>
+          <div style={{ display:'flex', alignItems:'center', gap:12, fontSize:20, color:'rgba(255,255,255,0.6)', marginBottom:40 }}>
+            <Users size={28} style={{color:'#4ade80'}} />
+            {Object.keys(players).length} player{Object.keys(players).length !== 1 ? 's' : ''} connected
           </div>
-
-          <button 
-             disabled={joinedCount < 1}
-             onClick={initializeFFA}
-             className="relative z-10 px-12 py-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-3xl font-black text-3xl shadow-[0_0_40px_rgba(79,70,229,0.4)] transition-all border border-indigo-400 active:scale-95 flex items-center gap-4 group"
-          >
-             Launch Astrogram <Rocket className="group-hover:animate-pulse" size={32} />
+          <div style={{ marginBottom:40 }}>
+            <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, textTransform:'uppercase', letterSpacing:2, textAlign:'center', marginBottom:12 }}>Turn duration</p>
+            <div style={{ display:'flex', gap:8 }}>
+              {[{l:'1 min',v:60},{l:'90 sec',v:90},{l:'2 min',v:120},{l:'5 min',v:300}].map(t => (
+                <button key={t.v} onClick={() => setSelectedTime(t.v)} style={{
+                  padding:'10px 20px', borderRadius:10, fontWeight:600, fontSize:14, cursor:'pointer', transition:'all 0.15s',
+                  background: selectedTime === t.v ? 'rgba(79,70,229,0.25)' : 'rgba(255,255,255,0.04)',
+                  border: selectedTime === t.v ? '1px solid rgba(79,70,229,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                  color: selectedTime === t.v ? '#a5b4fc' : 'rgba(255,255,255,0.4)'
+                }}>{t.l}</button>
+              ))}
+            </div>
+          </div>
+          <button onClick={startFFA} disabled={Object.keys(players).length < 1} style={{
+            padding:'14px 36px', borderRadius:12, fontSize:18, fontWeight:600, cursor:'pointer',
+            background:'rgba(79,70,229,0.2)', border:'1px solid rgba(79,70,229,0.5)',
+            color:'#a5b4fc', display:'flex', alignItems:'center', gap:10, opacity: Object.keys(players).length < 1 ? 0.4 : 1
+          }}>
+            <Rocket size={20}/> Begin Session
           </button>
+          <div style={{ marginTop:48, display:'flex', flexWrap:'wrap', gap:12, justifyContent:'center', maxWidth:600 }}>
+            {Object.values(players).map((p: any) => (
+              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', borderRadius:30, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)' }}>
+                {p.avatar && <img src={p.avatar} style={{width:24,height:24,borderRadius:'50%'}} />}
+                <span style={{fontSize:13, color:'rgba(255,255,255,0.7)'}}>{p.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
 
+    // NAMING
     if (gameStatus === 'lobby_naming') {
-        return (
-            <div className="w-full h-full flex flex-col p-12 scifi-bg text-white overflow-hidden relative">
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-overlay" />
-                <div className="flex justify-between items-center mb-12 relative z-10">
-                    <div>
-                        <h1 className="text-[6vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400 drop-shadow-lg">Awaiting Launch</h1>
-                        <p className="text-xl font-bold text-slate-400 uppercase tracking-widest mt-2">Explorers: Configure your cosmic alias on your devices</p>
-                    </div>
-                    <button onClick={startGame} className="px-12 py-6 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/50 backdrop-blur-md rounded-full font-black text-2xl uppercase tracking-widest shadow-[0_0_30px_rgba(16,185,129,0.2)] transition-transform active:scale-95 flex items-center gap-3">
-                        <CheckCircle2 size={24}/> Launch Expedition
-                    </button>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-8 overflow-y-auto custom-scrollbar pb-8 relative z-10">
-                    {teamArray.map((t: any) => (
-                        <div key={t.id} className={`p-8 rounded-3xl shadow-xl border border-slate-700/50 bg-slate-900/40 backdrop-blur-md animate-in zoom-in-95 duration-500 flex flex-col items-center justify-center text-center relative overflow-hidden`}>
-                            <div className={`absolute top-0 left-0 w-full h-1 ${t.color}`} />
-                            {t.avatar ? (
-                                <img src={t.avatar} className="w-20 h-20 bg-slate-950 rounded-full mb-4 border border-slate-800 shadow-inner" alt={t.name} />
-                            ) : (
-                                <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-4 border border-slate-800 shadow-inner">
-                                    <User size={32} className={t.textColor} />
-                                </div>
-                            )}
-                            <h2 className="text-3xl font-black uppercase tracking-tight leading-tight text-white">{t.name}</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2">Ready</p>
-                        </div>
-                    ))}
-                </div>
+      return (
+        <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:40, color:'#f8fafc' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:40 }}>
+            <div>
+              <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:40, color:'#f8fafc' }}>Ready to forge words?</div>
+              <p style={{ color:'rgba(255,255,255,0.35)', fontSize:13, marginTop:4 }}>Confirm your name on your device</p>
             </div>
-        );
-    }
-
-    if (gameStatus === 'finished') {
-        const sortedTeams = [...teamArray].sort((a, b) => (scores[b.id] || 0) - (scores[a.id] || 0));
-        return (
-            <div className="w-full h-full flex flex-col items-center justify-center p-12 scifi-bg text-white relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-overlay" />
-                <h1 className="text-[8vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400 mb-12 drop-shadow-2xl">EXPEDITION COMPLETE</h1>
-                <div className="flex gap-8 items-end relative z-10">
-                    {sortedTeams.slice(0,3).map((t: any, idx: number) => (
-                        <div key={t.id} className={`flex flex-col items-center animate-in slide-in-from-bottom-${(3-idx)*4} duration-700`}>
-                            <div className="mb-4 relative">
-                                {idx === 0 && <Trophy className="absolute -top-10 left-1/2 -translate-x-1/2 text-amber-400 w-12 h-12 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />}
-                                {t.avatar ? (
-                                    <img src={t.avatar} className={`w-32 h-32 rounded-full border-4 ${idx === 0 ? 'border-amber-400' : 'border-slate-600'} shadow-2xl bg-slate-900`} />
-                                ) : (
-                                    <div className={`w-32 h-32 rounded-full border-4 ${idx === 0 ? 'border-amber-400' : 'border-slate-600'} flex items-center justify-center bg-slate-900`}>
-                                        <User size={48} className={t.textColor}/>
-                                    </div>
-                                )}
-                            </div>
-                            <div className={`bg-slate-900/80 backdrop-blur-md border border-slate-700 p-6 rounded-t-3xl w-48 text-center flex flex-col items-center shadow-[0_-10px_20px_rgba(0,0,0,0.5)]`} style={{ height: `${250 - (idx * 40)}px` }}>
-                                <span className={`font-black text-2xl uppercase tracking-widest truncate w-full ${t.textColor}`}>{t.name}</span>
-                                <span className="text-4xl font-mono font-black text-white mt-2">{scores[t.id] || 0}</span>
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Star Power</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    return (
-      <div className="w-full h-full flex p-8 scifi-bg text-white gap-8 overflow-hidden relative">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
-        
-        <div className="flex-1 flex flex-col items-center justify-center relative z-10">
-          <div className="mb-6 flex items-center gap-4 animate-in slide-in-from-top-8">
-             <div className={`pl-2 pr-6 py-2 rounded-full border shadow-lg text-white font-black uppercase tracking-widest text-sm bg-slate-900/60 backdrop-blur-md border-slate-700 flex items-center gap-3`}>
-                {activeTeam?.avatar ? (
-                    <img src={activeTeam.avatar} className="w-8 h-8 rounded-full bg-slate-800 border border-slate-600" />
-                ) : (
-                    <User className="w-8 h-8 p-1 rounded-full bg-slate-800" />
-                )}
-                <span className={activeTeam?.textColor}>{activeTeam?.name || 'Waiting'}</span>'s Turn
-                {isExtraTurn && <span className="bg-fuchsia-500 text-white text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 ml-2"><FastForward size={12}/> DOUBLE PLAY</span>}
-             </div>
-             <div className={`backdrop-blur-md px-5 py-2 rounded-full border shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center gap-3 transition-colors ${isTimerPaused ? 'bg-amber-900/40 border-amber-500/50' : 'bg-slate-900/80 border-slate-700'}`}>
-                {isTimerPaused ? <Pause className="text-amber-400 w-4 h-4 animate-pulse" /> : <Clock className="text-indigo-400 w-4 h-4" />}
-                <span className={`text-xl font-mono font-bold ${isTimerPaused ? 'text-amber-400' : 'text-indigo-100'}`}>{isTimerPaused ? 'PAUSED' : `${timeLeft}s`}</span>
-             </div>
+            <button onClick={startGame} style={{
+              padding:'12px 28px', borderRadius:10, fontSize:15, fontWeight:600, cursor:'pointer',
+              background:'rgba(74,222,128,0.15)', border:'1px solid rgba(74,222,128,0.4)',
+              color:'#4ade80', display:'flex', alignItems:'center', gap:8
+            }}>
+              <CheckCircle2 size={18}/> Start Game
+            </button>
           </div>
-          
-          <div className="bg-slate-900/60 backdrop-blur-xl p-3 rounded-2xl shadow-2xl border border-slate-700/50">
-            <div className="board-grid">
-                {(globalBoard || []).map((tile: any, index: number) => {
-                const r = Math.floor(index / BOARD_SIZE);
-                const c = index % BOARD_SIZE;
-                const type = getSquareType(r, c);
-                return (
-                    <div key={index} className={`w-10 h-10 lg:w-14 lg:h-14 relative flex items-center justify-center transition-colors ${getSquareClasses(r, c, tile, false)}`}>
-                    {!tile && type === 'CT' && <Star className="text-indigo-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
-                    {!tile && type === 'DP' && <FastForward className="text-fuchsia-400 opacity-50 w-5 h-5 animate-pulse" fill="currentColor" />}
-                    {tile && <DataTile tile={tile} isLocked={true} className="w-[90%] h-[90%]" />}
-                    </div>
-                );
-                })}
-            </div>
-          </div>
-
-          {/* 🔥 INSTRUCTOR OVERRIDE CONSOLE */}
-          <div className="absolute bottom-4 left-4 flex bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-bottom-8">
-              <div className="px-4 py-3 bg-indigo-900/30 border-r border-slate-700 flex items-center justify-center" title="Instructor Override Panel">
-                  <ShieldAlert className="text-indigo-400 w-5 h-5" />
+          <div style={{ display:'flex', flexWrap:'wrap', gap:16 }}>
+            {teamArray.map((t: any) => (
+              <div key={t.id} style={{ padding:'24px 28px', borderRadius:16, background:'rgba(255,255,255,0.04)', border:`1px solid ${t.color.border}`, display:'flex', alignItems:'center', gap:14, minWidth:200 }}>
+                {t.avatar && <img src={t.avatar} style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.05)'}} />}
+                <div>
+                  <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:22, color:'#f8fafc' }}>{t.name}</div>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', marginTop:2 }}>Ready</div>
+                </div>
               </div>
-              <button onClick={togglePause} className="px-5 py-3 hover:bg-slate-800 transition-colors flex items-center gap-2 border-r border-slate-700">
-                  {isTimerPaused ? <Play size={16} className="text-emerald-400"/> : <Pause size={16} className="text-amber-400"/>}
-                  <span className="text-xs font-bold uppercase tracking-widest text-slate-300">{isTimerPaused ? 'Resume' : 'Pause'}</span>
-              </button>
-              <button onClick={passTurn} className="px-5 py-3 hover:bg-slate-800 transition-colors flex items-center gap-2 border-r border-slate-700">
-                  <FastForward size={16} className="text-slate-400"/>
-                  <span className="text-xs font-bold uppercase tracking-widest text-slate-300">Force Skip</span>
-              </button>
-              <button onClick={forceEndGame} className="px-5 py-3 hover:bg-rose-900/30 transition-colors flex items-center gap-2">
-                  <Power size={16} className="text-rose-400"/>
-                  <span className="text-xs font-bold uppercase tracking-widest text-rose-400">End Game</span>
-              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // FINISHED
+    if (gameStatus === 'finished') {
+      const sorted = [...teamArray].sort((a,b) => (scores[b.id]||0)-(scores[a.id]||0));
+      return (
+        <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:48, color:'#f8fafc' }}>
+          <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:52, marginBottom:48, color:'#f8fafc' }}>Session Complete</div>
+          <div style={{ display:'flex', gap:24, alignItems:'flex-end' }}>
+            {sorted.slice(0,3).map((t: any, i: number) => (
+              <div key={t.id} style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+                {i===0 && <Trophy size={32} style={{color:'#f59e0b', marginBottom:8}} />}
+                {t.avatar && <img src={t.avatar} style={{ width:80, height:80, borderRadius:'50%', border:`3px solid ${i===0?'#f59e0b':t.color.bg}`, background:'rgba(255,255,255,0.05)', marginBottom:12 }} />}
+                <div style={{ padding:'20px 28px', borderRadius:12, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', textAlign:'center', width:160, height: 180-i*30 }}>
+                  <div style={{ color: t.color.bg, fontWeight:600, fontSize:14, marginBottom:6 }}>{t.name}</div>
+                  <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:42 }}>{scores[t.id]||0}</div>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', marginTop:4 }}>
+                    {(journals[t.id]||[]).length} words found
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
+          {/* Show all word journals */}
+          <div style={{ marginTop:48, maxWidth:800, width:'100%' }}>
+            <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'rgba(255,255,255,0.3)', marginBottom:16 }}>Vocabulary Discovered This Session</p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {sorted.map((t: any) => (journals[t.id]||[]).map((e: any, i: number) => {
+                const tier = TIERS[e.tier]||TIERS[2];
+                return (
+                  <span key={`${t.id}-${i}`} style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600, background:tier.bg, border:`1px solid ${tier.border}`, color:tier.color }}>
+                    {e.word}
+                  </span>
+                );
+              }))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // PLAYING — PROJECTOR
+    return (
+      <div className="wf-root" style={{ ...bg, display:'flex', height:'100%', padding:24, gap:24, color:'#f8fafc', overflow:'hidden' }}>
+
+        {/* Board */}
+        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', position:'relative' }}>
+          {/* Turn banner */}
+          <div style={{ marginBottom:16, display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{
+              display:'flex', alignItems:'center', gap:10, padding:'8px 20px',
+              borderRadius:30, background:'rgba(255,255,255,0.05)', border:`1px solid ${activeTeam?.color?.border||'rgba(255,255,255,0.1)'}`
+            }}>
+              {activeTeam?.avatar && <img src={activeTeam.avatar} style={{width:28,height:28,borderRadius:'50%'}} />}
+              <span style={{ fontWeight:600, color: activeTeam?.color?.bg||'#f8fafc', fontSize:14 }}>{activeTeam?.name || '—'}</span>
+              <span style={{ color:'rgba(255,255,255,0.5)', fontSize:13 }}>is playing</span>
+              {isExtraTurn && <span style={{ background:'#d946ef', color:'white', fontSize:10, padding:'2px 6px', borderRadius:4, display:'flex', alignItems:'center', gap:4, marginLeft:8 }}><FastForward size={10}/> DOUBLE PLAY</span>}
+            </div>
+            <div style={{
+              display:'flex', alignItems:'center', gap:8, padding:'8px 16px',
+              borderRadius:30, background: isTimerPaused ? 'rgba(217,119,6,0.15)' : 'rgba(255,255,255,0.05)',
+              border: isTimerPaused ? '1px solid rgba(217,119,6,0.4)' : '1px solid rgba(255,255,255,0.1)'
+            }}>
+              {isTimerPaused ? <Pause size={14} style={{color:'#f59e0b'}}/> : <Clock size={14} style={{color:'rgba(255,255,255,0.4)'}}/>}
+              <span style={{ fontFamily:'monospace', fontWeight:700, color: isTimerPaused ? '#f59e0b' : '#f8fafc', fontSize:16 }}>
+                {isTimerPaused ? 'PAUSED' : `${timeLeft}s`}
+              </span>
+            </div>
+          </div>
+
+          {/* Board grid */}
+          <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:16, padding:10, border:'1px solid rgba(255,255,255,0.06)' }}>
+            <div className="wf-board" style={{ width:660, height:660 }}>
+              {(globalBoard||[]).map((tile: any, i: number) => {
+                const r = Math.floor(i/BOARD_SIZE), c = i%BOARD_SIZE;
+                const type = getSquareType(r,c);
+                return (
+                  <div key={i} style={{ ...squareStyle(r,c,false), display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+                    {!tile && type === 'CT' && <Star size={14} style={{color:'rgba(79,70,229,0.5)'}} fill="currentColor"/>}
+                    {!tile && type === 'TW' && <span style={{fontSize:7,fontWeight:700,color:'rgba(220,38,38,0.6)',textTransform:'uppercase'}}>3W</span>}
+                    {!tile && type === 'DW' && <span style={{fontSize:7,fontWeight:700,color:'rgba(217,119,6,0.6)',textTransform:'uppercase'}}>2W</span>}
+                    {!tile && type === 'TL' && <span style={{fontSize:7,fontWeight:700,color:'rgba(8,145,178,0.6)',textTransform:'uppercase'}}>3L</span>}
+                    {!tile && type === 'DL' && <span style={{fontSize:7,fontWeight:700,color:'rgba(5,150,105,0.6)',textTransform:'uppercase'}}>2L</span>}
+                    {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)'}} fill="currentColor"/>}
+                    {tile && <Tile tile={tile} locked size="sm" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Instructor console */}
+          <div style={{
+            position:'absolute', bottom:0, left:0, display:'flex',
+            background:'rgba(8,10,20,0.9)', border:'1px solid rgba(255,255,255,0.1)',
+            borderRadius:12, overflow:'hidden'
+          }}>
+            <div style={{ padding:'10px 14px', background:'rgba(79,70,229,0.1)', borderRight:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center' }}>
+              <ShieldAlert size={16} style={{color:'rgba(79,70,229,0.8)'}}/>
+            </div>
+            {[
+              { icon: isTimerPaused ? <Play size={14}/> : <Pause size={14}/>, label: isTimerPaused ? 'Resume' : 'Pause', action: togglePause, color:'#f59e0b' },
+              { icon: <FastForward size={14}/>, label: 'Skip turn', action: passTurn, color:'rgba(255,255,255,0.5)' },
+              { icon: <Power size={14}/>, label: 'End game', action: forceEnd, color:'#ef4444' },
+            ].map((btn, i) => (
+              <button key={i} onClick={btn.action} style={{
+                padding:'10px 16px', background:'transparent', border:'none', borderRight:'1px solid rgba(255,255,255,0.08)',
+                cursor:'pointer', display:'flex', alignItems:'center', gap:8, color:btn.color, fontSize:12, fontWeight:600
+              }}>{btn.icon}{btn.label}</button>
+            ))}
+          </div>
         </div>
 
-        <div className="w-[400px] flex flex-col gap-6 relative z-10">
-          <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col min-h-[40vh]">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800 shrink-0">
-              <h2 className="text-2xl font-black magister-font flex items-center gap-3 text-slate-100"><Trophy className="text-indigo-400"/> RANKINGS</h2>
-              <span className="text-slate-500 font-mono text-xs font-bold bg-slate-950 px-3 py-1 rounded-full border border-slate-800">{globalBag?.length || 0} ASTRO-TILES</span>
+        {/* Sidebar */}
+        <div style={{ width:360, display:'flex', flexDirection:'column', gap:16, overflowY:'auto' }} className="wf-scroll">
+
+          {/* Leaderboard */}
+          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:20 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, paddingBottom:12, borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+              <Trophy size={16} style={{color:'#f59e0b'}}/>
+              <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:18, color:'#f8fafc' }}>Scores</span>
+              <span style={{ marginLeft:'auto', fontSize:11, color:'rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.05)', padding:'2px 8px', borderRadius:6 }}>
+                {globalBag?.length||0} tiles left
+              </span>
             </div>
-            
-            <div className="space-y-4 overflow-y-auto custom-scrollbar pr-2 flex-1">
-              {teamArray.map((t: any) => {
-                const playerWords = teamWords[t.id] || [];
-                const isActive = activeTeamIndex === t.order;
-                return (
-                <div key={t.id} className={`flex flex-col p-4 rounded-2xl border transition-all ${isActive ? 'bg-slate-800/80 border-slate-600 shadow-[0_0_20px_rgba(0,0,0,0.3)] scale-[1.02]' : 'border-transparent bg-slate-950/50'}`}>
-                  <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                          {t.avatar && <img src={t.avatar} className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700" alt="avatar" />}
-                          <span className={`font-black uppercase tracking-widest text-sm ${t.textColor}`}>{t.name}</span>
-                      </div>
-                      <span className="text-2xl font-mono font-black text-slate-100">{scores?.[t.id] || 0}</span>
+            {teamArray.map((t: any, idx: number) => {
+              const isActive = idx === activeTeamIndex;
+              const myWords = journals[t.id]||[];
+              return (
+                <div key={t.id} style={{
+                  padding:'12px 14px', borderRadius:10, marginBottom:8, transition:'all 0.2s',
+                  background: isActive ? `${t.color.muted}` : 'transparent',
+                  border: isActive ? `1px solid ${t.color.border}` : '1px solid transparent'
+                }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: myWords.length > 0 ? 8 : 0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      {t.avatar && <img src={t.avatar} style={{width:28,height:28,borderRadius:'50%',opacity: isActive?1:0.6}} />}
+                      <span style={{ fontSize:14, fontWeight:600, color: isActive ? t.color.bg : 'rgba(255,255,255,0.6)' }}>{t.name}</span>
+                    </div>
+                    <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:26, color: isActive ? '#f8fafc' : 'rgba(255,255,255,0.5)' }}>{scores[t.id]||0}</span>
                   </div>
-                  {playerWords.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-800/50">
-                          {playerWords.map((w: string, i: number) => (
-                              <span key={i} className="px-2 py-1 bg-slate-900 rounded-md text-[9px] font-mono font-bold tracking-widest text-slate-400 border border-slate-800">
-                                  {w}
-                              </span>
-                          ))}
-                      </div>
+                  {myWords.length > 0 && (
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {myWords.slice(-8).map((e: any, i: number) => {
+                        const tier = TIERS[e.tier]||TIERS[2];
+                        return <span key={i} style={{ fontSize:9, padding:'2px 7px', borderRadius:10, background:tier.bg, border:`1px solid ${tier.border}`, color:tier.color, fontWeight:600 }}>{e.word}</span>;
+                      })}
+                    </div>
                   )}
                 </div>
-              )})}
-            </div>
+              );
+            })}
           </div>
-          
-          {(latestDiscoveries.length > 0 || latestSentence) && (
-            <div className="bg-indigo-900/20 backdrop-blur-xl p-6 rounded-3xl border border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-in slide-in-from-right duration-500 flex flex-col gap-4">
-              
-              {latestDiscoveries.length > 0 && (
-                 <div>
-                    <h3 className="text-cyan-400 font-black text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <BookOpen size={14} fill="currentColor" /> Lexicon Databanks 
-                    </h3>
-                    <div className="space-y-3">
-                        {latestDiscoveries.map((disc: any, idx: number) => (
-                            <div key={idx} className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 shadow-inner">
-                                <span className="font-black text-indigo-300 tracking-widest block mb-1">{disc.word}</span>
-                                <span className="text-xs text-slate-300 font-medium leading-relaxed block">{disc.def}</span>
-                            </div>
-                        ))}
-                    </div>
-                 </div>
-              )}
 
-              {latestSentence && (
-                 <div className="border-t border-indigo-500/20 pt-4 mt-2">
-                    <h3 className="text-amber-400 font-black text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <Star size={14} fill="currentColor" /> Intel Bonus (+{latestSentence.bonusAmount} XP)
-                    </h3>
-                    <p className="text-slate-100 text-sm font-medium italic mb-2 leading-relaxed">
-                        "{latestSentence.text}"
-                    </p>
-                    <p className="text-indigo-300/50 text-[10px] font-bold uppercase tracking-widest text-right">
-                        — {latestSentence.playerName}
-                    </p>
-                 </div>
-              )}
+          {/* Latest discoveries */}
+          {latestDiscoveries.length > 0 && (
+            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:20 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                <BookOpen size={14} style={{color:'rgba(255,255,255,0.4)'}}/>
+                <span style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'rgba(255,255,255,0.3)' }}>Words Played</span>
+              </div>
+              {latestDiscoveries.map((e: any, i: number) => <WordCard key={i} entry={e} />)}
+            </div>
+          )}
+
+          {/* Sentence bonus */}
+          {latestSentence && (
+            <div style={{ background:'rgba(245,208,90,0.06)', border:'1px solid rgba(245,208,90,0.2)', borderRadius:16, padding:20 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                <Star size={13} style={{color:'#f5d05a'}} fill="currentColor"/>
+                <span style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'#f5d05a' }}>
+                  Context bonus +{latestSentence.bonusAmount}
+                </span>
+              </div>
+              <p style={{ fontSize:13, color:'rgba(255,255,255,0.75)', fontStyle:'italic', lineHeight:1.6 }}>"{latestSentence.text}"</p>
+              <p style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:6, textAlign:'right' }}>— {latestSentence.playerName}</p>
             </div>
           )}
         </div>
@@ -1039,284 +944,303 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
-  // ==========================================
-  // RENDER: STUDENT VIEW (Mobile)
-  // ==========================================
+  // ─────────────────────────────────────────────
+  // STUDENT VIEWS
+  // ─────────────────────────────────────────────
+  const bg = { background: '#08090f', minHeight: '100%' };
+
   if (gameStatus === 'lobby_join') {
-    const hasJoined = players[studentId];
+    const joined = !!players[studentId];
     return (
-      <div className="flex flex-col h-full w-full scifi-bg p-6 justify-center items-center text-center relative">
-        <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 magister-font mb-8">ASTROGRAM</h2>
-        {hasJoined ? (
-            <div className="animate-in zoom-in duration-500 flex flex-col items-center">
-                <div className="w-24 h-24 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-6 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-                    <CheckCircle2 size={48} />
-                </div>
-                <p className="text-xl font-black text-slate-200 uppercase tracking-widest mb-4">Connection Established</p>
-                <p className="text-indigo-400/50 text-sm font-bold uppercase tracking-widest animate-pulse">Awaiting Launch Sequence...</p>
+      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32, textAlign:'center', color:'#f8fafc' }}>
+        <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:42, marginBottom:6 }}>WordForge</div>
+        <p style={{ color:'rgba(255,255,255,0.3)', fontSize:12, letterSpacing:3, textTransform:'uppercase', marginBottom:40 }}>Vocabulary Discovery</p>
+        {joined ? (
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
+            <div style={{ width:64, height:64, borderRadius:16, background:'rgba(74,222,128,0.1)', border:'1px solid rgba(74,222,128,0.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <CheckCircle2 size={32} style={{color:'#4ade80'}}/>
             </div>
+            <p style={{ fontSize:15, fontWeight:600, color:'#f8fafc' }}>You're in!</p>
+            <p style={{ fontSize:12, color:'rgba(255,255,255,0.3)', letterSpacing:2, textTransform:'uppercase' }}>Waiting for the session to start...</p>
+          </div>
         ) : (
-            <button 
-              onClick={joinLobby}
-              className="p-8 bg-indigo-600/20 hover:bg-indigo-600/40 backdrop-blur-md rounded-[2rem] font-black text-xl uppercase tracking-widest shadow-[0_0_40px_rgba(79,70,229,0.3)] transition-all active:scale-95 text-indigo-100 border border-indigo-500/50"
-            >
-              Join the Stars
-            </button>
+          <button onClick={joinLobby} style={{
+            padding:'16px 40px', borderRadius:14, fontSize:17, fontWeight:600, cursor:'pointer',
+            background:'rgba(79,70,229,0.15)', border:'1px solid rgba(79,70,229,0.4)',
+            color:'#a5b4fc', transition:'all 0.15s'
+          }}>
+            Join Session
+          </button>
         )}
       </div>
     );
   }
 
   if (gameStatus === 'lobby_naming') {
-    if (!myTeamEntry) return <div className="scifi-bg w-full h-full flex items-center justify-center text-slate-500 font-bold uppercase tracking-widest">Spectator Mode</div>;
+    if (!myTeamEntry) return <div className="wf-root" style={{ ...bg, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:13 }}>Spectator mode</div>;
     return (
-        <div className="flex flex-col h-full w-full scifi-bg p-6 text-center relative">
-            <div className={`p-10 rounded-[2.5rem] bg-slate-900/60 backdrop-blur-xl border border-slate-700 shadow-2xl mb-8 flex flex-col items-center`}>
-                {myTeamEntry.avatar ? (
-                    <img src={myTeamEntry.avatar} className="w-20 h-20 bg-slate-950 rounded-full mb-6 border border-slate-800 shadow-inner" alt="Avatar" />
-                ) : (
-                    <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-inner">
-                        <User size={32} className={myTeamEntry.textColor} />
-                    </div>
-                )}
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Explorer Alias</h3>
-                <h2 className={`text-3xl font-black uppercase tracking-tight ${myTeamEntry.textColor}`}>{myTeamEntry.name}</h2>
-            </div>
-            <div className="bg-slate-900/80 backdrop-blur-md p-8 rounded-[2rem] border border-slate-800 shadow-xl">
-                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4 block flex items-center justify-center gap-2">
-                    <PenTool size={14}/> Reconfigure Identifier
-                </label>
-                <div className="flex flex-col gap-4">
-                    <input 
-                        defaultValue={myTeamEntry.name}
-                        onBlur={(e) => submitTeamName(e.target.value)} 
-                        maxLength={15}
-                        placeholder="Your Name" 
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-white text-lg font-mono font-bold outline-none focus:border-indigo-500 transition-colors text-center shadow-inner"
-                    />
-                    <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Auto-syncs on blur</p>
-                </div>
-            </div>
-            <p className="mt-auto text-indigo-400/50 font-bold uppercase tracking-widest text-xs animate-pulse">Awaiting launch...</p>
+      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc' }}>
+        <div style={{ padding:24, borderRadius:20, background:'rgba(255,255,255,0.04)', border:`1px solid ${myTeamEntry.color?.border||'rgba(255,255,255,0.1)'}`, display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', marginBottom:20 }}>
+          {myTeamEntry.avatar && <img src={myTeamEntry.avatar} style={{width:64,height:64,borderRadius:'50%',marginBottom:12,background:'rgba(255,255,255,0.05)'}} />}
+          <span style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:2, display:'block', marginBottom:4 }}>Your name</span>
+          <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:28, color:myTeamEntry.color?.bg||'#f8fafc' }}>{myTeamEntry.name}</span>
         </div>
+        <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:20 }}>
+          <label style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:2, display:'block', marginBottom:10 }}>Update name</label>
+          <input
+            defaultValue={myTeamEntry.name}
+            onBlur={e => {
+              const v = e.target.value.trim();
+              if (v && myTeamId) {
+                const upd = { ...teams }; upd[myTeamId].name = v;
+                onUpdateLiveState({ teams: upd });
+              }
+            }}
+            maxLength={15}
+            style={{
+              width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)',
+              borderRadius:10, padding:'12px 16px', color:'#f8fafc', fontSize:16, fontFamily:"'DM Sans', sans-serif",
+              outline:'none', boxSizing:'border-box', textAlign:'center'
+            }}
+          />
+          <p style={{ fontSize:10, color:'rgba(255,255,255,0.2)', textAlign:'center', marginTop:8 }}>Saved automatically</p>
+        </div>
+        <p style={{ color:'rgba(255,255,255,0.2)', fontSize:11, textTransform:'uppercase', letterSpacing:2, textAlign:'center', marginTop:'auto', paddingTop:24 }}>Waiting for the teacher to start...</p>
+      </div>
     );
   }
 
   if (gameStatus === 'finished') {
-    const myScore = scores[myTeamId] || 0;
-    const sortedTeams = [...teamArray].sort((a, b) => (scores[b.id] || 0) - (scores[a.id] || 0));
-    const myRank = sortedTeams.findIndex((t: any) => t.id === myTeamId) + 1;
-    
+    const myScore = scores[myTeamId]||0;
+    const sorted = [...teamArray].sort((a,b) => (scores[b.id]||0)-(scores[a.id]||0));
+    const rank = sorted.findIndex((t: any) => t.id === myTeamId)+1;
+    const myJournal = journals[myTeamId]||[];
     return (
-        <div className="flex flex-col h-full w-full scifi-bg p-6 justify-center items-center text-center relative">
-            <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400 magister-font mb-8">OPERATION COMPLETE</h2>
-            
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-700 p-8 rounded-[3rem] shadow-2xl flex flex-col items-center">
-                {myTeamEntry?.avatar && <img src={myTeamEntry.avatar} className="w-24 h-24 bg-slate-950 rounded-full mb-6 border border-slate-800 shadow-inner" />}
-                <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Final Star Power</p>
-                <h3 className="text-6xl font-mono font-black text-white mb-6">{myScore}</h3>
-                <div className="bg-slate-950 border border-slate-800 px-6 py-3 rounded-full flex items-center gap-3">
-                    <Trophy className="text-amber-400 w-5 h-5"/>
-                    <span className="font-black text-slate-300 uppercase tracking-widest text-sm">Rank: #{myRank}</span>
-                </div>
-            </div>
+      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }}>
+        <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:32, marginBottom:4 }}>Session Complete</div>
+        <p style={{ color:'rgba(255,255,255,0.35)', fontSize:12, marginBottom:24 }}>Here's what you discovered</p>
+        <div style={{ padding:24, borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', textAlign:'center', marginBottom:24 }}>
+          <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:56, lineHeight:1 }}>{myScore}</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:2, marginTop:4 }}>points · Rank #{rank}</div>
         </div>
+        {myJournal.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'rgba(255,255,255,0.3)', marginBottom:14 }}>Your word journal ({myJournal.length} words)</p>
+            {myJournal.map((e: any, i: number) => <WordCard key={i} entry={e} />)}
+          </div>
+        )}
+      </div>
     );
   }
 
+  // ── Sentence Bonus Screen ──
   if (isMyTurn && pendingSentence) {
     return (
-        <div className="flex flex-col h-full w-full scifi-bg p-6 text-center animate-in zoom-in-95 relative overflow-y-auto">
-            <div className="flex-1 flex flex-col justify-center items-center max-w-sm mx-auto w-full relative z-10 py-12">
-                <div className="relative">
-                    <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 rounded-full" />
-                    <Star size={72} className="text-indigo-400 mb-6 relative z-10" fill="currentColor" />
-                </div>
-                
-                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight magister-font">COSMIC DISCOVERY</h2>
-                
-                <div className="bg-slate-900/80 border border-slate-700 rounded-2xl w-full p-4 mb-6 shadow-inner text-left">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 border-b border-slate-800 pb-2">Valid Database Entries Found</p>
-                    {currentTurnWords.map((disc: any, idx: number) => (
-                        <div key={idx} className="mb-3 last:mb-0">
-                            <span className="font-black text-indigo-300 block text-sm">{disc.word}</span>
-                            <span className="text-xs text-slate-300 font-medium">{disc.def}</span>
-                        </div>
-                    ))}
-                </div>
-
-                <p className="text-slate-400 font-medium mb-4 text-sm px-4">Write a sentence using one of your newly formed words to earn +5 Star Power.</p>
-                
-                <textarea 
-                    value={sentenceText}
-                    onChange={e => setSentenceText(e.target.value)}
-                    placeholder="Input contextual sentence..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-5 text-slate-200 text-lg font-medium outline-none focus:border-indigo-500 transition-colors mb-8 min-h-[120px] shadow-inner"
-                />
-
-                <div className="flex flex-col gap-3 w-full">
-                    <button 
-                        onClick={() => commitTurn(true)}
-                        disabled={sentenceText.trim().length < 5}
-                        className="w-full py-4 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/50 disabled:bg-slate-900 disabled:border-slate-800 disabled:text-slate-600 text-indigo-100 font-black uppercase tracking-widest rounded-xl transition-all shadow-lg disabled:shadow-none flex items-center justify-center gap-2"
-                    >
-                        <MessageSquare size={16} /> Submit Discovery
-                    </button>
-                    <button 
-                        onClick={() => commitTurn(false)}
-                        className="w-full py-4 bg-transparent text-slate-500 hover:text-slate-300 font-black uppercase tracking-widest rounded-xl transition-colors"
-                    >
-                        Bypass Bonus
-                    </button>
-                </div>
-            </div>
+      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }} className="wf-scroll">
+        <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:28, marginBottom:4 }}>Words found!</div>
+        <p style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginBottom:20 }}>Earn +5 points by writing a sentence using one of these words.</p>
+        <div style={{ marginBottom:20 }}>
+          {currentWords.map((e,i) => <WordCard key={i} entry={e} />)}
         </div>
+        <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:16, padding:16, border:'1px solid rgba(255,255,255,0.08)', marginBottom:16 }}>
+          <label style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'rgba(255,255,255,0.3)', display:'block', marginBottom:10 }}>
+            Write a sentence using one of your words
+          </label>
+          <textarea
+            value={sentenceText}
+            onChange={e => setSentenceText(e.target.value)}
+            placeholder="e.g. The ancient temple was a remarkable structure..."
+            style={{
+              width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
+              borderRadius:10, padding:'12px 14px', color:'#f8fafc', fontSize:14, fontFamily:"'DM Sans', sans-serif",
+              outline:'none', resize:'vertical', minHeight:100, boxSizing:'border-box',
+              lineHeight: 1.6
+            }}
+          />
+        </div>
+        <button
+          onClick={() => commitTurn(true)}
+          disabled={sentenceText.trim().length < 6}
+          style={{
+            padding:'13px 20px', borderRadius:12, fontSize:14, fontWeight:600, cursor:'pointer',
+            background: sentenceText.trim().length >= 6 ? 'rgba(245,208,90,0.15)' : 'rgba(255,255,255,0.04)',
+            border: sentenceText.trim().length >= 6 ? '1px solid rgba(245,208,90,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            color: sentenceText.trim().length >= 6 ? '#f5d05a' : 'rgba(255,255,255,0.25)',
+            display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:8
+          }}
+        >
+          <MessageSquare size={16}/> Submit with bonus (+5)
+        </button>
+        <button onClick={() => commitTurn(false)} style={{
+          padding:'13px 20px', borderRadius:12, fontSize:13, cursor:'pointer',
+          background:'transparent', border:'none', color:'rgba(255,255,255,0.3)', fontWeight:500
+        }}>Skip bonus, play word</button>
+      </div>
     );
   }
 
-  // MAIN GAME RENDER (MOBILE APP)
+  // ── MAIN GAME (Student) ──
+  const myJournal = journals[myTeamId] || [];
   return (
-    <div className="flex flex-col h-full w-full scifi-bg p-2 overflow-hidden relative">
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
-      
-      <div className={`relative z-10 flex justify-between items-center mb-3 p-3 rounded-2xl border backdrop-blur-md transition-colors ${isMyTurn ? 'bg-indigo-900/20 border-indigo-500/30' : (isTimerPaused ? 'bg-amber-900/20 border-amber-500/30' : 'bg-slate-900/40 border-slate-800')}`}>
-         <span className={`${isMyTurn ? 'text-indigo-300 animate-pulse' : (isTimerPaused ? 'text-amber-400 animate-pulse' : 'text-slate-500')} font-black uppercase tracking-widest flex items-center gap-2 text-xs transition-colors`}>
-            {isTimerPaused ? <Pause size={14} /> : <Clock size={14} />} 
-            {isTimerPaused ? 'PAUSED' : `${timeLeft}s`}
-         </span>
-         
-         <div className="flex items-center gap-2">
+    <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', height:'100%', padding:10, overflow:'hidden', position:'relative' }}>
+
+      {/* Journal overlay */}
+      {showJournal && <JournalPanel words={myJournal} onClose={() => setShowJournal(false)} />}
+
+      {/* Header bar */}
+      <div style={{
+        display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8,
+        padding:'8px 12px', borderRadius:12,
+        background: isMyTurn ? 'rgba(79,70,229,0.1)' : 'rgba(255,255,255,0.03)',
+        border: isMyTurn ? '1px solid rgba(79,70,229,0.25)' : '1px solid rgba(255,255,255,0.07)'
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          {isTimerPaused ? <Pause size={13} style={{color:'#f59e0b'}}/> : <Clock size={13} style={{color:'rgba(255,255,255,0.3)'}}/>}
+          <span style={{ fontFamily:'monospace', fontSize:14, fontWeight:700, color: isTimerPaused ? '#f59e0b' : (isMyTurn ? '#a5b4fc' : 'rgba(255,255,255,0.4)') }}>
+            {isTimerPaused ? 'Paused' : `${timeLeft}s`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
             {isExtraTurn && isMyTurn && <FastForward size={14} className="text-fuchsia-400 animate-pulse" />}
-            <span className={`${isMyTurn ? 'text-white' : 'text-slate-400'} font-black uppercase tracking-widest truncate max-w-[150px] text-right text-xs transition-colors`}>
-                {isMyTurn ? "Your Turn" : `${activeTeam?.name}'s Turn`}
+            <span style={{ fontSize:12, fontWeight:600, color: isMyTurn ? '#a5b4fc' : 'rgba(255,255,255,0.4)' }}>
+                {isMyTurn ? 'Your turn' : `${activeTeam?.name}'s turn`}
             </span>
-            {activeTeam?.avatar && !isMyTurn && (
-                <img src={activeTeam.avatar} className="w-5 h-5 rounded-full bg-slate-800" alt="Active Player" />
-            )}
-         </div>
+        </div>
+        <button onClick={() => setShowJournal(true)} style={{
+          display:'flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:8,
+          background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
+          cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:11, fontWeight:600
+        }}>
+          <BookOpen size={12}/> Journal {myJournal.length > 0 && `(${myJournal.length})`}
+        </button>
       </div>
 
-      <div className="relative z-10 flex-1 overflow-auto rounded-2xl shadow-inner bg-slate-900/40 backdrop-blur-md border border-slate-700/50 no-scrollbar">
-        
-        {/* 🔥 TACTICAL ZOOM HUD */}
-        <div className="sticky top-2 right-2 float-right z-50 flex flex-col gap-2 bg-slate-950/80 backdrop-blur-md p-2 rounded-xl border border-slate-800 shadow-[0_0_15px_rgba(0,0,0,0.5)] mr-2">
-            <button onClick={handleZoomIn} className="text-slate-400 hover:text-indigo-400 active:scale-95 transition-all">
-                <ZoomIn size={18} />
-            </button>
-            <div className="w-full h-[1px] bg-slate-800"></div>
-            <button onClick={handleZoomReset} className="text-slate-400 hover:text-indigo-400 active:scale-95 transition-all">
-                <LocateFixed size={18} />
-            </button>
-            <div className="w-full h-[1px] bg-slate-800"></div>
-            <button onClick={handleZoomOut} className="text-slate-400 hover:text-indigo-400 active:scale-95 transition-all">
-                <ZoomOut size={18} />
-            </button>
+      {/* Board area */}
+      <div style={{ flex:1, overflow:'auto', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', position:'relative', marginBottom:8 }} className="wf-scroll">
+        {/* Zoom HUD */}
+        <div style={{
+          position:'sticky', top:8, left:'calc(100% - 44px)', float:'right', zIndex:50,
+          display:'flex', flexDirection:'column', gap:0,
+          background:'rgba(8,10,20,0.9)', border:'1px solid rgba(255,255,255,0.1)',
+          borderRadius:10, overflow:'hidden', marginRight:8, width:32
+        }}>
+          {[{icon:<ZoomIn size={14}/>, fn:() => setZoom(p=>Math.min(p+0.2,2.0))},
+            {icon:<LocateFixed size={14}/>, fn:() => setZoom(1)},
+            {icon:<ZoomOut size={14}/>, fn:() => setZoom(p=>Math.max(p-0.2,0.5))}
+          ].map((b, i) => (
+            <button key={i} onClick={b.fn} style={{
+              width:32, height:30, display:'flex', alignItems:'center', justifyContent:'center',
+              background:'transparent', border:'none', borderBottom: i<2?'1px solid rgba(255,255,255,0.07)':undefined,
+              cursor:'pointer', color:'rgba(255,255,255,0.4)', transition:'color 0.1s'
+            }}>{b.icon}</button>
+          ))}
         </div>
 
-        {/* 🔥 SMART SCALING WRAPPER */}
-        <div className="relative origin-top-left transition-transform duration-300" style={{ transform: `scale(${zoomLevel})`, width: `${750 * zoomLevel}px`, height: `${750 * zoomLevel}px` }}>
-            <div className="board-grid absolute top-0 left-0 w-[750px] h-[750px] p-3">
-            {(localBoard || []).map((tile: any, index: number) => {
-                const r = Math.floor(index / BOARD_SIZE);
-                const c = index % BOARD_SIZE;
-                const isTargeted = targetSquare === index;
-                const type = getSquareType(r, c);
-                
-                return (
-                <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square relative flex items-center justify-center transition-all rounded-md ${getSquareClasses(r, c, tile, isTargeted)}`}>
-                    {!tile && type === 'CT' && <Star className="text-indigo-400 opacity-30 w-8 h-8" fill="currentColor" />}
-                    {!tile && type === 'DP' && <FastForward className="text-fuchsia-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
-                    
-                    {/* ORBITAL RETICLE */}
-                    {isTargeted && !tile && isMyTurn && !isTimerPaused && (
-                        <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]" style={{ transform: `scale(${1/zoomLevel})` }}>
-                            {rack.map((rackTile: any, rackIdx: number) => {
-                                if (!rackTile) return null;
-                                const angle = (rackIdx / 7) * Math.PI * 2 - (Math.PI / 2);
-                                const radius = 90; 
-                                const x = Math.cos(angle) * radius;
-                                const y = Math.sin(angle) * radius;
-                                return (
-                                    <div
-                                        key={`orbit_${rackIdx}`}
-                                        onClick={(e) => { e.stopPropagation(); handleRackClick(rackIdx); }}
-                                        className="absolute w-12 h-12 -ml-6 -mt-6 transition-all duration-300 animate-in zoom-in spin-in"
-                                        style={{ transform: `translate(${x}px, ${y}px)` }}
-                                    >
-                                        <DataTile tile={rackTile} className="w-full h-full shadow-[0_10px_30px_rgba(0,0,0,0.8)]" />
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    )}
-                    
-                    {tile && <DataTile tile={tile} isLocked={tile.isLocked} className="w-[90%] h-[90%]" />}
-                </div>
-                );
-            })}
-            </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 mt-3 bg-slate-900/80 backdrop-blur-xl rounded-2xl p-3 border border-slate-700 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] w-full ring-1 ring-white/5">
-         
-         {invalidWords.length > 0 && (
-             <div className="bg-rose-500/90 text-white px-3 py-2 rounded-lg mb-2 flex items-center gap-2 text-xs font-bold shadow-sm animate-in slide-in-from-bottom-2">
-                 <AlertTriangle size={14} /> Sequence Invalid: {invalidWords.join(', ')}
-             </div>
-         )}
-
-         <div className="flex justify-between items-end mb-3 px-2">
-             <p className={`text-[9px] font-black uppercase tracking-widest ${isMyTurn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`}>
-                {isTimerPaused ? 'OPERATION PAUSED BY INSTRUCTOR' : (isMyTurn ? (targetSquare === null ? 'Select orbital coordinate' : 'Tap Astro-Tile to deploy') : 'Sort your tiles')}
-             </p>
-             <div className="flex gap-2">
-                 <button 
-                     onClick={handlePurge} 
-                     disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
-                     title="Purge Hand (-10 XP)"
-                     className="p-1.5 bg-rose-500/20 text-rose-400 hover:text-white hover:bg-rose-500/40 rounded-lg active:scale-95 transition-colors border border-rose-500/30 shadow-sm disabled:opacity-30 disabled:hover:bg-rose-500/20 disabled:hover:text-rose-400"
-                 >
-                     <RefreshCw size={14} />
-                 </button>
-                 <button onClick={shuffleRack} disabled={isTimerPaused} className="p-1.5 bg-slate-950 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-800 shadow-sm disabled:opacity-30">
-                     <Shuffle size={14} />
-                 </button>
-             </div>
-         </div>
-
-         <div className="flex gap-2 bg-black/60 p-2.5 rounded-xl w-full justify-center min-h-[4rem] border border-slate-800/80 shadow-inner">
-            {rack.map((tile: any, idx: number) => {
-              const isRackSelected = selectedRackIndex === idx;
+        <div style={{ transformOrigin:'top left', transform:`scale(${zoom})`, width:`${720*zoom}px`, height:`${720*zoom}px` }}>
+          <div className="wf-board" style={{ width:720, height:720, padding:8, boxSizing:'border-box' }}>
+            {(localBoard||[]).map((tile: any, idx: number) => {
+              const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
+              const isTarget = targetSquare === idx;
+              const type = getSquareType(r,c);
               return (
-                <div 
-                  key={idx} 
-                  onClick={() => handleRackClick(idx)} 
-                  className={`w-10 h-10 rounded-lg transition-all ${!tile ? 'bg-white/5 border border-white/5' : ''} ${isRackSelected ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-black scale-105' : ''} ${isTimerPaused ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                   {tile && <DataTile tile={tile} className="w-full h-full" />}
+                <div key={idx} onClick={() => handleBoardClick(idx)} style={{ ...squareStyle(r,c,isTarget), display:'flex', alignItems:'center', justifyContent:'center', position:'relative', cursor: isMyTurn&&!tile?.isLocked ? 'pointer' : 'default' }}>
+                  {!tile && type === 'CT' && <Star size={10} style={{color:'rgba(79,70,229,0.4)'}} fill="currentColor"/>}
+                  {!tile && type === 'TW' && <span style={{fontSize:6,fontWeight:700,color:'rgba(220,38,38,0.5)',textTransform:'uppercase'}}>3W</span>}
+                  {!tile && type === 'DW' && <span style={{fontSize:6,fontWeight:700,color:'rgba(217,119,6,0.5)',textTransform:'uppercase'}}>2W</span>}
+                  {!tile && type === 'TL' && <span style={{fontSize:6,fontWeight:700,color:'rgba(8,145,178,0.5)',textTransform:'uppercase'}}>3L</span>}
+                  {!tile && type === 'DL' && <span style={{fontSize:6,fontWeight:700,color:'rgba(5,150,105,0.5)',textTransform:'uppercase'}}>2L</span>}
+                  {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)'}} fill="currentColor"/>}
+
+                  {/* Orbital tile selector */}
+                  {isTarget && !tile && isMyTurn && !isTimerPaused && (
+                    <div style={{ position:'absolute', top:'50%', left:'50%', width:0, height:0, zIndex:100, transform:`scale(${1/zoom})` }}>
+                      {rack.map((rt: any, ri: number) => {
+                        if (!rt) return null;
+                        const angle = (ri/7)*Math.PI*2 - Math.PI/2;
+                        const rad = 88;
+                        const x = Math.cos(angle)*rad, y = Math.sin(angle)*rad;
+                        return (
+                          <div key={`orb_${ri}`} onClick={e => { e.stopPropagation(); handleRackClick(ri); }}
+                            style={{ position:'absolute', width:40, height:40, marginLeft:-20, marginTop:-20, transform:`translate(${x}px,${y}px)`, zIndex:200 }}>
+                            <Tile tile={rt} size="md" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {tile && <Tile tile={tile} locked={tile.isLocked} size="sm" />}
                 </div>
               );
             })}
-         </div>
+          </div>
+        </div>
       </div>
 
-      <div className="relative z-10 flex gap-2 mt-3 pb-2">
-         <button onClick={recallAll} disabled={isValidating || isTimerPaused} className="flex-1 py-3.5 bg-slate-900/80 text-slate-300 rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 active:scale-95 transition-colors hover:bg-slate-800 border border-slate-700 disabled:opacity-50">
-             <ArrowDownToLine size={16}/> Recall
-         </button>
-         
-         {isMyTurn ? (
-             <button onClick={handleInitiateCommit} disabled={isValidating || isTimerPaused} className="flex-1 py-3.5 bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 shadow-lg active:scale-95 border border-indigo-500/50 transition-colors hover:bg-indigo-600/40 disabled:opacity-50 disabled:border-indigo-800">
-                 {isValidating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16}/>} 
-                 {isValidating ? 'Validating...' : 'Play Sequence'}
-             </button>
-         ) : (
-             <div className="flex-1 py-3.5 bg-slate-950/80 text-slate-600 rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 border border-slate-800/50">
-                 Standby...
-             </div>
-         )}
+      {/* Error banner */}
+      {invalidWords.length > 0 && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:10, background:'rgba(220,38,38,0.15)', border:'1px solid rgba(220,38,38,0.3)', marginBottom:6, fontSize:12, color:'#fca5a5' }}>
+          <AlertTriangle size={13}/> {invalidWords.join(', ')} — not found in dictionary
+        </div>
+      )}
+
+      {/* Rack */}
+      <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'10px 12px', marginBottom:8 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+          <span style={{ fontSize:10, textTransform:'uppercase', letterSpacing:2, color: isMyTurn ? 'rgba(165,180,252,0.6)' : 'rgba(255,255,255,0.2)' }}>
+            {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
+          </span>
+          <div style={{ display:'flex', gap:6 }}>
+            {/* 🔥 MULLIGAN / DATA PURGE BUTTON */}
+            <button 
+                onClick={handlePurge} 
+                disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
+                title="Purge Hand (-10 XP)"
+                style={{ width:28, height:28, borderRadius:7, background:'rgba(244,63,94,0.15)', border:'1px solid rgba(244,63,94,0.3)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fb7185', opacity: (!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10)?0.3:1 }}
+            >
+                <RefreshCw size={13} />
+            </button>
+            <button onClick={shuffleRack} disabled={isTimerPaused} style={{ width:28, height:28, borderRadius:7, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.4)', opacity: isTimerPaused?0.3:1 }}>
+              <Shuffle size={13}/>
+            </button>
+          </div>
+        </div>
+        <div style={{ display:'flex', gap:6, justifyContent:'center', minHeight:44 }}>
+          {rack.map((tile: any, i: number) => (
+            <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.02)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.06)', opacity: isTimerPaused ? 0.4 : 1 }}>
+              {tile && <Tile tile={tile} selected={selectedRack===i} size="md" />}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Action buttons */}
+      <div style={{ display:'flex', gap:8 }}>
+        <button onClick={recallAll} disabled={isValidating||isTimerPaused} style={{
+          flex:1, padding:'12px 0', borderRadius:12, fontSize:12, fontWeight:600, cursor:'pointer',
+          background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
+          color:'rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+          opacity: isValidating||isTimerPaused ? 0.4 : 1
+        }}>
+          <ArrowDownToLine size={14}/> Recall
+        </button>
+        {isMyTurn ? (
+          <button onClick={handleCommit} disabled={isValidating||isTimerPaused} style={{
+            flex:2, padding:'12px 0', borderRadius:12, fontSize:13, fontWeight:600, cursor:'pointer',
+            background: 'rgba(79,70,229,0.15)', border:'1px solid rgba(79,70,229,0.4)',
+            color:'#a5b4fc', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+            opacity: isValidating||isTimerPaused ? 0.5 : 1
+          }}>
+            {isValidating ? <><Loader2 size={14} style={{animation:'spin 1s linear infinite'}}/> Checking...</> : <><CheckCircle2 size={14}/> Play Word</>}
+          </button>
+        ) : (
+          <div style={{ flex:2, padding:'12px 0', borderRadius:12, fontSize:12, textAlign:'center', color:'rgba(255,255,255,0.2)', border:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            Standby...
+          </div>
+        )}
+      </div>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
