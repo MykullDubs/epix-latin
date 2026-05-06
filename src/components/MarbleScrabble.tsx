@@ -79,25 +79,23 @@ const createBag = () => {
 };
 
 // ─────────────────────────────────────────────
-// 3D TILE COMPONENT
+// 3D NEON TILE COMPONENT
 // ─────────────────────────────────────────────
 const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = false, isSolid = false, isRack3D = false }: any) => {
   if (!tile) return null;
-  const sz = size === 'sm' ? 'w-8 h-8 text-sm' : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
+  const sz = size === 'sm' ? 'w-8 h-8 text-xs' : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
   
-  let zDepth = 'none';
-  if (isBoardTile) {
-      zDepth = selected ? 'translateZ(25px) scale(1.1)' : 'translateZ(10px)';
-  } else if (isRack3D) {
-      zDepth = selected ? 'translateZ(20px) translateY(-10px) scale(1.1)' : 'translateZ(0px)';
-  } else {
-      zDepth = selected ? 'translateY(-3px) scale(1.08)' : 'none';
-  }
+  const zDepth = isBoardTile ? (selected ? 'translateZ(30px) scale(1.15)' : 'translateZ(12px)') : (selected ? 'translateY(-5px) scale(1.1)' : 'none');
   
   const defaultBg = isSolid ? '#0f172a' : 'rgba(255,255,255,0.06)';
-  const defaultBorder = isSolid ? '1px solid rgba(148, 163, 184, 0.3)' : '1px solid rgba(255,255,255,0.12)';
-  const selectedBg = isSolid ? '#78350f' : 'rgba(245,208,90,0.2)'; 
-  const selectedBorder = isSolid ? '1.5px solid #f59e0b' : '1.5px solid rgba(245,208,90,0.7)';
+  const defaultBorder = isSolid ? '1px solid rgba(148, 163, 184, 0.5)' : '1px solid rgba(255,255,255,0.2)';
+  const selectedBg = isSolid ? '#78350f' : 'rgba(245,208,90,0.3)'; 
+  const selectedBorder = isSolid ? '2px solid #f59e0b' : '2px solid rgba(245,208,90,0.9)';
+
+  const neonGlow = isSolid ? 'none' : '0 0 10px rgba(192,132,252,0.4), inset 0 0 15px rgba(192,132,252,0.2)';
+  const selectedGlow = '0 0 25px rgba(245,208,90,0.6), inset 0 0 20px rgba(245,208,90,0.4)';
+  
+  const letterGlow = isSolid ? 'none' : '0 0 8px #fff, 0 0 15px #d946ef';
 
   return (
     <div
@@ -105,7 +103,7 @@ const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = fals
       style={{
         background: selected ? selectedBg : defaultBg,
         border: selected ? selectedBorder : defaultBorder,
-        boxShadow: selected ? '0 0 20px rgba(245,208,90,0.3)' : (isSolid ? '0 6px 12px rgba(0,0,0,0.8)' : '0 4px 12px rgba(0,0,0,0.5)'),
+        boxShadow: selected ? selectedGlow : neonGlow,
         transform: zDepth,
         transformStyle: 'preserve-3d',
         cursor: locked ? 'default' : 'pointer',
@@ -113,14 +111,14 @@ const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = fals
       }}
       className={`${sz} relative flex items-center justify-center rounded-lg transition-all duration-300 select-none ${!isSolid ? 'backdrop-blur-md' : ''}`}
     >
-      <span style={{ color: locked ? 'rgba(255,255,255,0.7)' : (isSolid ? '#ffffff' : '#f8fafc'), fontWeight: 700, lineHeight: 1, textShadow: isSolid ? 'none' : '0 2px 4px rgba(0,0,0,0.5)' }}>
+      <span style={{ color: locked ? 'rgba(255,255,255,0.6)' : '#ffffff', fontWeight: 900, lineHeight: 1, textShadow: letterGlow }}>
         {tile.letter}
       </span>
       <span style={{
         position: 'absolute', bottom: 1, right: 2,
-        fontSize: 8, fontWeight: 700, color: '#f59e0b',
+        fontSize: 8, fontWeight: 800, color: '#fcd34d',
         fontFamily: 'monospace', lineHeight: 1,
-        textShadow: isSolid ? 'none' : '0 1px 2px rgba(0,0,0,0.8)'
+        textShadow: isSolid ? 'none' : '0 0 5px #f59e0b'
       }}>{tile.value}</span>
     </div>
   );
@@ -137,14 +135,14 @@ const WordCard = ({ entry }: any) => {
       borderRadius: 12, padding: '10px 14px', marginBottom: 8, position: 'relative', overflow: 'hidden'
     }}>
       {entry.isStanza && (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#d946ef' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#d946ef', boxShadow: '0 0 10px #d946ef' }} />
       )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: '#f8fafc', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: '#f8fafc', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6, textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>
           {entry.word}
           {entry.isStanza && (
             <span title="Stanza Stack" style={{ display: 'flex', alignItems: 'center' }}>
-                <Layers size={14} style={{ color: '#d946ef' }} />
+                <Layers size={14} style={{ color: '#d946ef', filter: 'drop-shadow(0 0 5px #d946ef)' }} />
             </span>
           )}
         </span>
@@ -184,10 +182,11 @@ const JournalPanel = ({ words, onClose }: any) => {
     <div style={{
       position: 'absolute', inset: 0, zIndex: 100,
       background: 'rgba(8,10,20,0.97)', overflowY: 'auto',
-      borderRadius: 16, padding: 20
+      borderRadius: 16, padding: 20,
+      backdropFilter: 'blur(10px)'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#f8fafc' }}>
+        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#f8fafc', textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>
           Word Journal
         </span>
         <button onClick={onClose} style={{
@@ -203,7 +202,7 @@ const JournalPanel = ({ words, onClose }: any) => {
         <div key={tier} style={{ marginBottom: 20 }}>
           <div style={{
             fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5,
-            color: TIERS[tier].color, marginBottom: 8
+            color: TIERS[tier].color, marginBottom: 8, textShadow: `0 0 8px ${TIERS[tier].color}`
           }}>{TIERS[tier].label} — {entries.length} word{entries.length !== 1 ? 's' : ''}</div>
           {entries.map((e: any, i: number) => <WordCard key={i} entry={e} />)}
         </div>
@@ -217,13 +216,13 @@ const JournalPanel = ({ words, onClose }: any) => {
 // ─────────────────────────────────────────────
 const squareStyle = (r: number, c: number, targeted: boolean) => {
   const type = getSquareType(r, c);
-  let bg = 'rgba(255,255,255,0.03)', border = 'rgba(255,255,255,0.07)';
-  if (type === 'TW') { bg = 'rgba(220,38,38,0.18)'; border = 'rgba(220,38,38,0.4)'; }
-  else if (type === 'DW') { bg = 'rgba(217,119,6,0.18)'; border = 'rgba(217,119,6,0.4)'; }
-  else if (type === 'TL') { bg = 'rgba(8,145,178,0.18)'; border = 'rgba(8,145,178,0.4)'; }
-  else if (type === 'DL') { bg = 'rgba(5,150,105,0.18)'; border = 'rgba(5,150,105,0.4)'; }
-  else if (type === 'CT') { bg = 'rgba(79,70,229,0.2)'; border = 'rgba(79,70,229,0.45)'; }
-  else if (type === 'DP') { bg = 'rgba(217,70,239,0.18)'; border = 'rgba(217,70,239,0.4)'; }
+  let bg = 'rgba(255,255,255,0.02)', border = 'rgba(255,255,255,0.08)';
+  if (type === 'TW') { bg = 'rgba(220,38,38,0.15)'; border = 'rgba(220,38,38,0.4)'; }
+  else if (type === 'DW') { bg = 'rgba(217,119,6,0.15)'; border = 'rgba(217,119,6,0.4)'; }
+  else if (type === 'TL') { bg = 'rgba(8,145,178,0.15)'; border = 'rgba(8,145,178,0.4)'; }
+  else if (type === 'DL') { bg = 'rgba(5,150,105,0.15)'; border = 'rgba(5,150,105,0.4)'; }
+  else if (type === 'CT') { bg = 'rgba(79,70,229,0.2)'; border = 'rgba(79,70,229,0.5)'; }
+  else if (type === 'DP') { bg = 'rgba(217,70,239,0.15)'; border = 'rgba(217,70,239,0.4)'; }
 
   if (targeted) { bg = 'rgba(245,208,90,0.15)'; border = 'rgba(245,208,90,0.6)'; }
   return { background: bg, border: `1px solid ${border}`, borderRadius: 4, transformStyle: 'preserve-3d' as 'preserve-3d' };
@@ -246,7 +245,15 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         .wf-board { display: grid; grid-template-columns: repeat(${BOARD_SIZE}, 1fr); gap: 2px; }
         .wf-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
         .wf-scroll::-webkit-scrollbar-track { background: transparent; }
-        .wf-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .wf-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        
+        @keyframes neon-float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-12px); }
+        }
+        .animate-float {
+            animation: neon-float 5s ease-in-out infinite;
+        }
       `;
       document.head.appendChild(s);
     }
@@ -259,6 +266,10 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const globalBag = liveState?.bag;
   const scores: Record<string, number> = liveState?.scores || {};
   const journals: Record<string, any[]> = liveState?.journals || {};
+  
+  const liveRacks: Record<string, any[]> = liveState?.racks || {};
+  const liveAngles: Record<string, number> = liveState?.angles || {};
+  
   const latestDiscoveries: any[] = liveState?.latestDiscoveries || [];
   const latestSentence = liveState?.latestSentence;
   const activeTeamIndex = liveState?.activeTeamIndex || 0;
@@ -305,11 +316,29 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [showJournal, setShowJournal] = useState(false);
 
   useEffect(() => {
+    if (myTeamId && gameStatus === 'playing' && rack) {
+      onUpdateLiveState({
+          racks: { ...(liveState?.racks || {}), [myTeamId]: rack }
+      });
+    }
+  }, [rack, myTeamId, gameStatus]);
+
+  const handleSetViewAngle = (angle: number) => {
+    setViewAngle(angle);
+    if (myTeamId && gameStatus === 'playing') {
+      onUpdateLiveState({
+          angles: { ...(liveState?.angles || {}), [myTeamId]: angle }
+      });
+    }
+  };
+
+  useEffect(() => {
     if (isProjector && !liveState?.gameStatus) {
       onUpdateLiveState({
         gameStatus: 'lobby_join',
         players: {}, teams: {}, board: Array(BOARD_SIZE * BOARD_SIZE).fill(null),
         bag: createBag(), scores: {}, journals: {},
+        racks: {}, angles: {},
         latestDiscoveries: [], activeTeamIndex: 0,
         turnEndTime: null, isTimerPaused: false, remainingPausedTime: 0, isExtraTurn: false
       });
@@ -500,7 +529,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   };
 
-  // 🔥 VALIDATION ENGINE WITH ANTI-UNDEFINED PAYLOAD SAFEGUARDS
   const handleCommit = async () => {
     const placed = localBoard.reduce((acc: number[], t: any, i: number) => {
       if (t && !t.isLocked) acc.push(i); return acc;
@@ -597,7 +625,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         } catch(e) {}
     }
 
-    // Initialize with explicit false to avoid Firestore undefined rejection
     const wordList: { word: string; rawSum: number; finalScore: number; isStanza: boolean }[] = [];
     let totalScore = 0;
 
@@ -641,7 +668,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       if (word.length < 2) return;
       const tier = assignTier(word, rawSum);
       
-      // Explicitly coalesce isStanza to avoid undefined
       let entry: any = { word: word.toUpperCase(), tier, finalScore, isStanza: isStanza || false };
       let found = false;
       try {
@@ -652,7 +678,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             const d0 = data[0];
             const m0 = d0.meanings?.[0];
             const def0 = m0?.definitions?.[0];
-            // Explicitly coalesce to null to avoid undefined
             entry.def = def0?.definition || 'Definition found.';
             entry.example = def0?.example || null;
             entry.pos = m0?.partOfSpeech || null;
@@ -715,7 +740,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     const payload: any = {
       board: lockedBoard, scores: updatedScores, journals: updatedJournals,
       latestDiscoveries: currentWords, bag: newBag,
-      // Pass null to safely clear out the sentence payload if one wasn't provided
       latestSentence: sentencePayload || null,
       activeTeamIndex: triggeredDP ? activeTeamIndex : (activeTeamIndex + 1) % teamArray.length,
       turnEndTime: Date.now() + timeLimit * 1000,
@@ -725,17 +749,11 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     setPendingSentence(false); setSentenceText(''); setCurrentWords([]); setCurrentScore(0);
   };
 
-  const getTransform = () => {
-    if (viewAngle === 1) return 'rotateX(45deg)';
-    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
-    return 'none';
-  };
-
   // ─────────────────────────────────────────────
   // PROJECTOR VIEWS
   // ─────────────────────────────────────────────
   if (isProjector) {
-    const bg = { background: '#08090f', minHeight: '100%' };
+    const bg = { background: 'radial-gradient(circle at center, #1e1b4b 0%, #08090f 80%)', minHeight: '100%' };
 
     if (gameStatus === 'lobby_join') {
       return (
@@ -770,14 +788,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           }}>
             <Rocket size={20}/> Begin Session
           </button>
-          <div style={{ marginTop:48, display:'flex', flexWrap:'wrap', gap:12, justifyContent:'center', maxWidth:600 }}>
-            {Object.values(players).map((p: any) => (
-              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', borderRadius:30, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)' }}>
-                {p.avatar && <img src={p.avatar} style={{width:24,height:24,borderRadius:'50%'}} />}
-                <span style={{fontSize:13, color:'rgba(255,255,255,0.7)'}}>{p.name}</span>
-              </div>
-            ))}
-          </div>
         </div>
       );
     }
@@ -850,13 +860,50 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       );
     }
 
+    const activeAngle = liveAngles[activeTeam?.id] || 0;
+    const projectorTransform = () => {
+      if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
+      if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
+      return 'rotateZ(2.5deg)';
+    };
+
     return (
-      <div className="wf-root" style={{ ...bg, display:'flex', height:'100%', padding:24, gap:24, color:'#f8fafc', overflow:'hidden' }}>
-        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', position:'relative' }}>
-          <div style={{ marginBottom:16, display:'flex', alignItems:'center', gap:12 }}>
+      <div className="wf-root" style={{ ...bg, position: 'relative', overflow: 'hidden', height: '100vh', width: '100vw' }}>
+        
+        {/* Full-Bleed Hologram Background */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 0, perspective: '1200px' }}>
+          <div className="animate-float" style={{ background:'rgba(255,255,255,0.01)', borderRadius:16, padding:10, border:'1px solid rgba(255,255,255,0.03)' }}>
+            <div className="wf-board" style={{ 
+                width: 720, height: 720,
+                transformStyle: 'preserve-3d',
+                transformOrigin: 'center center',
+                transform: projectorTransform(),
+                transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}>
+              {(globalBoard||[]).map((tile: any, i: number) => {
+                const r = Math.floor(i/BOARD_SIZE), c = i%BOARD_SIZE;
+                const type = getSquareType(r,c);
+                return (
+                  <div key={i} style={{ ...squareStyle(r,c,false), display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+                    {!tile && type === 'CT' && <Star size={14} style={{color:'rgba(79,70,229,0.5)', transform: activeAngle > 0 ? 'translateZ(2px)' : 'none'}} fill="currentColor"/>}
+                    {!tile && type === 'TW' && <span style={{fontSize:7,fontWeight:700,color:'rgba(220,38,38,0.6)',textTransform:'uppercase', transform: activeAngle > 0 ? 'translateZ(2px)' : 'none'}}>3W</span>}
+                    {!tile && type === 'DW' && <span style={{fontSize:7,fontWeight:700,color:'rgba(217,119,6,0.6)',textTransform:'uppercase', transform: activeAngle > 0 ? 'translateZ(2px)' : 'none'}}>2W</span>}
+                    {!tile && type === 'TL' && <span style={{fontSize:7,fontWeight:700,color:'rgba(8,145,178,0.6)',textTransform:'uppercase', transform: activeAngle > 0 ? 'translateZ(2px)' : 'none'}}>3L</span>}
+                    {!tile && type === 'DL' && <span style={{fontSize:7,fontWeight:700,color:'rgba(5,150,105,0.6)',textTransform:'uppercase', transform: activeAngle > 0 ? 'translateZ(2px)' : 'none'}}>2L</span>}
+                    {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)', transform: activeAngle > 0 ? 'translateZ(2px)' : 'none'}} fill="currentColor"/>}
+                    {tile && <Tile tile={tile} locked size="sm" isBoardTile={true} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Floating Overlays */}
+        <div style={{ position: 'absolute', top: 24, left: 24, zIndex: 10, display: 'flex', gap: 12 }}>
             <div style={{
-              display:'flex', alignItems:'center', gap:10, padding:'8px 20px',
-              borderRadius:30, background:'rgba(255,255,255,0.05)', border:`1px solid ${activeTeam?.color?.border||'rgba(255,255,255,0.1)'}`
+              display:'flex', alignItems:'center', gap:10, padding:'8px 20px', backdropFilter: 'blur(12px)',
+              borderRadius:30, background:'rgba(15, 23, 42, 0.6)', border:`1px solid ${activeTeam?.color?.border||'rgba(255,255,255,0.1)'}`
             }}>
               {activeTeam?.avatar && <img src={activeTeam.avatar} style={{width:28,height:28,borderRadius:'50%'}} />}
               <span style={{ fontWeight:600, color: activeTeam?.color?.bg||'#f8fafc', fontSize:14 }}>{activeTeam?.name || '—'}</span>
@@ -864,48 +911,28 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
               {isExtraTurn && <span style={{ background:'#d946ef', color:'white', fontSize:10, padding:'2px 6px', borderRadius:4, display:'flex', alignItems:'center', gap:4, marginLeft:8 }}><FastForward size={10}/> DOUBLE PLAY</span>}
             </div>
             <div style={{
-              display:'flex', alignItems:'center', gap:8, padding:'8px 16px',
-              borderRadius:30, background: isTimerPaused ? 'rgba(217,119,6,0.15)' : 'rgba(255,255,255,0.05)',
-              border: isTimerPaused ? '1px solid rgba(217,119,6,0.4)' : '1px solid rgba(255,255,255,0.1)'
+              display:'flex', alignItems:'center', gap:8, padding:'8px 16px', backdropFilter: 'blur(12px)',
+              borderRadius:30, background: isTimerPaused ? 'rgba(217,119,6,0.3)' : 'rgba(15, 23, 42, 0.6)',
+              border: isTimerPaused ? '1px solid rgba(217,119,6,0.5)' : '1px solid rgba(255,255,255,0.1)'
             }}>
               {isTimerPaused ? <Pause size={14} style={{color:'#f59e0b'}}/> : <Clock size={14} style={{color:'rgba(255,255,255,0.4)'}}/>}
               <span style={{ fontFamily:'monospace', fontWeight:700, color: isTimerPaused ? '#f59e0b' : '#f8fafc', fontSize:16 }}>
                 {isTimerPaused ? 'PAUSED' : `${timeLeft}s`}
               </span>
             </div>
-          </div>
+        </div>
 
-          <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:16, padding:10, border:'1px solid rgba(255,255,255,0.06)' }}>
-            <div className="wf-board" style={{ width:660, height:660 }}>
-              {(globalBoard||[]).map((tile: any, i: number) => {
-                const r = Math.floor(i/BOARD_SIZE), c = i%BOARD_SIZE;
-                const type = getSquareType(r,c);
-                return (
-                  <div key={i} style={{ ...squareStyle(r,c,false), display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
-                    {!tile && type === 'CT' && <Star size={14} style={{color:'rgba(79,70,229,0.5)'}} fill="currentColor"/>}
-                    {!tile && type === 'TW' && <span style={{fontSize:7,fontWeight:700,color:'rgba(220,38,38,0.6)',textTransform:'uppercase'}}>3W</span>}
-                    {!tile && type === 'DW' && <span style={{fontSize:7,fontWeight:700,color:'rgba(217,119,6,0.6)',textTransform:'uppercase'}}>2W</span>}
-                    {!tile && type === 'TL' && <span style={{fontSize:7,fontWeight:700,color:'rgba(8,145,178,0.6)',textTransform:'uppercase'}}>3L</span>}
-                    {!tile && type === 'DL' && <span style={{fontSize:7,fontWeight:700,color:'rgba(5,150,105,0.6)',textTransform:'uppercase'}}>2L</span>}
-                    {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)'}} fill="currentColor"/>}
-                    {tile && <Tile tile={tile} locked size="sm" isBoardTile={true} />}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{
-            position:'absolute', bottom:0, left:0, display:'flex',
-            background:'rgba(8,10,20,0.9)', border:'1px solid rgba(255,255,255,0.1)',
-            borderRadius:12, overflow:'hidden'
-          }}>
-            <div style={{ padding:'10px 14px', background:'rgba(79,70,229,0.1)', borderRight:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center' }}>
-              <ShieldAlert size={16} style={{color:'rgba(79,70,229,0.8)'}}/>
+        <div style={{
+            position:'absolute', bottom: 24, left: 24, display:'flex',
+            background:'rgba(15, 23, 42, 0.7)', border:'1px solid rgba(255,255,255,0.1)',
+            borderRadius:12, overflow:'hidden', backdropFilter: 'blur(12px)', zIndex: 10
+        }}>
+            <div style={{ padding:'10px 14px', background:'rgba(79,70,229,0.15)', borderRight:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center' }}>
+              <ShieldAlert size={16} style={{color:'rgba(79,70,229,0.9)'}}/>
             </div>
             {[
               { icon: isTimerPaused ? <Play size={14}/> : <Pause size={14}/>, label: isTimerPaused ? 'Resume' : 'Pause', action: togglePause, color:'#f59e0b' },
-              { icon: <FastForward size={14}/>, label: 'Skip turn', action: passTurn, color:'rgba(255,255,255,0.5)' },
+              { icon: <FastForward size={14}/>, label: 'Skip turn', action: passTurn, color:'rgba(255,255,255,0.6)' },
               { icon: <Power size={14}/>, label: 'End game', action: forceEnd, color:'#ef4444' },
             ].map((btn, i) => (
               <button key={i} onClick={btn.action} style={{
@@ -913,43 +940,54 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                 cursor:'pointer', display:'flex', alignItems:'center', gap:8, color:btn.color, fontSize:12, fontWeight:600
               }}>{btn.icon}{btn.label}</button>
             ))}
-          </div>
         </div>
 
-        {/* Sidebar */}
-        <div style={{ width:360, display:'flex', flexDirection:'column', gap:16, overflowY:'auto' }} className="wf-scroll">
+        <div style={{ position: 'absolute', top: 24, right: 24, bottom: 24, width: 360, display: 'flex', flexDirection: 'column', gap: 16, zIndex: 10, overflowY: 'auto' }} className="wf-scroll">
           {latestDiscoveries.some((e: any) => e.isStanza) && (
-            <div style={{ background:'rgba(217,70,239,0.15)', border:'1px solid rgba(217,70,239,0.4)', borderRadius:16, padding:'16px', textAlign:'center' }}>
-                <span style={{ fontSize: 16, fontWeight: 900, color: '#f8fafc', letterSpacing: 2 }}>STANZA STACK (2X)</span>
+            <div style={{ background:'rgba(217,70,239,0.2)', backdropFilter: 'blur(12px)', border:'1px solid rgba(217,70,239,0.5)', borderRadius:16, padding:'16px', textAlign:'center', boxShadow: '0 0 20px rgba(217,70,239,0.3)' }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: '#f8fafc', letterSpacing: 2, textShadow: '0 0 10px #d946ef' }}>STANZA STACK (2X)</span>
             </div>
           )}
 
-          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:20 }}>
+          <div style={{ background:'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(12px)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:16, padding:20, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, paddingBottom:12, borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
               <Trophy size={16} style={{color:'#f59e0b'}}/>
               <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:18, color:'#f8fafc' }}>Scores</span>
-              <span style={{ marginLeft:'auto', fontSize:11, color:'rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.05)', padding:'2px 8px', borderRadius:6 }}>
+              <span style={{ marginLeft:'auto', fontSize:11, color:'rgba(255,255,255,0.4)', background:'rgba(255,255,255,0.1)', padding:'2px 8px', borderRadius:6 }}>
                 {globalBag?.length||0} tiles left
               </span>
             </div>
             {teamArray.map((t: any, idx: number) => {
               const isActive = idx === activeTeamIndex;
               const myWords = journals[t.id]||[];
+              const teamRack = liveRacks[t.id] || []; 
+              
               return (
                 <div key={t.id} style={{
                   padding:'12px 14px', borderRadius:10, marginBottom:8, transition:'all 0.2s',
-                  background: isActive ? `${t.color.muted}` : 'transparent',
+                  background: isActive ? `${t.color.muted}` : 'rgba(255,255,255,0.02)',
                   border: isActive ? `1px solid ${t.color.border}` : '1px solid transparent'
                 }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: myWords.length > 0 ? 8 : 0 }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: (myWords.length > 0 || teamRack.length > 0) ? 8 : 0 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                       {t.avatar && <img src={t.avatar} style={{width:28,height:28,borderRadius:'50%',opacity: isActive?1:0.6}} />}
                       <span style={{ fontSize:14, fontWeight:600, color: isActive ? t.color.bg : 'rgba(255,255,255,0.6)' }}>{t.name}</span>
                     </div>
                     <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:26, color: isActive ? '#f8fafc' : 'rgba(255,255,255,0.5)' }}>{scores[t.id]||0}</span>
                   </div>
+                  
+                  {teamRack.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, marginTop: 12, justifyContent: 'center' }}>
+                      {teamRack.map((rt: any, ri: number) => (
+                        <div key={ri} style={{ width: 24, height: 24, borderRadius: 4, background: rt ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.02)', border: rt ? '1px solid rgba(255,255,255,0.3)' : '1px dashed rgba(255,255,255,0.1)' }}>
+                           {rt && <Tile tile={rt} size="sm" isSolid={true} />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {myWords.length > 0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop: 12 }}>
                       {myWords.slice(-8).map((e: any, i: number) => {
                         const tier = TIERS[e.tier]||TIERS[2];
                         return <span key={i} style={{ fontSize:9, padding:'2px 7px', borderRadius:10, background:tier.bg, border:`1px solid ${tier.border}`, color:tier.color, fontWeight:600 }}>{e.word}</span>;
@@ -962,10 +1000,10 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           </div>
 
           {latestDiscoveries.length > 0 && (
-            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:20 }}>
+            <div style={{ background:'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(12px)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:16, padding:20, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-                <BookOpen size={14} style={{color:'rgba(255,255,255,0.4)'}}/>
-                <span style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'rgba(255,255,255,0.3)' }}>Words Played</span>
+                <BookOpen size={14} style={{color:'rgba(255,255,255,0.5)'}}/>
+                <span style={{ fontSize:11, textTransform:'uppercase', letterSpacing:2, color:'rgba(255,255,255,0.4)' }}>Words Played</span>
               </div>
               {latestDiscoveries.map((e: any, i: number) => <WordCard key={i} entry={e} />)}
             </div>
@@ -978,7 +1016,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   // ─────────────────────────────────────────────
   // STUDENT VIEWS
   // ─────────────────────────────────────────────
-  const bg = { background: '#08090f', minHeight: '100%' };
+  const bg = { background: 'radial-gradient(circle at center, #1e1b4b 0%, #08090f 100%)', minHeight: '100%' };
 
   if (gameStatus === 'lobby_join') {
     const joined = !!players[studentId];
@@ -1067,7 +1105,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   if (isMyTurn && pendingSentence) {
     const isStanzaBonus = currentWords.some(w => w.isStanza);
     return (
-      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }}>
+      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto', position:'relative', zIndex:100 }}>
         {isStanzaBonus && (
             <div style={{ background:'rgba(217,70,239,0.15)', border:'1px solid rgba(217,70,239,0.4)', borderRadius:12, padding:'12px', textAlign:'center', marginBottom:16 }}>
                 <span style={{ fontSize: 14, fontWeight: 900, color: '#f8fafc', letterSpacing: 2 }}>STANZA STACK (2X)</span>
@@ -1123,61 +1161,67 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const myJournal = journals[myTeamId] || [];
 
   return (
-    <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', height:'100%', padding:10, overflow:'hidden', position:'relative' }}>
+    <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', position:'relative' }}>
 
       {showJournal && <JournalPanel words={myJournal} onClose={() => setShowJournal(false)} />}
 
+      {/* Floating Header */}
       <div style={{
-        display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8,
-        padding:'8px 12px', borderRadius:12,
-        background: isMyTurn ? 'rgba(79,70,229,0.1)' : 'rgba(255,255,255,0.03)',
-        border: isMyTurn ? '1px solid rgba(79,70,229,0.25)' : '1px solid rgba(255,255,255,0.07)'
+        position: 'absolute', top: 10, left: 10, right: 10, zIndex: 50,
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'8px 12px', borderRadius:12, backdropFilter: 'blur(12px)',
+        background: isMyTurn ? 'rgba(79,70,229,0.3)' : 'rgba(15, 23, 42, 0.6)',
+        border: isMyTurn ? '1px solid rgba(79,70,229,0.5)' : '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-          {isTimerPaused ? <Pause size={13} style={{color:'#f59e0b'}}/> : <Clock size={13} style={{color:'rgba(255,255,255,0.3)'}}/>}
-          <span style={{ fontFamily:'monospace', fontSize:14, fontWeight:700, color: isTimerPaused ? '#f59e0b' : (isMyTurn ? '#a5b4fc' : 'rgba(255,255,255,0.4)') }}>
+          {isTimerPaused ? <Pause size={13} style={{color:'#f59e0b'}}/> : <Clock size={13} style={{color:'rgba(255,255,255,0.4)'}}/>}
+          <span style={{ fontFamily:'monospace', fontSize:14, fontWeight:700, color: isTimerPaused ? '#f59e0b' : (isMyTurn ? '#fff' : 'rgba(255,255,255,0.6)') }}>
             {isTimerPaused ? 'Paused' : `${timeLeft}s`}
           </span>
         </div>
-        <span style={{ fontSize:12, fontWeight:600, color: isMyTurn ? '#a5b4fc' : 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize:12, fontWeight:600, color: isMyTurn ? '#fff' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 6 }}>
           {isExtraTurn && isMyTurn && <FastForward size={12} style={{color:'#d946ef'}} />}
           {isMyTurn ? 'Your turn' : `${activeTeam?.name}'s turn`}
         </span>
         <button onClick={() => setShowJournal(true)} style={{
           display:'flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:8,
-          background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
-          cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:11, fontWeight:600
+          background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)',
+          cursor:'pointer', color:'#fff', fontSize:11, fontWeight:600
         }}>
           <BookOpen size={12}/> Journal {myJournal.length > 0 && `(${myJournal.length})`}
         </button>
       </div>
 
-      <div style={{ flex:1, overflow:'auto', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', position:'relative', marginBottom:8, perspective: '1200px' }} className="wf-scroll">
+      {/* Full Background Board */}
+      <div style={{ position: 'absolute', inset: 0, overflow:'auto', zIndex: 1, perspective: '1200px', paddingTop: 80, paddingBottom: 220 }} className="wf-scroll">
+        
+        {/* 🔥 TACTICAL HUD */}
         <div style={{
-          position:'sticky', top:8, left:'calc(100% - 44px)', float:'right', zIndex:50,
+          position:'fixed', top: 70, right: 10, zIndex:50,
           display:'flex', flexDirection:'column', gap:0,
-          background:'rgba(8,10,20,0.9)', border:'1px solid rgba(255,255,255,0.1)',
-          borderRadius:10, overflow:'hidden', marginRight:8, width:32
+          background:'rgba(15, 23, 42, 0.7)', border:'1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)',
+          borderRadius:10, overflow:'hidden', width:32, boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
         }}>
-          {[{icon:<Layers size={14}/>, fn:() => setViewAngle(p=>(p+1)%3)},
+          {[{icon:<Layers size={14}/>, fn:() => handleSetViewAngle((viewAngle+1)%3)},
             {icon:<ZoomIn size={14}/>, fn:() => setZoom(p=>Math.min(p+0.2,2.0))},
-            {icon:<LocateFixed size={14}/>, fn:() => { setZoom(1); setViewAngle(0); }},
+            {icon:<LocateFixed size={14}/>, fn:() => { setZoom(1); handleSetViewAngle(0); }},
             {icon:<ZoomOut size={14}/>, fn:() => setZoom(p=>Math.max(p-0.2,0.5))}
           ].map((b, i) => (
             <button key={i} onClick={b.fn} style={{
               width:32, height:30, display:'flex', alignItems:'center', justifyContent:'center',
-              background:'transparent', border:'none', borderBottom: i<3?'1px solid rgba(255,255,255,0.07)':undefined,
-              cursor:'pointer', color:'rgba(255,255,255,0.4)', transition:'color 0.1s'
+              background:'transparent', border:'none', borderBottom: i<3?'1px solid rgba(255,255,255,0.1)':undefined,
+              cursor:'pointer', color:'rgba(255,255,255,0.6)', transition:'color 0.1s'
             }}>{b.icon}</button>
           ))}
         </div>
 
-        <div style={{ transformOrigin:'top left', transform:`scale(${zoom})`, width:`${720*zoom}px`, height:`${720*zoom}px` }}>
-          <div className="wf-board" style={{ 
+        <div style={{ transformOrigin:'top left', transform:`scale(${zoom})`, width:`${720*zoom}px`, height:`${720*zoom}px`, margin: '0 auto' }}>
+          <div className="wf-board animate-float" style={{ 
               width:720, height:720, padding:8, boxSizing:'border-box',
               transformStyle: 'preserve-3d',
-              transform: getTransform(),
-              transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+              transform: getTransform() + ' rotateZ(2.5deg)',
+              transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
           }}>
             {(localBoard||[]).map((tile: any, idx: number) => {
               const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
@@ -1219,68 +1263,70 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         </div>
       </div>
 
-      {invalidWords.length > 0 && (
-        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:10, background:'rgba(220,38,38,0.15)', border:'1px solid rgba(220,38,38,0.3)', marginBottom:6, fontSize:12, color:'#fca5a5' }}>
-          <AlertTriangle size={13}/> {invalidWords.join(', ')} — not found in dictionary
-        </div>
-      )}
-
-      {/* Rack Container */}
-      <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'10px 12px', marginBottom:8 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-          <span style={{ fontSize:10, textTransform:'uppercase', letterSpacing:2, color: isMyTurn ? 'rgba(165,180,252,0.6)' : 'rgba(255,255,255,0.2)' }}>
-            {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
-          </span>
-          <div style={{ display:'flex', gap:6 }}>
-            <button 
-                onClick={handlePurge} 
-                disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
-                title="Purge Hand (-10 XP)"
-                style={{ width:28, height:28, borderRadius:7, background:'rgba(244,63,94,0.15)', border:'1px solid rgba(244,63,94,0.3)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fb7185', opacity: (!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10)?0.3:1 }}
-            >
-                <RefreshCw size={13} />
-            </button>
-            <button onClick={shuffleRack} disabled={isTimerPaused} style={{ width:28, height:28, borderRadius:7, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.4)', opacity: isTimerPaused?0.3:1 }}>
-              <Shuffle size={13}/>
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display:'flex', gap:6, justifyContent:'center', minHeight:44 }}>
-          {rack.map((tile: any, i: number) => (
-            <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.02)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.06)', opacity: isTimerPaused ? 0.4 : 1 }}>
-              {tile && <Tile tile={tile} selected={selectedRack===i} size="md" isSolid={true} />}
+      {/* Floating Controls Overlay */}
+      <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 50, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          
+          {invalidWords.length > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:10, background:'rgba(220,38,38,0.8)', border:'1px solid rgba(220,38,38,1)', backdropFilter: 'blur(12px)', fontSize:12, color:'#fff', boxShadow: '0 4px 15px rgba(220,38,38,0.5)' }}>
+              <AlertTriangle size={13}/> {invalidWords.join(', ')} — not found in dictionary
             </div>
-          ))}
-        </div>
-      </div>
+          )}
 
-      <div style={{ display:'flex', gap:8 }}>
-        <button onClick={recallAll} disabled={isValidating||isTimerPaused} style={{
-          flex:1, padding:'12px 0', borderRadius:12, fontSize:12, fontWeight:600, cursor:'pointer',
-          background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
-          color:'rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-          opacity: isValidating||isTimerPaused ? 0.4 : 1
-        }}>
-          <ArrowDownToLine size={14}/> Recall
-        </button>
-        {isMyTurn ? (
-          <button onClick={handleCommit} disabled={isValidating||isTimerPaused} style={{
-            flex:2, padding:'12px 0', borderRadius:12, fontSize:13, fontWeight:600, cursor:'pointer',
-            background: 'rgba(79,70,229,0.15)', border:'1px solid rgba(79,70,229,0.4)',
-            color:'#a5b4fc', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-            opacity: isValidating||isTimerPaused ? 0.5 : 1
-          }}>
-            {isValidating ? <><Loader2 size={14} style={{animation:'spin 1s linear infinite'}}/> Checking...</> : <><CheckCircle2 size={14}/> Play Word</>}
-          </button>
-        ) : (
-          <div style={{ flex:2, padding:'12px 0', borderRadius:12, fontSize:12, textAlign:'center', color:'rgba(255,255,255,0.2)', border:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            Standby...
+          {/* Floating Rack */}
+          <div style={{ background:'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:'10px 12px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <span style={{ fontSize:10, textTransform:'uppercase', letterSpacing:2, color: isMyTurn ? 'rgba(165,180,252,0.8)' : 'rgba(255,255,255,0.5)' }}>
+                {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
+              </span>
+              <div style={{ display:'flex', gap:6 }}>
+                <button 
+                    onClick={handlePurge} 
+                    disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
+                    title="Purge Hand (-10 XP)"
+                    style={{ width:28, height:28, borderRadius:7, background:'rgba(244,63,94,0.2)', border:'1px solid rgba(244,63,94,0.4)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fb7185', opacity: (!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10)?0.3:1 }}
+                >
+                    <RefreshCw size={13} />
+                </button>
+                <button onClick={shuffleRack} disabled={isTimerPaused} style={{ width:28, height:28, borderRadius:7, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', opacity: isTimerPaused?0.3:1 }}>
+                  <Shuffle size={13}/>
+                </button>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:6, justifyContent:'center', minHeight:44 }}>
+              {rack.map((tile: any, i: number) => (
+                <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.05)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.2)', opacity: isTimerPaused ? 0.4 : 1 }}>
+                  {tile && <Tile tile={tile} selected={selectedRack===i} size="md" isSolid={true} />}
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={recallAll} disabled={isValidating||isTimerPaused} style={{
+              flex:1, padding:'12px 0', borderRadius:12, fontSize:12, fontWeight:600, cursor:'pointer',
+              background:'rgba(15, 23, 42, 0.7)', border:'1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)',
+              color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+              opacity: isValidating||isTimerPaused ? 0.4 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+            }}>
+              <ArrowDownToLine size={14}/> Recall
+            </button>
+            {isMyTurn ? (
+              <button onClick={handleCommit} disabled={isValidating||isTimerPaused} style={{
+                flex:2, padding:'12px 0', borderRadius:12, fontSize:13, fontWeight:600, cursor:'pointer',
+                background: 'rgba(79,70,229,0.8)', border:'1px solid rgba(99,102,241,1)', backdropFilter: 'blur(12px)',
+                color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                opacity: isValidating||isTimerPaused ? 0.5 : 1, boxShadow: '0 4px 15px rgba(79,70,229,0.5)'
+              }}>
+                {isValidating ? <><Loader2 size={14} style={{animation:'spin 1s linear infinite'}}/> Checking...</> : <><CheckCircle2 size={14}/> Play Word</>}
+              </button>
+            ) : (
+              <div style={{ flex:2, padding:'12px 0', borderRadius:12, fontSize:12, textAlign:'center', color:'rgba(255,255,255,0.4)', border:'1px solid rgba(255,255,255,0.1)', background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                Standby...
+              </div>
+            )}
+          </div>
       </div>
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
