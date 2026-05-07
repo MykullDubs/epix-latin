@@ -3,11 +3,12 @@ import {
   Trophy, Clock, CheckCircle2, FastForward, ArrowDownToLine,
   Star, Users, User, MessageSquare, Shuffle, Loader2,
   AlertTriangle, Rocket, RefreshCw, ZoomIn, ZoomOut,
-  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers
+  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers,
+  PenTool
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
-// CONSTANTS & TIER DATA
+// CONSTANTS
 // ─────────────────────────────────────────────
 const BOARD_SIZE = 15;
 
@@ -29,7 +30,6 @@ function assignTier(word: string, rawLetterSum: number): number {
   return 5;
 }
 
-// 🔥 ADDED PHONETIC HINGES (Diphthongs & Digraphs)
 const LETTER_DATA: Record<string, { count: number; value: number }> = {
   A:{count:9,value:1}, B:{count:2,value:3}, C:{count:2,value:3},
   D:{count:4,value:2}, E:{count:12,value:1}, F:{count:2,value:4},
@@ -39,11 +39,7 @@ const LETTER_DATA: Record<string, { count: number; value: number }> = {
   P:{count:2,value:3}, Q:{count:1,value:10}, R:{count:6,value:1},
   S:{count:4,value:1}, T:{count:6,value:1}, U:{count:4,value:1},
   V:{count:2,value:4}, W:{count:2,value:4}, X:{count:1,value:8},
-  Y:{count:2,value:4}, Z:{count:1,value:10},
-  // Multi-letter tiles (Hinges)
-  CH:{count:2,value:5}, SH:{count:2,value:5}, TH:{count:2,value:5},
-  OU:{count:2,value:6}, OI:{count:2,value:6}, OW:{count:2,value:6},
-  EA:{count:2,value:4}, OO:{count:2,value:4}
+  Y:{count:2,value:4}, Z:{count:1,value:10}
 };
 
 const PLAYER_COLORS = [
@@ -84,13 +80,11 @@ const createBag = () => {
 };
 
 // ─────────────────────────────────────────────
-// 3D NEON TILE COMPONENT (WITH HINGE VISUALS)
+// 3D NEON TILE COMPONENT
 // ─────────────────────────────────────────────
 const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = false, isSolid = false, isRack3D = false }: any) => {
   if (!tile) return null;
-  
-  const isHinge = tile.letter.length > 1; // Identify Phonetic Hinges
-  const sz = size === 'sm' ? (isHinge ? 'w-8 h-8 text-[10px]' : 'w-8 h-8 text-xs') : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
+  const sz = size === 'sm' ? 'w-8 h-8 text-xs' : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
   
   const zDepth = isBoardTile ? (selected ? 'translateZ(30px) scale(1.15)' : 'translateZ(12px)') : (selected ? 'translateY(-5px) scale(1.1)' : 'none');
   
@@ -102,7 +96,7 @@ const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = fals
   const neonGlow = isSolid ? 'none' : '0 0 10px rgba(192,132,252,0.4), inset 0 0 15px rgba(192,132,252,0.2)';
   const selectedGlow = '0 0 25px rgba(245,208,90,0.6), inset 0 0 20px rgba(245,208,90,0.4)';
   
-  const letterGlow = isSolid ? 'none' : (isHinge ? '0 0 8px #fff, 0 0 15px #4ade80' : '0 0 8px #fff, 0 0 15px #d946ef');
+  const letterGlow = isSolid ? 'none' : '0 0 8px #fff, 0 0 15px #d946ef';
 
   return (
     <div
@@ -118,11 +112,7 @@ const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = fals
       }}
       className={`${sz} relative flex items-center justify-center rounded-lg transition-all duration-300 select-none ${!isSolid ? 'backdrop-blur-md' : ''}`}
     >
-      {/* 🔥 Hinge Visual Indicator */}
-      {isHinge && (
-         <div style={{ position: 'absolute', top: 4, left: 4, width: 8, height: 8, borderTop: '2px solid rgba(74, 222, 128, 0.8)', borderLeft: '2px solid rgba(74, 222, 128, 0.8)', borderRadius: '2px 0 0 0', boxShadow: '-1px -1px 4px rgba(74, 222, 128, 0.4)' }} />
-      )}
-      <span style={{ color: locked ? 'rgba(255,255,255,0.6)' : '#ffffff', fontWeight: 900, lineHeight: 1, textShadow: letterGlow, letterSpacing: isHinge ? -1 : 0 }}>
+      <span style={{ color: locked ? 'rgba(255,255,255,0.6)' : '#ffffff', fontWeight: 900, lineHeight: 1, textShadow: letterGlow }}>
         {tile.letter}
       </span>
       <span style={{
@@ -294,6 +284,9 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const myTeamEntry: any = Object.values(teams).find((t: any) => t.members?.includes(studentId));
   const myTeamId = myTeamEntry?.id;
   const isMyTurn = myTeamId === activeTeam?.id && gameStatus === 'playing';
+  
+  // 🔥 GLOBALLY ACCESSIBLE JOURNAL STATE
+  const myJournal = journals[myTeamId] || [];
 
   const [timeLeft, setTimeLeft] = useState(0);
   useEffect(() => {
@@ -326,7 +319,22 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [viewAngle, setViewAngle] = useState(0); 
   const [showJournal, setShowJournal] = useState(false);
 
-  // DECOUPLED SYNC TO PREVENT MID-TURN ERASURES
+  // 🔥 GLOBAL TRANSFORM HELPERS
+  const activeAngle = liveAngles[activeTeam?.id] || 0;
+  
+  const getProjectorTransform = () => {
+    if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
+    if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
+    return 'rotateZ(2.5deg)';
+  };
+
+  const getTransform = () => {
+    if (viewAngle === 1) return 'rotateX(45deg)';
+    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
+    return 'none';
+  };
+
+  // 🔥 DECOUPLED SYNC TO PREVENT MID-TURN ERASURES
   const globalBoardString = JSON.stringify(globalBoard);
   useEffect(() => {
     if (globalBoardString && globalBoardString !== "undefined") {
@@ -545,7 +553,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   };
 
-  // 🔥 ADVANCED L-SHAPE / HINGE SCANNER
   const handleCommit = async () => {
     const placed = localBoard.reduce((acc: number[], t: any, i: number) => {
       if (t && !t.isLocked) acc.push(i); return acc;
@@ -556,141 +563,99 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
     const rows = [...new Set(placed.map(i => Math.floor(i/BOARD_SIZE)))];
     const cols = [...new Set(placed.map(i => i % BOARD_SIZE))];
-    
-    let isBentWord = false;
-    let cornerIdx = -1;
-
-    // Detect L-Shape Bend
     if (rows.length > 1 && cols.length > 1) {
-      const corners = placed.filter(idx => {
-        const r = Math.floor(idx/BOARD_SIZE), c = idx % BOARD_SIZE;
-        return placed.every(pIdx => Math.floor(pIdx/BOARD_SIZE) === r || pIdx % BOARD_SIZE === c);
-      });
-      if (corners.length === 1) {
-        const cTile = localBoard[corners[0]];
-        if (cTile && cTile.letter.length > 1) {
-           cornerIdx = corners[0];
-           isBentWord = true;
-        }
-      }
-    }
-
-    if (rows.length > 1 && cols.length > 1 && !isBentWord) {
-      setInvalidWords(['Tiles must be in one line, or use a multi-letter tile to bend.']);
-      setIsValidating(false); return;
+      setInvalidWords(['Tiles must be in one row or column.']); setIsValidating(false); return;
     }
 
     const getTile = (r: number, c: number) =>
       r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r*BOARD_SIZE+c] : null;
 
+    let gap = false;
+    if (rows.length === 1) {
+      const r = rows[0], mn = Math.min(...cols), mx = Math.max(...cols);
+      for (let c = mn; c <= mx; c++) if (!getTile(r,c)) gap = true;
+    } else {
+      const c = cols[0], mn = Math.min(...rows), mx = Math.max(...rows);
+      for (let r = mn; r <= mx; r++) if (!getTile(r,c)) gap = true;
+    }
+    if (gap) { setInvalidWords(['No gaps allowed between tiles.']); setIsValidating(false); return; }
+
+    const isFirst = !localBoard.some((t: any) => t?.isLocked);
+    if (isFirst) {
+      if (!placed.includes(112)) { setInvalidWords(['First word must cover the center star.']); setIsValidating(false); return; }
+      if (placed.length < 2) { setInvalidWords(['First word must be 2+ letters.']); setIsValidating(false); return; }
+    } else {
+      const touches = placed.some(idx => {
+        const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
+        return [[-1,0],[1,0],[0,-1],[0,1]].some(([dr,dc]) => getTile(r+dr,c+dc)?.isLocked);
+      });
+      if (!touches) { setInvalidWords(['New tiles must connect to an existing word.']); setIsValidating(false); return; }
+    }
+
+    const isHorizPlay = cols.length > 1 || placed.length === 1;
+    let startIdx = placed[0];
+    let rMain = Math.floor(startIdx/BOARD_SIZE), cMain = startIdx%BOARD_SIZE;
+    let startM = isHorizPlay ? cMain : rMain;
+    while (startM > 0 && getTile(isHorizPlay?rMain:startM-1, isHorizPlay?startM-1:cMain)) startM--;
+    let endM = startM;
+    while (endM < BOARD_SIZE-1 && getTile(isHorizPlay?rMain:endM+1, isHorizPlay?endM+1:cMain)) endM++;
+
+    let mWord = '', mRaw = 0, mScored = 0, mMult = 1;
+    for (let i = startM; i <= endM; i++) {
+        const t = getTile(isHorizPlay?rMain:i, isHorizPlay?i:cMain)!;
+        mWord += t.letter; mRaw += t.value;
+        let lv = t.value;
+        if (!t.isLocked) {
+           const sq = getSquareType(isHorizPlay?rMain:i, isHorizPlay?i:cMain);
+           if (sq==='DL') lv*=2; if(sq==='TL') lv*=3;
+           if (sq==='DW'||sq==='CT') mMult*=2; if(sq==='TW') mMult*=3;
+        }
+        mScored += lv;
+    }
+    const mFinalScore = mScored * mMult;
+
+    let adjWords = new Set<string>();
+    for (let i = startM; i <= endM; i++) {
+        const tr = isHorizPlay ? rMain : i;
+        const tc = isHorizPlay ? i : cMain;
+        const neighbors = isHorizPlay ? [[tr-1,tc], [tr+1,tc]] : [[tr,tc-1], [tr,tc+1]];
+        neighbors.forEach(([nr, nc]) => {
+            if (getTile(nr, nc)?.isLocked) {
+                let nStart = isHorizPlay ? nc : nr;
+                while (nStart > 0 && getTile(isHorizPlay?nr:nStart-1, isHorizPlay?nStart-1:nc)) nStart--;
+                let nEnd = nStart;
+                while (nEnd < BOARD_SIZE-1 && getTile(isHorizPlay?nr:nEnd+1, isHorizPlay?nEnd+1:nc)) nEnd++;
+                let adjW = '';
+                for (let j = nStart; j <= nEnd; j++) adjW += getTile(isHorizPlay?nr:j, isHorizPlay?j:nc).letter;
+                if (adjW.length > 1) adjWords.add(adjW);
+            }
+        });
+    }
+
+    let isStanza = false;
+    if (adjWords.size > 0 && mWord.length > 1) {
+        try {
+            const res = await fetch(`https://api.datamuse.com/words?rel_rhy=${mWord}`);
+            if (res.ok) {
+                const data = await res.json();
+                const rhymes = data.map((d:any) => d.word.toUpperCase());
+                for (let w of adjWords) {
+                    if (rhymes.includes(w.toUpperCase())) {
+                        isStanza = true;
+                        break;
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+
     const wordList: { word: string; rawSum: number; finalScore: number; isStanza: boolean }[] = [];
     let totalScore = 0;
-    let mWord = ''; // Primary word for Rhyme check
-    let adjWords = new Set<string>();
 
-    if (isBentWord) {
-        const cR = Math.floor(cornerIdx/BOARD_SIZE);
-        const cC = cornerIdx % BOARD_SIZE;
-        
-        let left = cC; while(left > 0 && getTile(cR, left-1)) left--;
-        let right = cC; while(right < BOARD_SIZE-1 && getTile(cR, right+1)) right++;
-        let top = cR; while(top > 0 && getTile(top-1, cC)) top--;
-        let bottom = cR; while(bottom < BOARD_SIZE-1 && getTile(bottom+1, cC)) bottom++;
-
-        let wordStr = '';
-        let raw = 0, scored = 0, mult = 1;
-
-        const addTile = (r: number, c: number) => {
-            const t = getTile(r, c)!;
-            wordStr += t.letter; raw += t.value;
-            let lv = t.value;
-            if (!t.isLocked) {
-                const sq = getSquareType(r, c);
-                if (sq==='DL') lv*=2; if(sq==='TL') lv*=3;
-                if (sq==='DW'||sq==='CT') mult*=2; if(sq==='TW') mult*=3;
-            }
-            scored += lv;
-            
-            // Gather adj words for Stanza check
-            const neighbors = [[r-1,c], [r+1,c], [r,c-1], [r,c+1]];
-            neighbors.forEach(([nr, nc]) => {
-                if (getTile(nr, nc)?.isLocked) {
-                    let nStartR = nr; while(nStartR > 0 && getTile(nStartR-1, nc)) nStartR--;
-                    let nEndR = nStartR; while(nEndR < BOARD_SIZE-1 && getTile(nEndR+1, nc)) nEndR++;
-                    let vW = ''; for(let j=nStartR; j<=nEndR; j++) vW += getTile(j, nc)!.letter;
-                    if(vW.length > 1) adjWords.add(vW);
-                    
-                    let nStartC = nc; while(nStartC > 0 && getTile(nr, nStartC-1)) nStartC--;
-                    let nEndC = nStartC; while(nEndC < BOARD_SIZE-1 && getTile(nr, nEndC+1)) nEndC++;
-                    let hW = ''; for(let j=nStartC; j<=nEndC; j++) hW += getTile(nr, j)!.letter;
-                    if(hW.length > 1) adjWords.add(hW);
-                }
-            });
-        };
-
-        if (left < cC && bottom > cR) {
-            // Reads Left-to-Right, then Down
-            for (let c = left; c < cC; c++) addTile(cR, c);
-            addTile(cR, cC); // the corner
-            for (let r = cR + 1; r <= bottom; r++) addTile(r, cC);
-        } else if (top < cR && right > cC) {
-            // Reads Top-to-Bottom, then Right
-            for (let r = top; r < cR; r++) addTile(r, cC);
-            addTile(cR, cC); // the corner
-            for (let c = cC + 1; c <= right; c++) addTile(cR, c);
-        } else {
-            setInvalidWords(['Bent words must form a clear L-shape (Left-to-Down or Top-to-Right).']);
-            setIsValidating(false); return;
-        }
-
-        mWord = wordStr;
-        wordList.push({ word: wordStr, rawSum: raw, finalScore: scored * mult, isStanza: false });
-        totalScore += (scored * mult);
-
-        // Extract perpendicular cross words from the arms
-        const seen = new Set<string>();
-        placed.forEach(idx => {
-            if (idx === cornerIdx) return;
-            const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
-            const isHorizArm = r === cR;
-            const axis = isHorizArm ? 1 : 0; // Check perpendicular axis
-            
-            let start = axis === 0 ? c : r;
-            while (start > 0 && getTile(axis===0?r:start-1, axis===0?start-1:c)) start--;
-            let end = start;
-            while (end < BOARD_SIZE-1 && getTile(axis===0?r:end+1, axis===0?end+1:c)) end++;
-            if (end === start) return;
-            const key = `${axis}-${axis===0?r:c}-${start}-${end}`;
-            if (seen.has(key)) return; seen.add(key);
-
-            let cw = '', craw = 0, cscored = 0, cmult = 1;
-            for (let i = start; i <= end; i++) {
-                const t = getTile(axis===0?r:i, axis===0?i:c)!;
-                cw += t.letter; craw += t.value;
-                let lv = t.value;
-                if (!t.isLocked) {
-                    const sq = getSquareType(axis===0?r:i, axis===0?i:c);
-                    if (sq==='DL') lv*=2; if(sq==='TL') lv*=3;
-                    if (sq==='DW'||sq==='CT') cmult*=2; if(sq==='TW') cmult*=3;
-                }
-                cscored += lv;
-            }
-            wordList.push({ word: cw, rawSum: craw, finalScore: cscored * cmult, isStanza: false });
-            totalScore += (cscored * cmult);
-        });
-
+    if (isStanza) {
+        wordList.push({ word: mWord, rawSum: mRaw, finalScore: mFinalScore * 2, isStanza: true });
+        totalScore = mFinalScore * 2;
     } else {
-        // Standard Linear Scanner
-        let gap = false;
-        if (rows.length === 1) {
-            const r = rows[0], mn = Math.min(...cols), mx = Math.max(...cols);
-            for (let c = mn; c <= mx; c++) if (!getTile(r,c)) gap = true;
-        } else {
-            const c = cols[0], mn = Math.min(...rows), mx = Math.max(...rows);
-            for (let r = mn; r <= mx; r++) if (!getTile(r,c)) gap = true;
-        }
-        if (gap) { setInvalidWords(['No gaps allowed between tiles.']); setIsValidating(false); return; }
-
         const seen = new Set<string>();
         placed.forEach(idx => {
             const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
@@ -715,60 +680,11 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                     }
                     scored += lv;
                 }
-                wordList.push({ word, rawSum: raw, finalScore: scored * mult, isStanza: false });
-                totalScore += (scored * mult);
-                
-                // Track longest word for Stanza check
-                if (word.length > mWord.length) mWord = word;
+                const fs = scored * mult;
+                wordList.push({ word, rawSum: raw, finalScore: fs, isStanza: false });
+                totalScore += fs;
             });
         });
-
-        // Gather adj words for standard linear play
-        placed.forEach(idx => {
-            const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
-            const neighbors = [[r-1,c], [r+1,c], [r,c-1], [r,c+1]];
-            neighbors.forEach(([nr, nc]) => {
-                if (getTile(nr, nc)?.isLocked) {
-                    let nStartR = nr; while(nStartR > 0 && getTile(nStartR-1, nc)) nStartR--;
-                    let nEndR = nStartR; while(nEndR < BOARD_SIZE-1 && getTile(nEndR+1, nc)) nEndR++;
-                    let vW = ''; for(let j=nStartR; j<=nEndR; j++) vW += getTile(j, nc)!.letter;
-                    if(vW.length > 1) adjWords.add(vW);
-                    
-                    let nStartC = nc; while(nStartC > 0 && getTile(nr, nStartC-1)) nStartC--;
-                    let nEndC = nStartC; while(nEndC < BOARD_SIZE-1 && getTile(nr, nEndC+1)) nEndC++;
-                    let hW = ''; for(let j=nStartC; j<=nEndC; j++) hW += getTile(nr, j)!.letter;
-                    if(hW.length > 1) adjWords.add(hW);
-                }
-            });
-        });
-    }
-
-    // 🔥 PING DATAMUSE FOR STANZA CHECK
-    let isStanza = false;
-    if (adjWords.size > 0 && mWord.length > 1) {
-        try {
-            const res = await fetch(`https://api.datamuse.com/words?rel_rhy=${mWord}`);
-            if (res.ok) {
-                const data = await res.json();
-                const rhymes = data.map((d:any) => d.word.toUpperCase());
-                for (let w of adjWords) {
-                    if (rhymes.includes(w.toUpperCase())) {
-                        isStanza = true;
-                        break;
-                    }
-                }
-            }
-        } catch(e) {}
-    }
-
-    // Apply Stanza Multiplier to the primary word
-    if (isStanza) {
-        const primary = wordList.find(w => w.word === mWord);
-        if (primary) {
-            primary.isStanza = true;
-            totalScore += primary.finalScore; // Double it
-            primary.finalScore *= 2;
-        }
     }
 
     const validEntries: any[] = [], failed: string[] = [];
@@ -968,14 +884,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       );
     }
 
-    const activeAngle = liveAngles[activeTeam?.id] || 0;
-    
-    const getProjectorTransform = () => {
-      if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
-      if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
-      return 'rotateZ(2.5deg)';
-    };
-
     return (
       <div className="wf-root" style={{ ...bg, position: 'relative', overflow: 'hidden', height: '100vh', width: '100vw' }}>
         
@@ -1085,7 +993,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                     <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:26, color: isActive ? '#f8fafc' : 'rgba(255,255,255,0.5)' }}>{scores[t.id]||0}</span>
                   </div>
                   
-                  {/* 🔥 RENDER MINI LIVE RACK */}
                   {teamRack.length > 0 && (
                     <div style={{ display: 'flex', gap: 4, marginTop: 12, justifyContent: 'center' }}>
                       {teamRack.map((rt: any, ri: number) => (
@@ -1238,7 +1145,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     const myScore = scores[myTeamId]||0;
     const sorted = [...teamArray].sort((a,b) => (scores[b.id]||0)-(scores[a.id]||0));
     const rank = sorted.findIndex((t: any) => t.id === myTeamId)+1;
-    const myJournal = journals[myTeamId]||[];
     return (
       <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }}>
         <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:32, marginBottom:4 }}>Session Complete</div>
@@ -1312,17 +1218,12 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     );
   }
 
-  const getTransform = () => {
-    if (viewAngle === 1) return 'rotateX(45deg)';
-    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
-    return 'none';
-  };
-
   return (
     <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', position:'relative' }}>
 
       {showJournal && <JournalPanel words={myJournal} onClose={() => setShowJournal(false)} />}
 
+      {/* Floating Header */}
       <div style={{
         position: 'absolute', top: 10, left: 10, right: 10, zIndex: 50,
         display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -1350,7 +1251,10 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         </button>
       </div>
 
+      {/* Full Background Board */}
       <div style={{ position: 'absolute', inset: 0, overflow:'auto', zIndex: 1, perspective: '1200px', paddingTop: 80, paddingBottom: 220 }} className="wf-scroll">
+        
+        {/* 🔥 TACTICAL HUD */}
         <div style={{
           position:'fixed', top: 70, right: 10, zIndex:50,
           display:'flex', flexDirection:'column', gap:0,
@@ -1390,6 +1294,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                   {!tile && type === 'DL' && <span style={{fontSize:6,fontWeight:700,color:'rgba(5,150,105,0.5)',textTransform:'uppercase', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}}>2L</span>}
                   {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}} fill="currentColor"/>}
 
+                  {/* Orbital tile selector */}
                   {isTarget && !tile && isMyTurn && !isTimerPaused && (
                     <div style={{ position:'absolute', top:'50%', left:'50%', width:0, height:0, zIndex:100, transform:`scale(${1/zoom}) ${viewAngle > 0 ? 'translateZ(40px)' : ''}`, transformStyle: 'preserve-3d' }}>
                       <div style={{ position: 'absolute', width: 280, height: 280, left: -140, top: -140, background: 'radial-gradient(circle, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.4) 50%, transparent 70%)', zIndex: 10, pointerEvents: 'none', borderRadius: '50%' }} />
@@ -1417,63 +1322,68 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         </div>
       </div>
 
-      {invalidWords.length > 0 && (
-        <div style={{ position: 'absolute', bottom: 120, left: 10, right: 10, zIndex: 50, display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:10, background:'rgba(220,38,38,0.8)', border:'1px solid rgba(220,38,38,1)', backdropFilter: 'blur(12px)', fontSize:12, color:'#fff', boxShadow: '0 4px 15px rgba(220,38,38,0.5)' }}>
-          <AlertTriangle size={13}/> {invalidWords.join(', ')} — not found in dictionary
-        </div>
-      )}
-
-      <div style={{ position: 'absolute', bottom: 64, left: 10, right: 10, zIndex: 50, background:'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:'10px 12px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-          <span style={{ fontSize:10, textTransform:'uppercase', letterSpacing:2, color: isMyTurn ? 'rgba(165,180,252,0.8)' : 'rgba(255,255,255,0.5)' }}>
-            {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
-          </span>
-          <div style={{ display:'flex', gap:6 }}>
-            <button 
-                onClick={handlePurge} 
-                disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
-                title="Purge Hand (-10 XP)"
-                style={{ width:28, height:28, borderRadius:7, background:'rgba(244,63,94,0.2)', border:'1px solid rgba(244,63,94,0.4)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fb7185', opacity: (!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10)?0.3:1 }}
-            >
-                <RefreshCw size={13} />
-            </button>
-            <button onClick={shuffleRack} disabled={isTimerPaused} style={{ width:28, height:28, borderRadius:7, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', opacity: isTimerPaused?0.3:1 }}>
-              <Shuffle size={13}/>
-            </button>
-          </div>
-        </div>
-        <div style={{ display:'flex', gap:6, justifyContent:'center', minHeight:44 }}>
-          {rack.map((tile: any, i: number) => (
-            <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.05)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.2)', opacity: isTimerPaused ? 0.4 : 1 }}>
-              {tile && <Tile tile={tile} selected={selectedRack===i} size="md" isSolid={true} />}
+      {/* Floating Controls Overlay */}
+      <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 50, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          
+          {invalidWords.length > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:10, background:'rgba(220,38,38,0.8)', border:'1px solid rgba(220,38,38,1)', backdropFilter: 'blur(12px)', fontSize:12, color:'#fff', boxShadow: '0 4px 15px rgba(220,38,38,0.5)' }}>
+              <AlertTriangle size={13}/> {invalidWords.join(', ')} — not found in dictionary
             </div>
-          ))}
-        </div>
-      </div>
+          )}
 
-      <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 50, display:'flex', gap:8 }}>
-        <button onClick={recallAll} disabled={isValidating||isTimerPaused} style={{
-          flex:1, padding:'12px 0', borderRadius:12, fontSize:12, fontWeight:600, cursor:'pointer',
-          background:'rgba(15, 23, 42, 0.7)', border:'1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)',
-          color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-          opacity: isValidating||isTimerPaused ? 0.4 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
-        }}>
-          <ArrowDownToLine size={14}/> Recall
-        </button>
-        {isMyTurn ? (
-          <button onClick={handleCommit} disabled={isValidating||isTimerPaused} style={{
-            flex:2, padding:'12px 0', borderRadius:12, fontSize:13, fontWeight:600, cursor:'pointer',
-            background: 'rgba(79,70,229,0.8)', border:'1px solid rgba(99,102,241,1)', backdropFilter: 'blur(12px)',
-            color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-            opacity: isValidating||isTimerPaused ? 0.5 : 1, boxShadow: '0 4px 15px rgba(79,70,229,0.5)'
-          }}>
-            {isValidating ? <><Loader2 size={14} style={{animation:'spin 1s linear infinite'}}/> Checking...</> : <><CheckCircle2 size={14}/> Play Word</>}
-          </button>
-        ) : (
-          <div style={{ flex:2, padding:'12px 0', borderRadius:12, fontSize:12, textAlign:'center', color:'rgba(255,255,255,0.4)', border:'1px solid rgba(255,255,255,0.1)', background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            Standby...
+          {/* Floating Rack */}
+          <div style={{ background:'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:'10px 12px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <span style={{ fontSize:10, textTransform:'uppercase', letterSpacing:2, color: isMyTurn ? 'rgba(165,180,252,0.8)' : 'rgba(255,255,255,0.5)' }}>
+                {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
+              </span>
+              <div style={{ display:'flex', gap:6 }}>
+                <button 
+                    onClick={handlePurge} 
+                    disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
+                    title="Purge Hand (-10 XP)"
+                    style={{ width:28, height:28, borderRadius:7, background:'rgba(244,63,94,0.2)', border:'1px solid rgba(244,63,94,0.4)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fb7185', opacity: (!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10)?0.3:1 }}
+                >
+                    <RefreshCw size={13} />
+                </button>
+                <button onClick={shuffleRack} disabled={isTimerPaused} style={{ width:28, height:28, borderRadius:7, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', opacity: isTimerPaused?0.3:1 }}>
+                  <Shuffle size={13}/>
+                </button>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:6, justifyContent:'center', minHeight:44 }}>
+              {rack.map((tile: any, i: number) => (
+                <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.05)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.2)', opacity: isTimerPaused ? 0.4 : 1 }}>
+                  {tile && <Tile tile={tile} selected={selectedRack===i} size="md" isSolid={true} />}
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={recallAll} disabled={isValidating||isTimerPaused} style={{
+              flex:1, padding:'12px 0', borderRadius:12, fontSize:12, fontWeight:600, cursor:'pointer',
+              background:'rgba(15, 23, 42, 0.7)', border:'1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)',
+              color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+              opacity: isValidating||isTimerPaused ? 0.4 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+            }}>
+              <ArrowDownToLine size={14}/> Recall
+            </button>
+            {isMyTurn ? (
+              <button onClick={handleCommit} disabled={isValidating||isTimerPaused} style={{
+                flex:2, padding:'12px 0', borderRadius:12, fontSize:13, fontWeight:600, cursor:'pointer',
+                background: 'rgba(79,70,229,0.8)', border:'1px solid rgba(99,102,241,1)', backdropFilter: 'blur(12px)',
+                color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                opacity: isValidating||isTimerPaused ? 0.5 : 1, boxShadow: '0 4px 15px rgba(79,70,229,0.5)'
+              }}>
+                {isValidating ? <><Loader2 size={14} style={{animation:'spin 1s linear infinite'}}/> Checking...</> : <><CheckCircle2 size={14}/> Play Word</>}
+              </button>
+            ) : (
+              <div style={{ flex:2, padding:'12px 0', borderRadius:12, fontSize:12, textAlign:'center', color:'rgba(255,255,255,0.4)', border:'1px solid rgba(255,255,255,0.1)', background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                Standby...
+              </div>
+            )}
+          </div>
       </div>
 
     </div>
