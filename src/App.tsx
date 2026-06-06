@@ -8,7 +8,8 @@ import { useLiveClass } from './hooks/useLiveClass';
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
-import LandingPage from './components/LandingPage'; // 🔥 NEW: Replaced PublicDiscoveryHub
+import LandingPage from './components/LandingPage';
+import GuestJoinLobby from './components/GuestJoinLobby'; // 🔥 IMPORTED GUEST LOBBY
 import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
 import FlashcardView from './components/FlashcardView';
@@ -98,6 +99,10 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [hasAutoRouted, setHasAutoRouted] = useState(false); 
   
+  // 🔥 NEW: Guest Access State
+  const [isGuestJoining, setIsGuestJoining] = useState(false);
+  const [guestTargetClassId, setGuestTargetClassId] = useState<string | null>(null);
+
   // Content State
   const [activeLesson, setActiveLesson] = useState<any>(null); 
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null); 
@@ -230,11 +235,21 @@ export default function App() {
     if (!authChecked || isHydrated.current) return;
     const params = new URLSearchParams(window.location.search);
     
+    // Parse paths like /join/XYZ123
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     if ((pathParts[0] === 'join' || pathParts[0] === 'live' || pathParts[0] === 'play') && pathParts[1]) {
         params.set('classId', pathParts[1]);
         params.set('autoJoin', 'true'); 
         window.history.replaceState({}, '', `/?${params.toString()}`);
+    }
+
+    // 🔥 NEW: Check for explicit guest join intent
+    if (params.get('autoJoin') === 'true' || params.get('joinCode')) {
+        const targetId = params.get('classId') || params.get('joinCode');
+        if (targetId && !user) {
+            setGuestTargetClassId(targetId);
+            setIsGuestJoining(true);
+        }
     }
 
     if (params.get('action') === 'signup' && !user) {
@@ -323,6 +338,7 @@ export default function App() {
         orphanedPortals.forEach(portal => portal.remove());
 
         setShowAuth(false); 
+        setIsGuestJoining(false); // 🔥 NEW: Clear guest intent if they log in
 
         if (userData?.role && !hasAutoRouted) {
             const params = new URLSearchParams(window.location.search);
@@ -352,8 +368,28 @@ export default function App() {
       );
   }
 
-  // 🔥 THE NEW PUBLIC FACE ROUTING (Connected to LandingPage)
+  // 🔥 THE NEW PUBLIC FACE ROUTING (Connected to LandingPage & GuestJoinLobby)
   if (!user) {
+    
+    // 1. Intercept for Frictionless Guest Entry
+    if (isGuestJoining) {
+        return (
+            <GuestJoinLobby 
+                targetClassId={guestTargetClassId} 
+                onCancel={() => {
+                    setIsGuestJoining(false);
+                    setGuestTargetClassId(null);
+                    window.history.replaceState({}, '', '/'); // Clean URL back to root
+                }} 
+                onLoginRedirect={() => {
+                    setIsGuestJoining(false);
+                    setShowAuth(true);
+                }}
+            />
+        );
+    }
+
+    // 2. Auth Flow
     if (showAuth) {
       return (
         <div className="relative min-h-[100dvh] bg-slate-950">
@@ -370,11 +406,12 @@ export default function App() {
       );
     }
     
-    // Serve the Promotional / Documentation Landing Page
+    // 3. Serve the Promotional / Documentation Landing Page
     return (
         <LandingPage 
             onGetStarted={() => setShowAuth(true)} 
             onLogin={() => setShowAuth(true)} 
+            onJoinGuest={() => setIsGuestJoining(true)}
         />
     );
   }
