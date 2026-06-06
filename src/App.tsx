@@ -73,6 +73,7 @@ const LiveScrabbleWrapper = ({ deckId, classId, onExit }: any) => {
             <div className="flex-1 relative">
                 <MarbleScrabble 
                     block={scrabblePayload} 
+                    classId={classId}
                     isProjector={true} 
                     liveState={liveState} 
                     studentId="projector" 
