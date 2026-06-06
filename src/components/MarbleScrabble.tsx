@@ -6,7 +6,7 @@ import {
   LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers,
   PenTool
 } from 'lucide-react';
-import SmartboardQRCode from './SmartboardQRCode'; // 🔥 IMPORTED QR CODE
+import SmartboardQRCode from './SmartboardQRCode';
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -83,7 +83,7 @@ const createBag = () => {
 // ─────────────────────────────────────────────
 // 3D NEON TILE COMPONENT
 // ─────────────────────────────────────────────
-const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = false, isSolid = false, isRack3D = false }: any) => {
+const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = false, isSolid = false }: any) => {
   if (!tile) return null;
   const sz = size === 'sm' ? 'w-8 h-8 text-xs' : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
   
@@ -303,9 +303,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
   const [localBoard, setLocalBoard] = useState<any[]>(Array(BOARD_SIZE * BOARD_SIZE).fill(null));
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
-  const [targetSquare, setTargetSquare] = useState<number | null>(null);
-  const [lastPlaced, setLastPlaced] = useState<number | null>(null);
-  const [playDir, setPlayDir] = useState<number | null>(null);
   const [selectedRack, setSelectedRack] = useState<number | null>(null);
   const [hasDrawn, setHasDrawn] = useState(false);
 
@@ -340,7 +337,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   useEffect(() => {
     if (globalBoardString && globalBoardString !== "undefined") {
       setLocalBoard(JSON.parse(globalBoardString));
-      setTargetSquare(null); setLastPlaced(null); setPlayDir(null);
       setPendingSentence(false); setSentenceText('');
       setSelectedRack(null); setInvalidWords([]); setCurrentWords([]);
     }
@@ -378,7 +374,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         }
       });
       if (changed) { setRack(nr); setLocalBoard(nb); }
-      setTargetSquare(null); setLastPlaced(null); setPlayDir(null); setSelectedRack(null);
+      setSelectedRack(null);
     }
   }, [isMyTurn]);
 
@@ -454,7 +450,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       }
     });
     setLocalBoard(nb); setRack(nr);
-    setTargetSquare(null); setLastPlaced(null); setPlayDir(null); setInvalidWords([]);
+    setInvalidWords([]);
   };
 
   const shuffleRack = () => {
@@ -489,7 +485,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     newRack = newRack.map(() => newBag.length > 0 ? newBag.pop() : null);
 
     setRack(newRack); setLocalBoard(newBoard);
-    setTargetSquare(null); setLastPlaced(null); setPlayDir(null);
     setInvalidWords([]); setSelectedRack(null);
 
     const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) - 10 };
@@ -504,52 +499,56 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
   const handleBoardClick = (idx: number) => {
     if (!isMyTurn || isValidating || isTimerPaused) return;
-    setSelectedRack(null); setInvalidWords([]);
+    setInvalidWords([]);
+    
+    // Ignore locked tiles
     if (localBoard[idx]?.isLocked) return;
+
+    // Recall an unlocked tile from the board to the rack
     if (localBoard[idx] && !localBoard[idx].isLocked) {
       const ei = rack.findIndex(t => t === null);
       if (ei !== -1) {
         const nr = [...rack], nb = [...localBoard];
-        nr[ei] = nb[idx]; nb[idx] = null;
-        setRack(nr); setLocalBoard(nb);
-        setTargetSquare(idx); setLastPlaced(null); setPlayDir(null);
+        nr[ei] = nb[idx]; 
+        nb[idx] = null;
+        setRack(nr); 
+        setLocalBoard(nb);
       }
       return;
     }
-    setTargetSquare(idx);
+
+    // Place a selected rack tile onto an empty board square
+    if (!localBoard[idx] && selectedRack !== null && rack[selectedRack]) {
+      const nb = [...localBoard], nr = [...rack];
+      nb[idx] = { ...nr[selectedRack], isLocked: false };
+      nr[selectedRack] = null;
+      
+      setLocalBoard(nb); 
+      setRack(nr);
+      setSelectedRack(null); // Deselect after placement
+    }
   };
 
   const handleRackClick = (idx: number) => {
     if (isValidating || isTimerPaused) return;
     setInvalidWords([]);
-    if (targetSquare !== null) {
-      if (!isMyTurn || !rack[idx]) return;
-      if (!localBoard[targetSquare]) {
-        const nb = [...localBoard], nr = [...rack];
-        nb[targetSquare] = { ...nr[idx], isLocked: false };
-        nr[idx] = null;
-        setLocalBoard(nb); setRack(nr);
-        let dir = playDir;
-        if (lastPlaced !== null) {
-          const d = targetSquare - lastPlaced;
-          if (d === 1 || d === BOARD_SIZE) { dir = d; setPlayDir(d); } else { dir = null; setPlayDir(null); }
-        }
-        setLastPlaced(targetSquare);
-        if (dir !== null) {
-          const next = targetSquare + dir;
-          const hv = dir === 1 && targetSquare % BOARD_SIZE !== BOARD_SIZE - 1;
-          const vv = dir === BOARD_SIZE && targetSquare + BOARD_SIZE < BOARD_SIZE * BOARD_SIZE;
-          if ((hv || vv) && !nb[next]) setTargetSquare(next); else setTargetSquare(null);
-        } else setTargetSquare(null);
-      }
-      return;
-    }
-    if (selectedRack === null) { if (rack[idx]) setSelectedRack(idx); }
-    else {
-      if (selectedRack === idx) { setSelectedRack(null); }
-      else {
-        const nr = [...rack]; [nr[idx], nr[selectedRack]] = [nr[selectedRack], nr[idx]];
-        setRack(nr); setSelectedRack(null);
+    
+    // Ignore empty rack slots
+    if (!rack[idx]) return;
+
+    if (selectedRack === null) { 
+      // Select tile
+      setSelectedRack(idx); 
+    } else {
+      if (selectedRack === idx) { 
+        // Deselect tile
+        setSelectedRack(null); 
+      } else {
+        // Swap tiles in rack for organization
+        const nr = [...rack]; 
+        [nr[idx], nr[selectedRack]] = [nr[selectedRack], nr[idx]];
+        setRack(nr); 
+        setSelectedRack(null);
       }
     }
   };
@@ -650,7 +649,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         } catch(e) {}
     }
 
-    const wordList: { word: string; rawSum: number; finalScore: number; isStanza: boolean }[] = [];
+    const wordList: { word: string; rawSum: number; finalScore: boolean | number; isStanza: boolean }[] = [];
     let totalScore = 0;
 
     if (isStanza) {
@@ -777,10 +776,11 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   // ─────────────────────────────────────────────
   // PROJECTOR VIEWS
   // ─────────────────────────────────────────────
- if (isProjector) {
+  if (isProjector) {
     const bg = { background: 'radial-gradient(circle at center, #1e1b4b 0%, #08090f 80%)', minHeight: '100%' };
 
-   if (gameStatus === 'lobby_join') {
+    // 🔥 THE REDESIGNED QR CODE LOBBY
+    if (gameStatus === 'lobby_join') {
       
       // 1. Try classId prop -> 2. Try liveState (sometimes it's in the session) -> 3. Try URL params
       const currentClassId = classId || liveState?.classId || new URLSearchParams(window.location.search).get('classId');
@@ -814,7 +814,37 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
              {/* Right Side: Controls */}
              <div style={{ flex: 1, display: 'flex', flexDirection:'column', alignItems:'flex-start' }}>
-                 {/* ... (rest of your controls JSX) ... */}
+                 <div style={{ display:'flex', alignItems:'center', gap:16, fontSize:28, color:'rgba(255,255,255,0.9)', marginBottom:40, fontWeight: 700 }}>
+                   <div style={{ background: 'rgba(74,222,128,0.15)', padding: 12, borderRadius: 16, border: '1px solid rgba(74,222,128,0.3)' }}>
+                     <Users size={36} style={{color:'#4ade80'}} />
+                   </div>
+                   {Object.keys(players).length} operative{Object.keys(players).length !== 1 ? 's' : ''} connected
+                 </div>
+                 
+                 <div style={{ marginBottom:48 }}>
+                   <p style={{ color:'rgba(255,255,255,0.4)', fontSize:13, textTransform:'uppercase', letterSpacing:2, marginBottom:16, fontWeight: 700 }}>Select Turn Duration</p>
+                   <div style={{ display:'flex', gap:10, flexWrap: 'wrap' }}>
+                     {[{l:'1 min',v:60},{l:'90 sec',v:90},{l:'2 min',v:120},{l:'5 min',v:300}].map(t => (
+                       <button key={t.v} onClick={() => setSelectedTime(t.v)} style={{
+                         padding:'12px 24px', borderRadius:12, fontWeight:700, fontSize:15, cursor:'pointer', transition:'all 0.2s',
+                         background: selectedTime === t.v ? 'rgba(79,70,229,0.25)' : 'rgba(255,255,255,0.04)',
+                         border: selectedTime === t.v ? '1px solid rgba(79,70,229,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                         color: selectedTime === t.v ? '#a5b4fc' : 'rgba(255,255,255,0.4)'
+                       }}>{t.l}</button>
+                     ))}
+                   </div>
+                 </div>
+
+                 <button onClick={startFFA} disabled={Object.keys(players).length < 1} style={{
+                   padding:'20px 48px', borderRadius:16, fontSize:22, fontWeight:800, cursor:'pointer',
+                   background: Object.keys(players).length < 1 ? 'rgba(255,255,255,0.05)' : 'rgba(79,70,229,0.9)', 
+                   border: Object.keys(players).length < 1 ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(99,102,241,1)',
+                   color: Object.keys(players).length < 1 ? 'rgba(255,255,255,0.3)' : '#ffffff', 
+                   display:'flex', alignItems:'center', gap:12, transition: 'all 0.3s',
+                   boxShadow: Object.keys(players).length < 1 ? 'none' : '0 15px 40px rgba(79,70,229,0.5)'
+                 }}>
+                   <Rocket size={26}/> Begin Sequence
+                 </button>
              </div>
           </div>
         </div>
@@ -1287,36 +1317,15 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           }}>
             {(localBoard||[]).map((tile: any, idx: number) => {
               const r = Math.floor(idx/BOARD_SIZE), c = idx%BOARD_SIZE;
-              const isTarget = targetSquare === idx;
               const type = getSquareType(r,c);
               return (
-                <div key={idx} onClick={() => handleBoardClick(idx)} style={{ ...squareStyle(r,c,isTarget), display:'flex', alignItems:'center', justifyContent:'center', position:'relative', cursor: isMyTurn&&!tile?.isLocked ? 'pointer' : 'default' }}>
+                <div key={idx} onClick={() => handleBoardClick(idx)} style={{ ...squareStyle(r,c,false), display:'flex', alignItems:'center', justifyContent:'center', position:'relative', cursor: isMyTurn&&!tile?.isLocked ? 'pointer' : 'default' }}>
                   {!tile && type === 'CT' && <Star size={10} style={{color:'rgba(79,70,229,0.4)', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}} fill="currentColor"/>}
                   {!tile && type === 'TW' && <span style={{fontSize:6,fontWeight:700,color:'rgba(220,38,38,0.5)',textTransform:'uppercase', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}}>3W</span>}
                   {!tile && type === 'DW' && <span style={{fontSize:6,fontWeight:700,color:'rgba(217,119,6,0.5)',textTransform:'uppercase', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}}>2W</span>}
                   {!tile && type === 'TL' && <span style={{fontSize:6,fontWeight:700,color:'rgba(8,145,178,0.5)',textTransform:'uppercase', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}}>3L</span>}
                   {!tile && type === 'DL' && <span style={{fontSize:6,fontWeight:700,color:'rgba(5,150,105,0.5)',textTransform:'uppercase', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}}>2L</span>}
                   {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}} fill="currentColor"/>}
-
-                  {/* Orbital tile selector */}
-                  {isTarget && !tile && isMyTurn && !isTimerPaused && (
-                    <div style={{ position:'absolute', top:'50%', left:'50%', width:0, height:0, zIndex:100, transform:`scale(${1/zoom}) ${viewAngle > 0 ? 'translateZ(40px)' : ''}`, transformStyle: 'preserve-3d' }}>
-                      <div style={{ position: 'absolute', width: 280, height: 280, left: -140, top: -140, background: 'radial-gradient(circle, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.4) 50%, transparent 70%)', zIndex: 10, pointerEvents: 'none', borderRadius: '50%' }} />
-                      
-                      {rack.map((rt: any, ri: number) => {
-                        if (!rt) return null;
-                        const angle = (ri/7)*Math.PI*2 - Math.PI/2;
-                        const rad = 88;
-                        const x = Math.cos(angle)*rad, y = Math.sin(angle)*rad;
-                        return (
-                          <div key={`orb_${ri}`} onClick={e => { e.stopPropagation(); handleRackClick(ri); }}
-                            style={{ position:'absolute', width:40, height:40, marginLeft:-20, marginTop:-20, transform:`translate(${x}px,${y}px)`, zIndex:200 }}>
-                            <Tile tile={rt} size="md" isSolid={true} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
 
                   {tile && <Tile tile={tile} locked={tile.isLocked} size="sm" isBoardTile={viewAngle > 0} />}
                 </div>
@@ -1339,7 +1348,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           <div style={{ background:'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:'10px 12px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
               <span style={{ fontSize:10, textTransform:'uppercase', letterSpacing:2, color: isMyTurn ? 'rgba(165,180,252,0.8)' : 'rgba(255,255,255,0.5)' }}>
-                {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
+                {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (selectedRack !== null ? 'Tap an empty square to place' : 'Select a tile from your rack') : 'Waiting...')}
               </span>
               <div style={{ display:'flex', gap:6 }}>
                 <button 
