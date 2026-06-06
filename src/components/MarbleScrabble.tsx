@@ -6,6 +6,7 @@ import {
   LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers,
   PenTool
 } from 'lucide-react';
+import SmartboardQRCode from './SmartboardQRCode'; // 🔥 IMPORTED QR CODE
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -232,7 +233,7 @@ const squareStyle = (r: number, c: number, targeted: boolean) => {
 // ─────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────
-export default function WordForge({ block, isProjector, liveState, studentId, onUpdateLiveState }: any) {
+export default function WordForge({ block, isProjector, liveState, studentId, onUpdateLiveState, classId }: any) {
   const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 90;
   const [selectedTime, setSelectedTime] = useState(90);
 
@@ -779,39 +780,73 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   if (isProjector) {
     const bg = { background: 'radial-gradient(circle at center, #1e1b4b 0%, #08090f 80%)', minHeight: '100%' };
 
+    // 🔥 THE NEW REDESIGNED QR CODE LOBBY 🔥
     if (gameStatus === 'lobby_join') {
+      // Intelligently grab the classId either from props or the URL Search Params
+      const currentClassId = classId || new URLSearchParams(window.location.search).get('classId');
+
       return (
-        <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding: 48, color:'#f8fafc' }}>
+        <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding: 48, color:'#f8fafc', minHeight: '100vh' }}>
+          
+          {/* Header */}
           <div style={{ fontFamily:"'DM Serif Display', serif", fontSize: 72, lineHeight: 1, marginBottom: 8, background: 'linear-gradient(135deg,#f8fafc,#94a3b8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
             WordForge
           </div>
-          <p style={{ color:'rgba(255,255,255,0.35)', fontSize:14, letterSpacing:3, textTransform:'uppercase', marginBottom:48 }}>
-            Vocabulary Discovery Game
+          <p style={{ color:'rgba(255,255,255,0.35)', fontSize:14, letterSpacing:3, textTransform:'uppercase', marginBottom:40 }}>
+            Vocabulary Discovery Arena
           </p>
-          <div style={{ display:'flex', alignItems:'center', gap:12, fontSize:20, color:'rgba(255,255,255,0.6)', marginBottom:40 }}>
-            <Users size={28} style={{color:'#4ade80'}} />
-            {Object.keys(players).length} player{Object.keys(players).length !== 1 ? 's' : ''} connected
+
+          <div style={{ display: 'flex', gap: 64, alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 1100 }}>
+             
+             {/* Left Side: The Glowing QR Code */}
+             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                 {currentClassId ? (
+                     <SmartboardQRCode classId={currentClassId} />
+                 ) : (
+                     <div className="flex flex-col items-center justify-center p-12 bg-slate-900/50 rounded-3xl border border-white/10">
+                         <Loader2 className="animate-spin text-indigo-500 mb-4" size={32} />
+                         <span className="text-slate-400 font-mono text-sm uppercase tracking-widest">Generating Link...</span>
+                     </div>
+                 )}
+             </div>
+
+             {/* Right Side: Player Count & Game Controls */}
+             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                 
+                 <div style={{ display:'flex', alignItems:'center', gap:16, fontSize:28, color:'rgba(255,255,255,0.9)', marginBottom:40, fontWeight: 700 }}>
+                   <div style={{ background: 'rgba(74,222,128,0.15)', padding: 12, borderRadius: 16, border: '1px solid rgba(74,222,128,0.3)' }}>
+                     <Users size={36} style={{color:'#4ade80'}} />
+                   </div>
+                   {Object.keys(players).length} operative{Object.keys(players).length !== 1 ? 's' : ''} connected
+                 </div>
+                 
+                 <div style={{ marginBottom:48 }}>
+                   <p style={{ color:'rgba(255,255,255,0.4)', fontSize:13, textTransform:'uppercase', letterSpacing:2, marginBottom:16, fontWeight: 700 }}>Select Turn Duration</p>
+                   <div style={{ display:'flex', gap:10, flexWrap: 'wrap' }}>
+                     {[{l:'1 min',v:60},{l:'90 sec',v:90},{l:'2 min',v:120},{l:'5 min',v:300}].map(t => (
+                       <button key={t.v} onClick={() => setSelectedTime(t.v)} style={{
+                         padding:'12px 24px', borderRadius:12, fontWeight:700, fontSize:15, cursor:'pointer', transition:'all 0.2s',
+                         background: selectedTime === t.v ? 'rgba(79,70,229,0.25)' : 'rgba(255,255,255,0.04)',
+                         border: selectedTime === t.v ? '1px solid rgba(79,70,229,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                         color: selectedTime === t.v ? '#a5b4fc' : 'rgba(255,255,255,0.4)'
+                       }}>{t.l}</button>
+                     ))}
+                   </div>
+                 </div>
+
+                 <button onClick={startFFA} disabled={Object.keys(players).length < 1} style={{
+                   padding:'20px 48px', borderRadius:16, fontSize:22, fontWeight:800, cursor:'pointer',
+                   background: Object.keys(players).length < 1 ? 'rgba(255,255,255,0.05)' : 'rgba(79,70,229,0.9)', 
+                   border: Object.keys(players).length < 1 ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(99,102,241,1)',
+                   color: Object.keys(players).length < 1 ? 'rgba(255,255,255,0.3)' : '#ffffff', 
+                   display:'flex', alignItems:'center', gap:12, transition: 'all 0.3s',
+                   boxShadow: Object.keys(players).length < 1 ? 'none' : '0 15px 40px rgba(79,70,229,0.5)'
+                 }}>
+                   <Rocket size={26}/> Begin Sequence
+                 </button>
+             </div>
+
           </div>
-          <div style={{ marginBottom:40 }}>
-            <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, textTransform:'uppercase', letterSpacing:2, textAlign:'center', marginBottom:12 }}>Turn duration</p>
-            <div style={{ display:'flex', gap:8 }}>
-              {[{l:'1 min',v:60},{l:'90 sec',v:90},{l:'2 min',v:120},{l:'5 min',v:300}].map(t => (
-                <button key={t.v} onClick={() => setSelectedTime(t.v)} style={{
-                  padding:'10px 20px', borderRadius:10, fontWeight:600, fontSize:14, cursor:'pointer', transition:'all 0.15s',
-                  background: selectedTime === t.v ? 'rgba(79,70,229,0.25)' : 'rgba(255,255,255,0.04)',
-                  border: selectedTime === t.v ? '1px solid rgba(79,70,229,0.6)' : '1px solid rgba(255,255,255,0.1)',
-                  color: selectedTime === t.v ? '#a5b4fc' : 'rgba(255,255,255,0.4)'
-                }}>{t.l}</button>
-              ))}
-            </div>
-          </div>
-          <button onClick={startFFA} disabled={Object.keys(players).length < 1} style={{
-            padding:'14px 36px', borderRadius:12, fontSize:18, fontWeight:600, cursor:'pointer',
-            background:'rgba(79,70,229,0.2)', border:'1px solid rgba(79,70,229,0.5)',
-            color:'#a5b4fc', display:'flex', alignItems:'center', gap:10, opacity: Object.keys(players).length < 1 ? 0.4 : 1
-          }}>
-            <Rocket size={20}/> Begin Session
-          </button>
         </div>
       );
     }
