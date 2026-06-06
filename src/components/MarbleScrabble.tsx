@@ -780,21 +780,23 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
  if (isProjector) {
     const bg = { background: 'radial-gradient(circle at center, #1e1b4b 0%, #08090f 80%)', minHeight: '100%' };
 
-    // 🔥 THE REDESIGNED QR CODE LOBBY
-    if (gameStatus === 'lobby_join') {
+   if (gameStatus === 'lobby_join') {
       
-      // Use the classId prop provided by the parent (which comes from App.tsx or URL)
-      const currentClassId = classId;
+      // 1. Try classId prop -> 2. Try liveState (sometimes it's in the session) -> 3. Try URL params
+      const currentClassId = classId || liveState?.classId || new URLSearchParams(window.location.search).get('classId');
 
       return (
         <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding: 48, color:'#f8fafc', minHeight: '100vh' }}>
           
+          {/* Header */}
           <div style={{ fontFamily:"'DM Serif Display', serif", fontSize: 72, lineHeight: 1, marginBottom: 8, background: 'linear-gradient(135deg,#f8fafc,#94a3b8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
             WordForge
           </div>
-          <p style={{ color:'rgba(255,255,255,0.35)', fontSize:14, letterSpacing:3, textTransform:'uppercase', marginBottom:40 }}>
-            Vocabulary Discovery Arena
-          </p>
+          
+          {/* DEBUG INFO: This will show you exactly why the ID is missing */}
+          <div className="text-slate-600 font-mono text-xs mb-8">
+            DEBUG: classId prop: {classId || 'NULL'} | liveState ID: {liveState?.classId || 'NULL'}
+          </div>
 
           <div style={{ display: 'flex', gap: 64, alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 1100 }}>
              
@@ -811,30 +813,14 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
              </div>
 
              {/* Right Side: Controls */}
-             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                 <div style={{ display:'flex', alignItems:'center', gap:16, fontSize:28, color:'rgba(255,255,255,0.9)', marginBottom:40, fontWeight: 700 }}>
-                   <div style={{ background: 'rgba(74,222,128,0.15)', padding: 12, borderRadius: 16, border: '1px solid rgba(74,222,128,0.3)' }}>
-                     <Users size={36} style={{color:'#4ade80'}} />
-                   </div>
-                   {Object.keys(players).length} operative{Object.keys(players).length !== 1 ? 's' : ''} connected
-                 </div>
-                 
-                 <button onClick={startFFA} disabled={Object.keys(players).length < 1} style={{
-                   padding:'20px 48px', borderRadius:16, fontSize:22, fontWeight:800, cursor:'pointer',
-                   background: Object.keys(players).length < 1 ? 'rgba(255,255,255,0.05)' : 'rgba(79,70,229,0.9)', 
-                   border: Object.keys(players).length < 1 ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(99,102,241,1)',
-                   color: Object.keys(players).length < 1 ? 'rgba(255,255,255,0.3)' : '#ffffff', 
-                   display:'flex', alignItems:'center', gap:12, transition: 'all 0.3s',
-                   boxShadow: Object.keys(players).length < 1 ? 'none' : '0 15px 40px rgba(79,70,229,0.5)'
-                 }}>
-                   <Rocket size={26}/> Begin Sequence
-                 </button>
+             <div style={{ flex: 1, display: 'flex', flexDirection:'column', alignItems:'flex-start' }}>
+                 {/* ... (rest of your controls JSX) ... */}
              </div>
           </div>
         </div>
       );
     }
-    if (gameStatus === 'lobby_naming') {
+   if (gameStatus === 'lobby_naming') {
       return (
         <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:40, color:'#f8fafc' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:40 }}>
