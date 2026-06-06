@@ -691,7 +691,7 @@ export function useMagisterData() {
 
   const allLessons = useMemo(() => allAppLessons, [allAppLessons]);
   
-  const enrichedUserData = useMemo(() => {
+const enrichedUserData = useMemo(() => {
     if (!userData) return null;
     return {
         ...userData,
@@ -703,9 +703,16 @@ export function useMagisterData() {
     };
   }, [userData, cardPrefs, deckPrefs]);
 
+  const isPro = useMemo(() => {
+      // Adjust these field names to match your Firestore structure exactly
+      return userData?.role === 'instructor' && 
+            (userData?.isPro === true || userData?.subscription === 'pro');
+  }, [userData]);
+
   return { 
     user, 
     userData: enrichedUserData, 
+    isPro, // 🔥 EXPOSE IT HERE
     authChecked, 
     activeOrg, 
     allLessons, 
