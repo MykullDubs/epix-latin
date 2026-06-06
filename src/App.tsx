@@ -372,19 +372,15 @@ export default function App() {
   if (!user) {
     
     // 1. Intercept for Frictionless Guest Entry
-    if (isGuestJoining) {
+if (isGuestJoining && guestTargetClassId) {
         return (
             <GuestJoinLobby 
-                targetClassId={guestTargetClassId} 
+                classId={guestTargetClassId} 
                 onCancel={() => {
                     setIsGuestJoining(false);
                     setGuestTargetClassId(null);
                     window.history.replaceState({}, '', '/'); // Clean URL back to root
                 }} 
-                onLoginRedirect={() => {
-                    setIsGuestJoining(false);
-                    setShowAuth(true);
-                }}
             />
         );
     }
