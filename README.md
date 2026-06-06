@@ -1,4 +1,3 @@
-```markdown
 <div align="center">
 
 # 🎓 MagisterOS //
@@ -83,3 +82,63 @@ For example, inputting a YouTube video about "Negotiating a tech salary" instant
     }
   ]
 }
+```
+
+---
+
+## 📡 3. Dual-Screen Sync & Live Arenas
+
+The backbone of the live classroom experience. MagisterOS utilizes a high-speed Websocket architecture (via Firebase Firestore) to link a central smartboard projector with up to 30 individual student mobile devices simultaneously.
+
+* **Zero-Latency Interactions:** Actions taken on the student HUD reflect instantly on the projector view.
+* **Frictionless Entry:** Students join active sessions via a dynamic smartboard QR code. No account creation or app installation is required for live arena participation.
+* **State Recovery:** Dropped connections are instantly restored to the current application state without disrupting the global game loop.
+
+### The Multiplayer Suite
+MagisterOS abandons traditional static quizzing in favor of highly interactive, multiplayer gamification.
+
+| Arena Mode | Mechanics | Pedagogical Target |
+| :--- | :--- | :--- |
+| **Trivia Battle** | A fast-paced, classic multiple-choice showdown. | Rapid recall and baseline vocabulary testing. |
+| **Squad Strike** | Team-based strategy. Teams answer correctly to drop colored tokens into a shared Connect-4 grid. | Collaborative problem-solving and peer teaching. |
+| **Slipstream Run** | A continuous, infinite-scroll runner where correct answers accelerate the student's avatar. | Fluency, reading speed, and automaticity. |
+| **Marble Scrabble** | *Littera Marmoris.* Teams battle to form words from scattered letters under a strict time limit. | Spelling, syntax, and advanced lexical recall. |
+
+---
+
+## 🎮 4. Gamification & Student HUD
+
+A dark-mode, app-like mobile interface designed for daily student engagement outside of the classroom.
+
+* **Spaced Repetition System (SRS):** Built-in flashcard engine that tracks user performance, calculating optimal review intervals based on mastery.
+* **Dynamic Theme Engine:** Personalization integrated directly into the OS. Students unlock and equip UI themes (`theme_hacker`, `theme_synth`, `theme_vapor`) that dynamically inject Tailwind modifier classes across the entire application state.
+* **HoloAvatars & Storefront:** Students earn XP by completing lessons and exams. They can spend earned currency in the storefront to unlock cosmetic avatar borders, interface colors, and particle effects.
+* **Study Folders:** Complete autonomy over asynchronous learning. Students can star, archive, and organize network decks into custom directories.
+
+---
+
+## 🔐 5. Core LMS Features & RBAC
+
+MagisterOS routes users deterministically based on their database permissions, ensuring a tailored experience for every role.
+
+### 👨‍🎓 Student Level
+* Locked into the mobile-first HUD.
+* Access to enrolled classes, flashcard decks, storefront, and direct inbox.
+* Automated celebration screens upon module completion.
+
+### 👨‍🏫 Instructor Level (Magister Command)
+* **Advanced Dashboard:** Create classes, manage rosters, and assign dynamic curriculums.
+* **Live Control:** Launch Live Arenas directly to the smartboard and monitor real-time student performance.
+* **Content Management:** Build, edit, and publish custom flashcard decks and lessons.
+
+### 🛡️ Admin Level
+* Unrestricted global view of the organization.
+* Oversee organization-wide analytics and manage overarching global curriculums.
+* Seamlessly impersonate the student experience to preview application behavior.
+
+---
+
+<div align="center">
+  <p><i>Built by educators, for educators.</i></p>
+  <p>&copy; 2026 MagisterOS Development Team</p>
+</div>
