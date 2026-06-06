@@ -1,3 +1,4 @@
+```markdown
 <div align="center">
 
 # 🎓 MagisterOS //
@@ -21,10 +22,10 @@ MagisterOS abandons traditional static HTML/CSS lesson building in favor of a st
 
 ### Object-Tree Engine
 Content and layout are strictly decoupled. All pedagogical content is stored as clean JSON arrays using our core schemas:
-*   `text_block`: Handles localized descriptive body text and tiered headings.
-*   `dialogue_block`: Pairs dual speakers cleanly into step-by-step roleplay strings.
-*   `discussion_block`: Highlights targeted question sequences with strict structural grammar prompts.
-*   `wrap_up_block`: Summarizes milestones reached, confirming structural learning parameters.
+* `text_block`: Handles localized descriptive body text and tiered headings.
+* `dialogue_block`: Pairs dual speakers cleanly into step-by-step roleplay strings.
+* `discussion_block`: Highlights targeted question sequences with strict structural grammar prompts.
+* `wrap_up_block`: Summarizes milestones reached, confirming structural learning parameters.
 
 ```json
 {
@@ -34,6 +35,14 @@ Content and layout are strictly decoupled. All pedagogical content is stored as 
     "Use specific technical vocabulary.",
     "Provide one concrete example."
   ]
+}
+```
+
+### Adaptive Constraints
+The compiler reads the target device environment at runtime. It automatically strips out unsupported interactive elements (e.g., suppressing complex smartphone queries when projecting to a passive smartboard display).
+
+---
+
 ## 🧠 2. AI-Accelerated Lesson Forging
 
 **Teach at the speed of thought.** The Magister Magic Generator (Powered by Gemini AI) is a deterministic pipeline designed to reduce instructor prep time from hours to seconds. It acts as an intelligent compiler, translating unstructured media into strict MagisterOS JSON payloads.
@@ -73,5 +82,4 @@ For example, inputting a YouTube video about "Negotiating a tech salary" instant
       "text": "Based on my market research and specialized skill set, I was targeting closer to $140,000, perhaps offset by additional equity." 
     }
   ]
-}
 }
