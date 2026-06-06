@@ -34,4 +34,44 @@ Content and layout are strictly decoupled. All pedagogical content is stored as 
     "Use specific technical vocabulary.",
     "Provide one concrete example."
   ]
+## 🧠 2. AI-Accelerated Lesson Forging
+
+**Teach at the speed of thought.** The Magister Magic Generator (Powered by Gemini AI) is a deterministic pipeline designed to reduce instructor prep time from hours to seconds. It acts as an intelligent compiler, translating unstructured media into strict MagisterOS JSON payloads.
+
+### The Ingestion Pipeline
+Instructors no longer need to manually author flashcards or type out quiz questions. The engine natively accepts:
+* **Raw Text & PDFs:** Paste articles, textbook chapters, or literature excerpts.
+* **Web Architecture:** Input Wikipedia URLs or news article links.
+* **Video Transcripts:** Paste a YouTube URL, and the engine will extract the transcript, identify speakers, and isolate the core lexical targets.
+
+### The Compilation Matrix
+Once unstructured data is ingested, the AI passes it through a pedagogical filter to ensure the output matches the instructor's exact classroom needs.
+
+* **CEFR Level Targeting:** Instructors select a target difficulty (A1 Beginner to C2 Mastery). The AI automatically scales the vocabulary, simplifies or complexifies the grammar, and adjusts the syntax to match the chosen baseline.
+* **Automated Extraction:** The engine isolates high-value vocabulary, generates contextual fill-in-the-blank exercises, and structures grammatical focus points without human intervention.
+* **Pedagogical Guardrails:** The AI is strictly prompted to adhere to Universal Design for Learning (UDL) principles, ensuring diverse representation and clear, unambiguous instruction formatting.
+
+### Real-Time Payload Generation
+The true power of the Magic Generator is that it outputs pure, ready-to-render `MagisterOS.json_spec` code. 
+
+For example, inputting a YouTube video about "Negotiating a tech salary" instantly compiles into a perfectly structured `dialogue_block` ready for the Live Arena:
+
+```json
+{
+  "type": "dialogue_block",
+  "metadata": {
+    "target_cefr": "B2",
+    "lexical_focus": ["compensation", "equity", "leverage"]
+  },
+  "turns": [
+    { 
+      "speaker": "Hiring Manager", 
+      "text": "We are prepared to offer you a baseline compensation of $120,000." 
+    },
+    { 
+      "speaker": "Candidate", 
+      "text": "Based on my market research and specialized skill set, I was targeting closer to $140,000, perhaps offset by additional equity." 
+    }
+  ]
+}
 }
