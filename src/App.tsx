@@ -4,11 +4,11 @@ import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, appId } from './config/firebase';   
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums'; 
-import { useLiveClass } from './hooks/useLiveClass'; // 🔥 ADDED FOR SCRABBLE WRAPPER
+import { useLiveClass } from './hooks/useLiveClass'; 
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
-import PublicDiscoveryHub from './components/PublicDiscoveryHub'; 
+import LandingPage from './components/LandingPage'; // 🔥 NEW: Replaced PublicDiscoveryHub
 import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
 import FlashcardView from './components/FlashcardView';
@@ -29,7 +29,7 @@ import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
 import InstructorHUD from './components/instructor/InstructorHUD'; 
 import StudentInbox from './components/StudentInbox';
-import MarbleScrabble from './components/MarbleScrabble'; // 🔥 IMPORTED SCRABBLE COMPONENT
+import MarbleScrabble from './components/MarbleScrabble';
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -40,7 +40,7 @@ const OS_THEMES: Record<string, string> = {
 };
 
 // ==========================================================================
-// 🔥 NEW: STANDALONE SCRABBLE PROJECTOR WRAPPER
+// 🔥 STANDALONE SCRABBLE PROJECTOR WRAPPER
 // ==========================================================================
 const LiveScrabbleWrapper = ({ deckId, classId, onExit }: any) => {
     const { liveState, startLiveClass, endLiveClass, updateLiveState } = useLiveClass(classId, true);
@@ -58,7 +58,6 @@ const LiveScrabbleWrapper = ({ deckId, classId, onExit }: any) => {
     }), []);
 
     useEffect(() => {
-        // Initialize the class with the payload as the 'currentQuestion'
         startLiveClass(deckId, 'vocab', scrabblePayload);
         return () => { endLiveClass(); };
     }, [deckId, classId]);
@@ -110,7 +109,7 @@ export default function App() {
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
   const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
   const [activeSlipstream, setActiveSlipstream] = useState<{deckId: string, classId: string} | null>(null);
-  const [activeMarbleScrabble, setActiveMarbleScrabble] = useState<{deckId: string, classId: string} | null>(null); // 🔥 NEW SCRABBLE STATE
+  const [activeMarbleScrabble, setActiveMarbleScrabble] = useState<{deckId: string, classId: string} | null>(null);
   const [activeHUD, setActiveHUD] = useState<{lessonId: string, classId: string} | null>(null); 
 
   const allCurriculums = useMemo(() => {
@@ -218,7 +217,6 @@ export default function App() {
       } catch (error) { console.error("Failed to launch Slipstream Run:", error); }
   };
 
-  // 🔥 NEW: Scrabble Launcher
   const handleStartMarbleScrabble = (deckId: string, classId: string) => {
       setActiveMarbleScrabble({ deckId, classId });
   };
@@ -354,29 +352,37 @@ export default function App() {
       );
   }
 
+  // 🔥 THE NEW PUBLIC FACE ROUTING (Connected to LandingPage)
   if (!user) {
     if (showAuth) {
       return (
-        <>
+        <div className="relative min-h-[100dvh] bg-slate-950">
+           {/* Floating Back Button */}
            <button 
              onClick={() => setShowAuth(false)} 
-             className="fixed top-6 left-6 z-[9999] text-slate-400 hover:text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-colors bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10"
+             className="fixed top-6 left-6 z-[9999] text-slate-400 hover:text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-colors bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 hover:border-white/30"
            >
                ← Back to Hub
            </button>
+           
            <AuthView />
-        </>
+        </div>
       );
     }
     
-    return <PublicDiscoveryHub onAuthenticateToLaunch={() => setShowAuth(true)} />;
+    // Serve the Promotional / Documentation Landing Page
+    return (
+        <LandingPage 
+            onGetStarted={() => setShowAuth(true)} 
+            onLogin={() => setShowAuth(true)} 
+        />
+    );
   }
 
   // ==========================================================================
   //  AUTHENTICATED APP VIEWS
   // ==========================================================================
 
-  // 🔥 SCRABBLE PROJECTOR OVERRIDE
   if (activeMarbleScrabble) {
       return (
           <LiveScrabbleWrapper 
@@ -461,7 +467,6 @@ export default function App() {
   // 4. INSTRUCTOR VIEW
   if (currentView === 'instructor' && userData?.role !== 'student') {
     
-    // 🔥 PRO VIEW: The Advanced Instructor Dashboard
     if (useAdvancedDashboard) {
       return (
         <InstructorDashboard 
@@ -492,7 +497,7 @@ export default function App() {
           onStartVocabGame={handleStartVocabGame}      
           onStartConnectFour={handleStartConnectFour} 
           onStartSlipstream={handleStartSlipstream}
-          onStartMarbleScrabble={handleStartMarbleScrabble} // 🔥 ADDED
+          onStartMarbleScrabble={handleStartMarbleScrabble}
           onPublishDeck={actions.publishDeck}
           onSwitchView={() => setCurrentView('student')}
           onLogout={actions.logout} 
@@ -504,7 +509,6 @@ export default function App() {
       );
     } 
     
-    // 🔥 LITE VIEW: The Simplified MagisterHub
     else {
       return (
         <MagisterHub 
@@ -519,7 +523,7 @@ export default function App() {
             onStartVocabGame={handleStartVocabGame}      
             onStartConnectFour={handleStartConnectFour} 
             onStartSlipstream={handleStartSlipstream}
-            onStartMarbleScrabble={handleStartMarbleScrabble} // 🔥 ADDED
+            onStartMarbleScrabble={handleStartMarbleScrabble} 
             
             onSaveLesson={actions.saveLesson}
             onSaveCard={actions.saveCard}
