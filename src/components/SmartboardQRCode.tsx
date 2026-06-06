@@ -12,8 +12,8 @@ export default function SmartboardQRCode({ classId }: SmartboardQRCodeProps) {
 
   useEffect(() => {
     // Dynamically grab the current domain (localhost or production domain)
-    setJoinUrl(`${window.location.origin}/join/${classId}`);
-  }, [classId]);
+setJoinUrl(`${window.location.origin}/?joinCode=${classId}`);
+}, [classId]);
 
   // Prevent rendering until the client-side URL is established
   if (!joinUrl) return null; 
