@@ -1,13 +1,14 @@
 // src/components/PlacementExam.tsx
 import React, { useState } from 'react';
 import { 
-    Target, Zap, CheckCircle2, BrainCircuit, ArrowRight 
+    Target, Zap, CheckCircle2, BrainCircuit, ArrowRight, Server, AlertTriangle, Loader2
 } from 'lucide-react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db, appId } from '../config/firebase';
 
 // --- DATA: QUESTION MATRIX ---
 export type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
 
-// Format: [Question, Option 1, Option 2, Option 3, Option 4, Correct Index (0-3)]
 const QUESTION_MATRIX: Record<CEFRLevel, (string | number)[][]> = {
   A1: [
     ["Hi, what ___ your name?", "am", "is", "are", "be", 1],
@@ -137,6 +138,10 @@ export default function PlacementExam() {
     const [history, setHistory] = useState<any[]>([]);
     const [currentQuestionTuple, setCurrentQuestionTuple] = useState<any[] | null>(null);
 
+    // Database Status State
+    const [syncStatus, setSyncStatus] = useState<'pending' | 'success' | 'error'>('pending');
+    const [finalPayloadObject, setFinalPayloadObject] = useState<any>(null);
+
     const getNextQuestion = (level: CEFRLevel) => {
         const bank = QUESTION_MATRIX[level];
         const askedInLevel = history.filter(h => h.level === level).map(h => h.question);
@@ -150,6 +155,41 @@ export default function PlacementExam() {
         if (!studentName.trim()) return;
         setCurrentQuestionTuple(getNextQuestion('A1'));
         setAppState('testing');
+    };
+
+    const generatePayloadObject = (finalHistory: any[], finalLevel: CEFRLevel) => {
+        const correctCount = finalHistory.filter(h => h.correct).length;
+        const levelBonus = (LEVELS.indexOf(finalLevel) + 1) * 50;
+        const finalXp = (correctCount * 10) + levelBonus;
+
+        return {
+            student_name: studentName,
+            final_placement: finalLevel,
+            xp_earned: finalXp,
+            coins_earned: Math.floor(finalXp / 5),
+            total_questions: finalHistory.length,
+            accuracy: Math.round((correctCount / finalHistory.length) * 100) + '%',
+            audit_trail: finalHistory,
+            timestamp: Date.now(),
+            status: 'pending_review' // Flags it for the instructor dashboard
+        };
+    };
+
+    const saveToDatabase = async (payload: any) => {
+        setSyncStatus('pending');
+        try {
+            // Sanitize name for document ID
+            const safeName = studentName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+            const docId = `${safeName}_${Date.now()}`;
+            
+            const placementRef = doc(db, 'artifacts', appId, 'placements', docId);
+            await setDoc(placementRef, payload);
+            
+            setSyncStatus('success');
+        } catch (error) {
+            console.error("Failed to sync placement payload:", error);
+            setSyncStatus('error');
+        }
     };
 
     const handleAnswer = (selectedIndex: number) => {
@@ -183,26 +223,14 @@ export default function PlacementExam() {
         setQuestionsAnswered(prev => prev + 1);
 
         if (questionsAnswered + 1 >= MAX_QUESTIONS) {
+            // Exam Complete! Generate payload and save to DB
+            const payloadObj = generatePayloadObject(newHistory, newLevel);
+            setFinalPayloadObject(payloadObj);
+            saveToDatabase(payloadObj);
             setAppState('results');
         } else {
             setCurrentQuestionTuple(getNextQuestion(newLevel));
         }
-    };
-
-    const generateMagisterPayload = () => {
-        const correctCount = history.filter(h => h.correct).length;
-        const levelBonus = (LEVELS.indexOf(currentLevel) + 1) * 50;
-        const finalXp = (correctCount * 10) + levelBonus;
-
-        return JSON.stringify({
-            student_name: studentName,
-            final_placement: currentLevel,
-            xp_earned: finalXp,
-            coins_earned: Math.floor(finalXp / 5),
-            total_questions: history.length,
-            accuracy: Math.round((correctCount / history.length) * 100) + '%',
-            audit_trail: history
-        }, null, 2);
     };
 
     // --- UI RENDERING ---
@@ -286,6 +314,8 @@ export default function PlacementExam() {
     }
 
     if (appState === 'results') {
+        const payloadString = JSON.stringify(finalPayloadObject, null, 2);
+
         return (
             <div className="min-h-screen bg-slate-950 flex flex-col items-center p-6 text-slate-100 py-12 overflow-y-auto font-sans">
                 <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative">
@@ -306,26 +336,49 @@ export default function PlacementExam() {
                         <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl text-center">
                             <span className="block text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Accuracy</span>
                             <span className="text-4xl font-black text-slate-200">
-                                {Math.round((history.filter(h => h.correct).length / MAX_QUESTIONS) * 100)}%
+                                {finalPayloadObject?.accuracy || '0%'}
                             </span>
                         </div>
                     </div>
 
-                    <div className="mb-8">
-                        <div className="flex items-center gap-2 mb-4 text-slate-400">
-                            <Zap size={16} className="text-amber-500" />
-                            <span className="text-xs font-black uppercase tracking-widest">MagisterOS Payload Generated</span>
+                    {/* 🔥 DATABASE SYNC STATUS HUD */}
+                    <div className={`mb-8 p-4 rounded-xl border flex items-center justify-between transition-colors ${
+                        syncStatus === 'pending' ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' :
+                        syncStatus === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                        'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                    }`}>
+                        <div className="flex items-center gap-3">
+                            {syncStatus === 'pending' && <Loader2 size={18} className="animate-spin" />}
+                            {syncStatus === 'success' && <Server size={18} />}
+                            {syncStatus === 'error' && <AlertTriangle size={18} />}
+                            <span className="text-xs font-black uppercase tracking-widest">
+                                {syncStatus === 'pending' ? 'Syncing to Magister Command...' :
+                                 syncStatus === 'success' ? 'Payload Secured in Database' :
+                                 'Network Failure: Local Backup Required'}
+                            </span>
                         </div>
-                        <pre className="bg-black/50 border border-slate-800 p-4 rounded-xl overflow-x-auto text-xs font-mono text-emerald-400/80">
-                            {generateMagisterPayload()}
+                        {syncStatus === 'success' && <CheckCircle2 size={18} />}
+                    </div>
+
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between mb-4 text-slate-400">
+                            <div className="flex items-center gap-2">
+                                <Zap size={16} className="text-amber-500" />
+                                <span className="text-xs font-black uppercase tracking-widest">Local Payload Record</span>
+                            </div>
+                        </div>
+                        <pre className="bg-black/50 border border-slate-800 p-4 rounded-xl overflow-x-auto text-xs font-mono text-emerald-400/80 max-h-48">
+                            {payloadString}
                         </pre>
                     </div>
 
                     <button 
-                        onClick={() => navigator.clipboard.writeText(generateMagisterPayload())}
-                        className="w-full bg-slate-800 hover:bg-slate-700 text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all"
+                        onClick={() => navigator.clipboard.writeText(payloadString)}
+                        className={`w-full text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all ${
+                            syncStatus === 'success' ? 'bg-slate-800 hover:bg-slate-700' : 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-500/20'
+                        }`}
                     >
-                        Copy Payload to Clipboard
+                        {syncStatus === 'success' ? 'Copy Backup to Clipboard' : 'Copy Payload Manually'}
                     </button>
                 </div>
             </div>
