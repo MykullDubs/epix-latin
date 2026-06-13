@@ -124,10 +124,10 @@ const QUESTION_MATRIX: Record<CEFRLevel, (string | number)[][]> = {
     ["She ___ her keys. She can't get into her apartment.", "lost", "has lost", "had lost", "was losing", 1, "Present Perfect (Recent Past)"],
     ["I enjoy ___ new languages.", "to learn", "learning", "learn", "learned", 1, "Verbs followed by Gerunds"],
     ["She asked me what time ___.", "it was", "was it", "is it", "it is", 0, "Indirect Questions"],
-    ["I'm looking forward to ___ you.", "see", "seeing", "saw", "be seeing", 1, "Phrasal Verbs + Gerund"],
+    ["She kept on ___ despite the noise.", "to talk", "talking", "talk", "talked", 1, "Verbs followed by Gerunds"],
     ["She told me she ___ tired.", "is", "was", "has been", "were", 1, "Reported Speech (Basic)"],
     ["He hasn't finished the report ___.", "already", "still", "yet", "just", 2, "Present Perfect: Yet"],
-    ["I promise I ___ help you tomorrow.", "am going to", "will", "would", "am helping", 1, "Future Simple (Promises)"],
+    ["I ___ to contact them several times, but there's no answer.", "try", "tried", "have tried", "was trying", 2, "Present Perfect: Repeated Actions"],
     ["That's the hospital ___ my mother works.", "which", "that", "where", "who", 2, "Relative Clauses (Where)"]
   ],
   B2: [
@@ -148,11 +148,11 @@ const QUESTION_MATRIX: Record<CEFRLevel, (string | number)[][]> = {
     ["It's about time you ___ a job.", "get", "got", "getting", "have got", 1, "It's time + Past Simple"],
     ["If only I ___ more time for my hobbies.", "have", "had", "will have", "have had", 1, "If Only + Past (Regret)"],
     ["He is thought ___ a millionaire.", "be", "to be", "being", "is", 1, "Passive Reporting Verbs"],
-    ["I'd rather you ___ here.", "don't smoke", "didn't smoke", "not smoke", "no smoking", 1, "Would rather + Past"],
+    ["Suppose you ___ the meeting early, what would happen?", "leave", "left", "have left", "leaving", 1, "Unreal Past (Suppose)"],
     ["It's high time you ___ a haircut.", "get", "got", "getting", "to get", 1, "It's high time + Past"],
     ["He ___ his car washed yesterday.", "has", "had", "gotten", "have", 1, "Causative Verbs"],
-    ["We'll leave as soon as he ___.", "arrives", "will arrive", "arrived", "is arriving", 0, "Time Clauses"],
-    ["She denied ___ the window.", "break", "broke", "breaking", "to break", 2, "Gerunds after Verbs"],
+    ["By the time you arrive, we ___ dinner.", "finish", "will finish", "will have finished", "are finishing", 2, "Future Perfect in Time Clauses"],
+    ["He stopped ___ so that I could catch up.", "to run", "run", "running", "ran", 2, "Stop + Gerund vs Infinitive"],
     ["I recommend ___ a doctor.", "to see", "see", "seeing", "that you seeing", 2, "Recommend + Gerund"],
     ["By next month, I ___ here for 5 years.", "will be working", "will have been working", "work", "am working", 1, "Future Perfect Continuous"],
     ["He was made ___ the fine.", "pay", "paying", "to pay", "paid", 2, "Passive with Make"],
@@ -188,7 +188,7 @@ const QUESTION_MATRIX: Record<CEFRLevel, (string | number)[][]> = {
     ["We must ___ out the root cause of this systemic failure.", "ferret", "badger", "weasel", "hound", 0, "Advanced Phrasal Verbs"],
     ["Scarcely ___ the house when it started to rain.", "I had left", "had I left", "I left", "did I leave", 1, "Negative Inversion"],
     ["Not only ___ the exam, but she got the highest score.", "she passed", "did she pass", "passed she", "she did pass", 1, "Negative Inversion"],
-    ["___ of what he says, I still don't trust him.", "Regardless", "In spite", "Despite", "Although", 0, "Prepositional Phrases"],
+    ["___ of what he says, I still don't trust him.", "Regardless", "Provided", "Despite", "Although", 0, "Prepositional Phrases"],
     ["They decided to ___ the issue until the next meeting.", "shelve", "chair", "desk", "floor", 0, "Advanced Phrasal/Idiomatic Verbs"],
     ["Only when he apologized ___ him.", "I forgave", "did I forgive", "I did forgive", "forgave I", 1, "Inversion after Only"],
     ["On no account ___ the red button.", "you must press", "must you press", "you press", "press you", 1, "Negative Inversion (On no account)"],
@@ -208,14 +208,14 @@ const QUESTION_MATRIX: Record<CEFRLevel, (string | number)[][]> = {
 
 // --- CORE LOGIC ---
 const LEVELS: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1'];
-const MAX_QUESTIONS = 30; // Increased to 30 for optimal diagnostic accuracy
+const MAX_QUESTIONS = 30; 
 
 export default function PlacementExam() {
     const [appState, setAppState] = useState<'intro' | 'testing' | 'results'>('intro');
     const [studentName, setStudentName] = useState('');
     
-    // Adaptive State
-    const [currentLevel, setCurrentLevel] = useState<CEFRLevel>('A1');
+    // Adaptive State: Starts at A2 to avoid beginner-grind for advanced students
+    const [currentLevel, setCurrentLevel] = useState<CEFRLevel>('A2');
     const [questionsAnswered, setQuestionsAnswered] = useState(0);
     const [streak, setStreak] = useState(0);
     
@@ -241,7 +241,7 @@ export default function PlacementExam() {
 
     const startExam = () => {
         if (!studentName.trim()) return;
-        setCurrentQuestionTuple(getNextQuestion('A1'));
+        setCurrentQuestionTuple(getNextQuestion('A2'));
         setAppState('testing');
     };
 
@@ -288,7 +288,7 @@ export default function PlacementExam() {
             .map(([topic]) => topic);
 
         return {
-            version: "1.1",
+            version: "1.2",
             student_name: studentName,
             final_placement: calculatedLevel,
             xp_earned: finalXp,
