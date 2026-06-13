@@ -288,7 +288,7 @@ export default function PlacementExam() {
             .map(([topic]) => topic);
 
         return {
-            version: "1.2",
+            version: "1.3",
             student_name: studentName,
             final_placement: calculatedLevel,
             xp_earned: finalXp,
@@ -427,8 +427,12 @@ export default function PlacementExam() {
                         <div className="grid grid-cols-1 gap-3 shrink-0">
                             {[1, 2, 3, 4].map((optIdx) => (
                                 <button 
-                                    key={optIdx}
-                                    onClick={() => handleAnswer(optIdx - 1)}
+                                    // 🔥 THE FIX: Using the question text in the key forces React to render a fresh, unhighlighted button
+                                    key={`${currentQuestionTuple[0]}-${optIdx}`}
+                                    onClick={(e) => {
+                                        e.currentTarget.blur();
+                                        handleAnswer(optIdx - 1);
+                                    }}
                                     className="w-full bg-slate-900 border-2 border-slate-800 hover:border-indigo-500 hover:bg-indigo-500/10 active:bg-indigo-500/20 text-slate-200 font-bold py-4 px-6 rounded-2xl text-left transition-all"
                                 >
                                     {currentQuestionTuple[optIdx]}
