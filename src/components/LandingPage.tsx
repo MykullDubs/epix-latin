@@ -193,7 +193,7 @@ function LivePlayground() {
 // ─────────────────────────────────────────────────────────────
 // COMPONENT 2: THE MAIN LANDING PAGE EXPORT
 // ─────────────────────────────────────────────────────────────
-export default function LandingPage({ onGetStarted, onLogin }: any) {
+export default function LandingPage({ onGetStarted, onLogin, onJoinGuest, onStartPlacement }: any) {
     const [scrolled, setScrolled] = useState(false);
     const [activeTab, setActiveTab] = useState<'all' | 'survival' | 'professional' | 'grammar'>('all');
 
@@ -237,30 +237,58 @@ export default function LandingPage({ onGetStarted, onLogin }: any) {
             </nav>
 
             {/* 1. HERO SECTION */}
-            <section className="relative pt-40 pb-20 px-6 overflow-hidden">
+            <section className="relative pt-32 pb-20 px-6 overflow-hidden">
                 <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
-                <div className="max-w-5xl mx-auto text-center relative z-10 animate-in slide-in-from-bottom-8 fade-in duration-1000">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-8 shadow-2xl">
-                        <Sparkles size={14} className="text-indigo-400" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">The Next Generation LMS</span>
-                    </div>
-                    <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black tracking-tighter leading-[1.05] mb-8 text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-slate-400">
-                        Teach at the speed of <br className="hidden md:block" />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-fuchsia-400">thought.</span>
-                    </h1>
-                    <p className="text-lg md:text-xl text-slate-400 font-medium max-w-2xl mx-auto mb-10 leading-relaxed">
-                        Magister OS transforms static PDFs and Wikipedia articles into gamified, highly interactive live classroom experiences in under 10 seconds using AI.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-                        <button onClick={onGetStarted} className="w-full sm:w-auto bg-indigo-500 hover:bg-indigo-400 text-white px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-[0_0_40px_rgba(99,102,241,0.4)] active:scale-95 transition-all flex items-center justify-center gap-3">
-                            Launch Your Classroom <ArrowRight size={18} />
-                        </button>
+                
+                <div className="max-w-5xl mx-auto relative z-10 animate-in slide-in-from-bottom-8 fade-in duration-1000">
+                    
+                    {/* 🔥 BIG HERO PLACEMENT BANNER */}
+                    <div className="mb-16 md:mb-20">
+                        <div 
+                            onClick={onStartPlacement}
+                            className="bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900/40 rounded-[2rem] border border-indigo-500/30 p-1 cursor-pointer hover:border-indigo-400/60 transition-all duration-300 group overflow-hidden relative shadow-[0_0_40px_rgba(99,102,241,0.15)] hover:shadow-[0_0_60px_rgba(99,102,241,0.25)] hover:-translate-y-1"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                            <div className="bg-slate-950/80 backdrop-blur-xl rounded-[1.8rem] p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
+                                <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+                                    <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/40 shrink-0">
+                                        <BrainCircuit size={28} className="text-indigo-400 group-hover:scale-110 transition-transform duration-300" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-black text-xl md:text-2xl tracking-tight mb-1">Incoming Student?</h3>
+                                        <p className="text-slate-400 text-sm font-medium">Take the adaptive placement calibration to discover your true CEFR level.</p>
+                                    </div>
+                                </div>
+                                <button className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all group-hover:shadow-indigo-500/25 flex items-center gap-3 w-full sm:w-auto justify-center">
+                                    Start Protocol <ArrowRight size={16} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="w-full max-w-5xl mx-auto aspect-video bg-black rounded-[2rem] md:rounded-[3rem] border-4 border-slate-800/80 shadow-[0_20px_80px_rgba(0,0,0,0.6)] relative overflow-hidden flex items-center justify-center group">
-                        <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center">
-                            <MonitorPlay size={64} className="text-slate-700 mb-4" />
-                            <span className="text-xs font-black uppercase tracking-widest text-slate-500">Drop `hero_demo.mp4` here</span>
+                    <div className="text-center">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-8 shadow-2xl">
+                            <Sparkles size={14} className="text-indigo-400" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">The Next Generation LMS</span>
+                        </div>
+                        <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black tracking-tighter leading-[1.05] mb-8 text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-slate-400">
+                            Teach at the speed of <br className="hidden md:block" />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-fuchsia-400">thought.</span>
+                        </h1>
+                        <p className="text-lg md:text-xl text-slate-400 font-medium max-w-2xl mx-auto mb-10 leading-relaxed">
+                            Magister OS transforms static PDFs and Wikipedia articles into gamified, highly interactive live classroom experiences in under 10 seconds using AI.
+                        </p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+                            <button onClick={onGetStarted} className="w-full sm:w-auto bg-indigo-500 hover:bg-indigo-400 text-white px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-[0_0_40px_rgba(99,102,241,0.4)] active:scale-95 transition-all flex items-center justify-center gap-3">
+                                Launch Your Classroom <ArrowRight size={18} />
+                            </button>
+                        </div>
+
+                        <div className="w-full max-w-5xl mx-auto aspect-video bg-black rounded-[2rem] md:rounded-[3rem] border-4 border-slate-800/80 shadow-[0_20px_80px_rgba(0,0,0,0.6)] relative overflow-hidden flex items-center justify-center group">
+                            <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center">
+                                <MonitorPlay size={64} className="text-slate-700 mb-4" />
+                                <span className="text-xs font-black uppercase tracking-widest text-slate-500">Drop `hero_demo.mp4` here</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -328,7 +356,7 @@ export default function LandingPage({ onGetStarted, onLogin }: any) {
                 </div>
             </section>
 
-            {/* 3.5 THE DEVELOPER ENGINE & DOCUMENTATION (Injecting the Playground) */}
+            {/* 3.5 THE DEVELOPER ENGINE & DOCUMENTATION */}
             <section className="max-w-7xl mx-auto px-6 py-24 relative z-10 border-t border-white/5 mt-12">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
                     <div className="max-w-3xl">
