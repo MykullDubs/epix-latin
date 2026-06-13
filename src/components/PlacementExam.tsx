@@ -288,7 +288,7 @@ export default function PlacementExam() {
             .map(([topic]) => topic);
 
         return {
-            version: "1.3",
+            version: "1.4",
             student_name: studentName,
             final_placement: calculatedLevel,
             xp_earned: finalXp,
@@ -333,7 +333,7 @@ export default function PlacementExam() {
         }];
         setHistory(newHistory);
         
-        // Fixed math bug: Standard +1/-1 streak incrementing
+        // Standard +1/-1 streak incrementing
         let newStreak = isCorrect ? streak + 1 : streak - 1;
         let newLevel = currentLevel;
         const levelIdx = LEVELS.indexOf(currentLevel);
@@ -372,7 +372,8 @@ export default function PlacementExam() {
                         <div className="w-16 h-16 bg-indigo-500/20 border border-indigo-500/50 rounded-2xl flex items-center justify-center mb-6">
                             <BrainCircuit size={32} className="text-indigo-400" />
                         </div>
-                        <h1 className="text-3xl font-black tracking-tight mb-2">Placement Exam</h1>
+                        <h2 className="text-lg font-bold text-indigo-400 tracking-widest uppercase mb-1">Harmony School</h2>
+                        <h1 className="text-4xl font-black tracking-tight mb-2">Placement Exam</h1>
                         <p className="text-sm text-slate-400 uppercase tracking-widest mb-8">English Level Assessment</p>
                         
                         <input 
@@ -446,7 +447,6 @@ export default function PlacementExam() {
     }
 
     if (appState === 'results') {
-        const resultsString = JSON.stringify(finalResultsObject, null, 2);
         const placedLevel = finalResultsObject?.final_placement as CEFRLevel;
 
         return (
@@ -463,7 +463,7 @@ export default function PlacementExam() {
 
                     <div className="grid grid-cols-2 gap-4 mb-8">
                         <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl text-center flex flex-col justify-center">
-                            <span className="block text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Your English Level</span>
+                            <span className="block text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Estimated CEFR Level</span>
                             <span className="text-4xl font-black text-indigo-400 mb-2">{placedLevel}</span>
                             <span className="text-[10px] font-medium text-slate-400 px-2 leading-relaxed">
                                 {CEFR_DESCRIPTIONS[placedLevel]}
@@ -505,7 +505,7 @@ export default function PlacementExam() {
                     </div>
 
                     {/* 🔥 DATABASE SYNC STATUS HUD */}
-                    <div className={`mb-8 p-4 rounded-xl border flex items-center justify-between transition-colors ${
+                    <div className={`mb-4 p-4 rounded-xl border flex items-center justify-between transition-colors ${
                         syncStatus === 'pending' ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' :
                         syncStatus === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
                         'bg-rose-500/10 border-rose-500/30 text-rose-400'
@@ -517,32 +517,11 @@ export default function PlacementExam() {
                             <span className="text-xs font-black uppercase tracking-widest">
                                 {syncStatus === 'pending' ? 'Saving your results...' :
                                  syncStatus === 'success' ? 'Results saved successfully' :
-                                 'Connection error: Please copy your results'}
+                                 'Connection error'}
                             </span>
                         </div>
                         {syncStatus === 'success' && <CheckCircle2 size={18} />}
                     </div>
-
-                    <div className="mb-8 hidden md:block">
-                        <div className="flex items-center justify-between mb-4 text-slate-400">
-                            <div className="flex items-center gap-2">
-                                <BarChart3 size={16} className="text-indigo-400" />
-                                <span className="text-xs font-black uppercase tracking-widest">Diagnostic Record</span>
-                            </div>
-                        </div>
-                        <pre className="bg-black/50 border border-slate-800 p-4 rounded-xl overflow-x-auto text-[10px] font-mono text-indigo-300/80 max-h-48 custom-scrollbar">
-                            {resultsString}
-                        </pre>
-                    </div>
-
-                    <button 
-                        onClick={() => navigator.clipboard.writeText(resultsString)}
-                        className={`w-full text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all ${
-                            syncStatus === 'success' ? 'bg-slate-800 hover:bg-slate-700' : 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-500/20'
-                        }`}
-                    >
-                        Copy Results
-                    </button>
                 </div>
             </div>
         );
