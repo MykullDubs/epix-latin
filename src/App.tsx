@@ -9,7 +9,7 @@ import { useLiveClass } from './hooks/useLiveClass';
 // Sub-component Imports
 import AuthView from './components/AuthView';
 import LandingPage from './components/LandingPage';
-import GuestJoinLobby from './components/GuestJoinLobby'; // 🔥 IMPORTED GUEST LOBBY
+import GuestJoinLobby from './components/GuestJoinLobby'; 
 import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
 import FlashcardView from './components/FlashcardView';
@@ -31,6 +31,7 @@ import HoloAvatar from './components/HoloAvatar';
 import InstructorHUD from './components/instructor/InstructorHUD'; 
 import StudentInbox from './components/StudentInbox';
 import MarbleScrabble from './components/MarbleScrabble';
+import PlacementExam from './components/PlacementExam'; // 🔥 IMPORTED PLACEMENT EXAM
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -100,9 +101,10 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [hasAutoRouted, setHasAutoRouted] = useState(false); 
   
-  // 🔥 NEW: Guest Access State
+  // 🔥 NEW: Guest Access & Placement Exam State
   const [isGuestJoining, setIsGuestJoining] = useState(false);
   const [guestTargetClassId, setGuestTargetClassId] = useState<string | null>(null);
+  const [showPlacementExam, setShowPlacementExam] = useState(false);
 
   // Content State
   const [activeLesson, setActiveLesson] = useState<any>(null); 
@@ -236,15 +238,18 @@ export default function App() {
     if (!authChecked || isHydrated.current) return;
     const params = new URLSearchParams(window.location.search);
     
-    // Parse paths like /join/XYZ123
     const pathParts = window.location.pathname.split('/').filter(Boolean);
-    if ((pathParts[0] === 'join' || pathParts[0] === 'live' || pathParts[0] === 'play') && pathParts[1]) {
+
+    // 🔥 NEW: Intercept for Placement Exam
+    if (pathParts[0] === 'placement') {
+        setShowPlacementExam(true);
+        window.history.replaceState({}, '', '/placement');
+    } else if ((pathParts[0] === 'join' || pathParts[0] === 'live' || pathParts[0] === 'play') && pathParts[1]) {
         params.set('classId', pathParts[1]);
         params.set('autoJoin', 'true'); 
         window.history.replaceState({}, '', `/?${params.toString()}`);
     }
 
-    // 🔥 NEW: Check for explicit guest join intent
     if (params.get('autoJoin') === 'true' || params.get('joinCode')) {
         const targetId = params.get('classId') || params.get('joinCode');
         if (targetId && !user) {
@@ -293,7 +298,7 @@ export default function App() {
   }, [authChecked, combinedClasses, allLessons, user, allClasses]);
 
   useEffect(() => {
-    if (!isHydrated.current) return;
+    if (!isHydrated.current || showPlacementExam) return;
     const params = new URLSearchParams(window.location.search);
     params.set('view', currentView);
     params.set('tab', activeTab);
@@ -307,10 +312,18 @@ export default function App() {
 
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     if (window.location.search !== `?${params.toString()}`) window.history.pushState({}, '', newUrl);
-  }, [currentView, activeTab, activeStudentClass, activeLesson, activeDeckKey]);
+  }, [currentView, activeTab, activeStudentClass, activeLesson, activeDeckKey, showPlacementExam]);
 
   useEffect(() => {
     const handlePopState = () => {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      if (pathParts[0] === 'placement') {
+          setShowPlacementExam(true);
+          return;
+      } else {
+          setShowPlacementExam(false);
+      }
+
       const params = new URLSearchParams(window.location.search);
       
       setCurrentView((params.get('view') as any) || 'student');
@@ -339,7 +352,8 @@ export default function App() {
         orphanedPortals.forEach(portal => portal.remove());
 
         setShowAuth(false); 
-        setIsGuestJoining(false); // 🔥 NEW: Clear guest intent if they log in
+        setIsGuestJoining(false);
+        setShowPlacementExam(false); // Ensure exam closes upon auth
 
         if (userData?.role && !hasAutoRouted) {
             const params = new URLSearchParams(window.location.search);
@@ -369,18 +383,36 @@ export default function App() {
       );
   }
 
-  // 🔥 THE NEW PUBLIC FACE ROUTING (Connected to LandingPage & GuestJoinLobby)
+  // 🔥 THE NEW PUBLIC FACE ROUTING
   if (!user) {
     
+    // 0. Intercept for Placement Exam
+    if (showPlacementExam) {
+        return (
+            <div className="relative min-h-[100dvh] bg-slate-950">
+                <button 
+                    onClick={() => {
+                        setShowPlacementExam(false);
+                        window.history.replaceState({}, '', '/');
+                    }} 
+                    className="fixed top-6 left-6 z-[9999] text-slate-400 hover:text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-colors bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 hover:border-white/30"
+                >
+                    ← Exit Protocol
+                </button>
+                <PlacementExam />
+            </div>
+        );
+    }
+
     // 1. Intercept for Frictionless Guest Entry
-if (isGuestJoining && guestTargetClassId) {
+    if (isGuestJoining && guestTargetClassId) {
         return (
             <GuestJoinLobby 
                 classId={guestTargetClassId} 
                 onCancel={() => {
                     setIsGuestJoining(false);
                     setGuestTargetClassId(null);
-                    window.history.replaceState({}, '', '/'); // Clean URL back to root
+                    window.history.replaceState({}, '', '/');
                 }} 
             />
         );
@@ -390,7 +422,6 @@ if (isGuestJoining && guestTargetClassId) {
     if (showAuth) {
       return (
         <div className="relative min-h-[100dvh] bg-slate-950">
-           {/* Floating Back Button */}
            <button 
              onClick={() => setShowAuth(false)} 
              className="fixed top-6 left-6 z-[9999] text-slate-400 hover:text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-colors bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 hover:border-white/30"
@@ -409,6 +440,10 @@ if (isGuestJoining && guestTargetClassId) {
             onGetStarted={() => setShowAuth(true)} 
             onLogin={() => setShowAuth(true)} 
             onJoinGuest={() => setIsGuestJoining(true)}
+            onStartPlacement={() => {
+                setShowPlacementExam(true);
+                window.history.pushState({}, '', '/placement');
+            }}
         />
     );
   }
