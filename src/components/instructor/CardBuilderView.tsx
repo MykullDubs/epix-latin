@@ -33,68 +33,68 @@ const DeckShareModal = ({ deck, instructorClasses, onClose, onPublish }: any) =>
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-slate-950 w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border-t sm:border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 max-h-[90vh] flex flex-col pb-safe">
-                <div className="px-6 sm:px-8 py-5 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+        <div className="fixed inset-0 z-[9999] bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200/50 dark:border-slate-800 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 max-h-[90vh] flex flex-col pb-safe">
+                <div className="px-6 sm:px-8 py-5 border-b border-slate-100 dark:border-slate-800/60 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900 shrink-0">
                     <div>
-                        <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Network Settings</h2>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{deck?.title}</p>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Network Settings</h2>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">{deck?.title}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-400 dark:text-slate-500 hover:text-rose-500 transition-colors shadow-sm">
-                        <X size={20} strokeWidth={3}/>
+                    <button onClick={onClose} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">
+                        <X size={20} strokeWidth={2.5}/>
                     </button>
                 </div>
 
-                <div className="p-6 sm:p-8 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-                    <button onClick={() => setVisibility('private')} className={`w-full p-4 sm:p-5 rounded-2xl border-2 flex items-start gap-4 transition-all text-left ${visibility === 'private' ? 'bg-slate-50 dark:bg-slate-900 border-slate-800 dark:border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}>
-                        <div className={`p-3 rounded-full shrink-0 ${visibility === 'private' ? 'bg-slate-800 dark:bg-indigo-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                <div className="p-6 sm:p-8 space-y-4 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/30 dark:bg-slate-950">
+                    <button onClick={() => setVisibility('private')} className={`w-full p-4 sm:p-5 rounded-2xl border flex items-start gap-4 transition-all text-left shadow-sm ${visibility === 'private' ? 'bg-white dark:bg-slate-900 border-slate-900 dark:border-indigo-500 ring-1 ring-slate-900 dark:ring-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}>
+                        <div className={`p-3 rounded-full shrink-0 transition-colors ${visibility === 'private' ? 'bg-slate-900 dark:bg-indigo-500/20 text-white dark:text-indigo-400 shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                             <Lock size={20} className="sm:w-6 sm:h-6" />
                         </div>
                         <div className="flex-1">
-                            <h4 className={`font-black text-base sm:text-lg ${visibility === 'private' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Classified (Private)</h4>
-                            <p className="text-[10px] sm:text-xs font-bold text-slate-400 mt-1">Only you can view and present this deck.</p>
+                            <h4 className={`font-bold text-base sm:text-lg ${visibility === 'private' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Classified (Private)</h4>
+                            <p className="text-[11px] sm:text-xs font-medium text-slate-500 mt-1">Only you can view and present this deck.</p>
                         </div>
-                        {visibility === 'private' && <CheckCircle2 size={24} className="text-slate-800 dark:text-indigo-400 shrink-0" />}
+                        {visibility === 'private' && <CheckCircle2 size={24} className="text-slate-900 dark:text-indigo-400 shrink-0" />}
                     </button>
 
-                    <button onClick={() => setVisibility('restricted')} className={`w-full p-4 sm:p-5 rounded-2xl border-2 flex flex-col gap-4 transition-all text-left ${visibility === 'restricted' ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-300'}`}>
+                    <button onClick={() => setVisibility('restricted')} className={`w-full p-4 sm:p-5 rounded-2xl border flex flex-col gap-4 transition-all text-left shadow-sm ${visibility === 'restricted' ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-slate-700'}`}>
                         <div className="flex items-start gap-4 w-full">
-                            <div className={`p-3 rounded-full shrink-0 ${visibility === 'restricted' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                            <div className={`p-3 rounded-full shrink-0 transition-colors ${visibility === 'restricted' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                                 <Users size={20} className="sm:w-6 sm:h-6" />
                             </div>
                             <div className="flex-1">
-                                <h4 className={`font-black text-base sm:text-lg ${visibility === 'restricted' ? 'text-indigo-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Restricted Access</h4>
-                                <p className="text-[10px] sm:text-xs font-bold text-slate-400 mt-1">Publish to specific cohorts.</p>
+                                <h4 className={`font-bold text-base sm:text-lg ${visibility === 'restricted' ? 'text-indigo-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Restricted Access</h4>
+                                <p className="text-[11px] sm:text-xs font-medium text-slate-500 mt-1">Publish to specific cohorts.</p>
                             </div>
                             {visibility === 'restricted' && <CheckCircle2 size={24} className="text-indigo-600 dark:text-indigo-400 shrink-0" />}
                         </div>
                         {visibility === 'restricted' && (
                             <div className="w-full pt-4 border-t border-indigo-100 dark:border-indigo-500/20 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {instructorClasses?.map((cls: any) => (
-                                    <div key={cls.id} onClick={(e) => { e.stopPropagation(); toggleClass(cls.id); }} className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${selectedClasses.includes(cls.id) ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white dark:bg-slate-800 border-indigo-100 dark:border-slate-700 text-indigo-900 dark:text-indigo-400 hover:bg-indigo-50'}`}>
-                                        <span className="font-bold text-xs truncate pr-2">{cls.name}</span>
-                                        {selectedClasses.includes(cls.id) && <CheckCircle2 size={14} />}
+                                    <div key={cls.id} onClick={(e) => { e.stopPropagation(); toggleClass(cls.id); }} className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${selectedClasses.includes(cls.id) ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300'}`}>
+                                        <span className="font-semibold text-xs truncate pr-2">{cls.name}</span>
+                                        {selectedClasses.includes(cls.id) && <CheckCircle2 size={16} />}
                                     </div>
                                 ))}
                             </div>
                         )}
                     </button>
 
-                    <button onClick={() => setVisibility('public')} className={`w-full p-4 sm:p-5 rounded-2xl border-2 flex items-start gap-4 transition-all text-left ${visibility === 'public' ? 'bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-300'}`}>
-                        <div className={`p-3 rounded-full shrink-0 ${visibility === 'public' ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                    <button onClick={() => setVisibility('public')} className={`w-full p-4 sm:p-5 rounded-2xl border flex items-start gap-4 transition-all text-left shadow-sm ${visibility === 'public' ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-500 ring-1 ring-emerald-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-slate-700'}`}>
+                        <div className={`p-3 rounded-full shrink-0 transition-colors ${visibility === 'public' ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                             <Globe size={20} className="sm:w-6 sm:h-6" />
                         </div>
                         <div className="flex-1">
-                            <h4 className={`font-black text-base sm:text-lg ${visibility === 'public' ? 'text-emerald-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Global Network</h4>
-                            <p className="text-[10px] sm:text-xs font-bold text-slate-400 mt-1">Open to all students on the platform.</p>
+                            <h4 className={`font-bold text-base sm:text-lg ${visibility === 'public' ? 'text-emerald-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Global Network</h4>
+                            <p className="text-[11px] sm:text-xs font-medium text-slate-500 mt-1">Open to all students on the platform.</p>
                         </div>
                         {visibility === 'public' && <CheckCircle2 size={24} className="text-emerald-500 dark:text-emerald-400 shrink-0" />}
                     </button>
                 </div>
 
-                <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex justify-end shrink-0 pb-safe-6">
-                    <button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto px-8 py-4 bg-slate-900 dark:bg-indigo-600 text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
-                        {isSaving ? <><Loader2 size={16} className="animate-spin"/> Syncing...</> : 'Save Network Protocol'}
+                <div className="p-6 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800/60 flex justify-end shrink-0 pb-safe-6">
+                    <button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto px-8 py-3.5 bg-slate-900 dark:bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2">
+                        {isSaving ? <><Loader2 size={18} className="animate-spin"/> Syncing...</> : 'Save Network Protocol'}
                     </button>
                 </div>
             </div>
@@ -277,7 +277,7 @@ export default function CardBuilderView({
             }
         };
         fetchDeckCards();
-    }, [formData.deckId]);
+    }, [formData.deckId, availableDecks]);
     
     const handleChange = (e: any) => { 
         if (e.target.name === 'deckId') { 
@@ -485,7 +485,7 @@ export default function CardBuilderView({
                 type: 'vocabulary', 
                 createdAt: new Date().toISOString(),
                 updatedAt: Date.now(),
-                authorId: uid,           
+                authorId: uid,            
                 instructorId: uid,       
                 userId: uid,             
                 ownerId: uid,            
@@ -759,20 +759,20 @@ export default function CardBuilderView({
         }
     };
     
-    // 🔥 REUSABLE RENDERER FOR THE DOMAIN MAP (Mobile padded)
+    // 🔥 REUSABLE RENDERER FOR THE DOMAIN MAP
     const renderDomainBuilder = () => (
-        <div className="flex flex-col gap-3 p-4 sm:p-5 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/10 mt-4 animate-in slide-in-from-top-2">
+        <div className="flex flex-col gap-3 p-4 sm:p-5 bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200/60 dark:border-slate-800 mt-4 animate-in slide-in-from-top-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5 mb-1">
-                        <Map size={14}/> Lexicon Map
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5 mb-0.5">
+                        <Map size={14} className="text-indigo-500" /> Lexicon Map
                     </label>
-                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Map this module's location in the global network.</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Map this module's location in the global network.</p>
                 </div>
                 
                 <button 
                     onClick={(e) => { e.preventDefault(); handleAutoMap(); }}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md active:scale-95 transition-all"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-colors border border-indigo-200/50 dark:border-indigo-500/20"
                 >
                     <Wand2 size={14} /> Auto-Map
                 </button>
@@ -780,20 +780,20 @@ export default function CardBuilderView({
             
             <div className="flex flex-wrap items-center gap-2 min-h-[32px] mt-2">
                 {domainPath.length === 0 && (
-                    <span className="text-xs font-bold text-slate-400 italic">Root Level (Uncategorized)</span>
+                    <span className="text-xs font-medium text-slate-400 italic">Root Level (Uncategorized)</span>
                 )}
                 {domainPath.map((domain, idx) => (
                     <React.Fragment key={idx}>
-                        <div className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-2 shadow-sm border border-indigo-100 dark:border-slate-700 transition-all">
+                        <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm border border-slate-200 dark:border-slate-700 transition-all">
                             {domain}
                             <button 
                                 onClick={(e) => { e.preventDefault(); removeDomain(idx); }} 
-                                className="text-slate-300 hover:text-rose-500 transition-colors"
+                                className="text-slate-400 hover:text-rose-500 transition-colors"
                             >
-                                <X size={12} strokeWidth={3}/>
+                                <X size={14} strokeWidth={2.5}/>
                             </button>
                         </div>
-                        {idx < domainPath.length - 1 && <ChevronRight size={14} className="text-indigo-300 dark:text-indigo-500/50 hidden sm:block" />}
+                        {idx < domainPath.length - 1 && <ChevronRight size={14} className="text-slate-300 dark:text-slate-600 hidden sm:block" />}
                     </React.Fragment>
                 ))}
             </div>
@@ -804,9 +804,9 @@ export default function CardBuilderView({
                     onChange={(e) => setDomainInput(e.target.value)} 
                     onKeyDown={handleAddDomain}
                     placeholder="Type level & press Enter" 
-                    className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 focus:border-indigo-500 dark:text-white font-bold outline-none transition-colors shadow-sm text-sm"
+                    className="w-full p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white font-medium outline-none transition-all shadow-sm text-sm"
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800 pointer-events-none hidden sm:block">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-md bg-slate-50 dark:bg-slate-900 pointer-events-none hidden sm:block">
                     Enter ↵
                 </div>
             </div>
@@ -828,23 +828,23 @@ export default function CardBuilderView({
                 />
             )}
 
-            {/* Disambiguation Modal */}
+            {/* Disambiguation Modal (Updated UI) */}
             {showDefSelector && (
-                <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-950 w-full max-w-xl rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border-t sm:border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 max-h-[85vh] flex flex-col pb-safe">
-                        <div className="px-6 py-5 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+                <div className="fixed inset-0 z-[9999] bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200/50 dark:border-slate-800 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 max-h-[85vh] flex flex-col pb-safe">
+                        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800/60 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900 shrink-0">
                             <div>
-                                <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
+                                <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                                     <BookOpen size={20} className="text-indigo-500" /> Disambiguation Required
                                 </h2>
-                                <p className="text-xs font-bold text-slate-400 mt-1">Select the definition for <span className="text-indigo-500 uppercase tracking-widest ml-1">"{formData.front}"</span></p>
+                                <p className="text-xs font-medium text-slate-500 mt-1">Select the definition for <span className="text-indigo-600 dark:text-indigo-400 font-bold ml-1">"{formData.front}"</span></p>
                             </div>
-                            <button onClick={() => setShowDefSelector(false)} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-400 hover:text-rose-500 transition-colors shadow-sm">
-                                <X size={20} strokeWidth={3}/>
+                            <button onClick={() => setShowDefSelector(false)} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 transition-colors shadow-sm border border-slate-200 dark:border-slate-700">
+                                <X size={20} strokeWidth={2.5}/>
                             </button>
                         </div>
 
-                        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3 bg-slate-50 dark:bg-slate-950">
+                        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3 bg-slate-50/30 dark:bg-slate-950">
                             {fetchedOptions.map((opt, i) => (
                                 <button
                                     key={i}
@@ -853,12 +853,12 @@ export default function CardBuilderView({
                                         setShowDefSelector(false);
                                         setToastMsg("Target data auto-filled! ✨");
                                     }}
-                                    className="w-full text-left p-5 rounded-[1.5rem] border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all group active:scale-[0.98] shadow-sm hover:shadow-md"
+                                    className="w-full text-left p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all group active:scale-[0.98]"
                                 >
-                                    <span className="inline-block px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3 border border-indigo-100 dark:border-indigo-500/20">
+                                    <span className="inline-block px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-[10px] font-bold uppercase tracking-wider mb-3 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-500/20 dark:group-hover:text-indigo-400 transition-colors">
                                         {opt.type}
                                     </span>
-                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300 group-hover:text-indigo-900 dark:group-hover:text-indigo-100 transition-colors leading-relaxed">
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors leading-relaxed">
                                         {opt.definition}
                                     </p>
                                 </button>
@@ -868,124 +868,122 @@ export default function CardBuilderView({
                 </div>
             )}
             
-            <div className="bg-indigo-50 dark:bg-indigo-950 p-4 rounded-xl border border-indigo-100 dark:border-indigo-500/20 mb-4 text-sm text-indigo-800 dark:text-indigo-300 flex justify-between items-center transition-colors">
-                <div><p className="font-bold flex items-center gap-2"><Layers size={16}/> Deck Builder</p></div>
-                {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white dark:bg-slate-800 dark:text-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600 dark:hover:text-indigo-400">Cancel Edit</button>}
+            {/* Header Status Bar */}
+            <div className="bg-white dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800 mb-4 text-sm text-slate-700 dark:text-slate-300 flex justify-between items-center transition-colors shadow-sm backdrop-blur-sm">
+                <div><p className="font-bold flex items-center gap-2"><Layers size={18} className="text-indigo-500"/> Deck Builder</p></div>
+                {editingId && <button onClick={handleClear} className="text-xs font-bold bg-slate-100 dark:bg-slate-800 dark:text-white px-3 py-1.5 rounded-lg shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancel Edit</button>}
             </div>
 
-            {/* 🔥 3-WAY TAB SELECTOR (Mobile: Scrollable X) */}
-            <div className="flex gap-4 border-b-2 border-slate-100 dark:border-slate-800 relative bottom-[-1px] overflow-x-auto custom-scrollbar scroll-smooth whitespace-nowrap">
-                <button disabled={isImporting} onClick={() => setBuilderTab('single')} className={`pb-4 shrink-0 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${builderTab === 'single' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
+            {/* 🔥 MODERN PILL-BASED TAB SELECTOR */}
+            <div className="flex p-1.5 bg-slate-100/80 dark:bg-slate-800/50 rounded-2xl overflow-x-auto custom-scrollbar scroll-smooth whitespace-nowrap shadow-inner border border-slate-200/50 dark:border-slate-800">
+                <button disabled={isImporting} onClick={() => setBuilderTab('single')} className={`flex-1 min-w-fit py-2.5 px-4 text-sm font-bold transition-all rounded-xl flex items-center justify-center gap-2 ${builderTab === 'single' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'} disabled:opacity-50`}>
                     <Edit3 size={16} /> Single Target
                 </button>
-                <button disabled={isImporting} onClick={() => { setBuilderTab('ai'); handleClear(); }} className={`pb-4 shrink-0 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${builderTab === 'ai' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
+                <button disabled={isImporting} onClick={() => { setBuilderTab('ai'); handleClear(); }} className={`flex-1 min-w-fit py-2.5 px-4 text-sm font-bold transition-all rounded-xl flex items-center justify-center gap-2 ${builderTab === 'ai' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'} disabled:opacity-50`}>
                     <BrainCircuit size={16} /> Neural Auto-Forge
                 </button>
-                <button disabled={isImporting} onClick={() => { setBuilderTab('bulk'); handleClear(); }} className={`pb-4 shrink-0 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${builderTab === 'bulk' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
+                <button disabled={isImporting} onClick={() => { setBuilderTab('bulk'); handleClear(); }} className={`flex-1 min-w-fit py-2.5 px-4 text-sm font-bold transition-all rounded-xl flex items-center justify-center gap-2 ${builderTab === 'bulk' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'} disabled:opacity-50`}>
                     <FileJson size={16} /> Bulk JSON
                 </button>
             </div>
 
             {/* 🔥 TAB 1: SINGLE TARGET */}
             {builderTab === 'single' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <section className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
-                        <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+                <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <section className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-colors">
+                        <h3 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider mb-4 flex items-center gap-2">
                             <Database size={16} className="text-indigo-500" /> Target Deck
                         </h3>
-                        <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-indigo-50/30 dark:bg-slate-800 font-black text-indigo-900 dark:text-indigo-400 focus:border-indigo-500 outline-none transition-colors mb-3 cursor-pointer">
+                        <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-semibold text-slate-800 dark:text-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all mb-3 cursor-pointer shadow-sm">
                             <option value="custom">✍️ Scriptorium (My Deck)</option>
                             {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
                             <option value="new">✨ + Create New Deck</option>
                         </select>
                         {isCreatingDeck && (
                             <div className="animate-in slide-in-from-top-2">
-                                <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter new deck name..." className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-white font-black outline-none shadow-sm transition-colors" autoFocus />
+                                <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter new deck name..." className="w-full p-3.5 rounded-xl border border-indigo-300 dark:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/50 bg-white dark:bg-slate-950 dark:text-white font-bold outline-none shadow-sm transition-all" autoFocus />
                                 {renderDomainBuilder()}
                             </div>
                         )}
                     </section>
 
-                    <section className="space-y-4 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Core Data</h3>
+                    <section className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-colors">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">Core Data</h3>
                         </div>
                         
-                        {/* Mobile Grid Optimization: Stacks to 1 col on mobile, 2 on tablet+ */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Target Word (Front)</label>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-1">Target Word (Front)</label>
                                 <div className="relative flex items-center">
                                     <input 
                                         name="front" 
                                         value={formData.front} 
                                         onChange={handleChange} 
-                                        className="w-full p-4 pl-4 pr-16 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors" 
+                                        className="w-full p-3.5 pl-4 pr-14 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 dark:text-white font-semibold focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all shadow-sm" 
                                         placeholder="e.g. Incorporate" 
                                     />
                                     <button 
                                         type="button" onClick={handleMagicAutoFill} disabled={isAutoFilling || !formData.front.trim()} title="Magic Auto-Fill"
-                                        className="absolute right-2 p-2 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-500/40 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-indigo-100 active:scale-95 shadow-sm"
+                                        className="absolute right-2 p-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg transition-all disabled:opacity-30 active:scale-95 border border-indigo-100 dark:border-indigo-500/20"
                                     >
                                         {isAutoFilling ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Meaning (Back)</label>
-                                <input name="back" value={formData.back} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors" placeholder="e.g. To include as part of a whole" />
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-1">Meaning (Back)</label>
+                                <input name="back" value={formData.back} onChange={handleChange} className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 dark:text-white font-semibold focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all shadow-sm" placeholder="e.g. To include as part of a whole" />
                             </div>
                         </div>
 
-                        {/* Mobile Grid Optimization: Stacks 1 col on mobile, 3 cols on tablet+ */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="flex flex-col gap-2 md:col-span-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Phonetics (IPA)</label>
-                                <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-mono text-slate-800 dark:text-white focus:border-indigo-500 outline-none transition-colors" placeholder="e.g. /ɪnˈkɔːpəɹeɪt/" />
+                            <div className="flex flex-col gap-1.5 md:col-span-2">
+                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-1">Phonetics (IPA)</label>
+                                <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-mono text-sm text-slate-800 dark:text-slate-300 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all shadow-sm" placeholder="e.g. /ɪnˈkɔːpəɹeɪt/" />
                             </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Word Type</label>
-                                <select name="type" value={formData.type} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-bold dark:text-white focus:border-indigo-500 outline-none cursor-pointer transition-colors">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-1">Word Type</label>
+                                <select name="type" value={formData.type} onChange={handleChange} className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-semibold dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none cursor-pointer transition-all shadow-sm">
                                     <option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option>
                                 </select>
                             </div>
                         </div>
                     </section>
 
-                    <section className="bg-slate-50 dark:bg-slate-900/50 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner transition-colors">
+                    <section className="bg-slate-50/50 dark:bg-slate-900/40 p-5 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 transition-colors">
                         <div className="flex items-center gap-2 mb-4">
                             <UploadCloud size={16} className="text-indigo-500" />
-                            <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Media Payload</h3>
+                            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">Media Payload</h3>
                         </div>
-                        {/* Mobile Grid Optimization: Stacks 1 col on mobile, 2 cols on tablet+ */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center text-center relative hover:border-indigo-400 transition-colors group">
+                            <div className="bg-white dark:bg-slate-950 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-5 flex flex-col items-center justify-center text-center relative hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors group shadow-sm hover:shadow-md">
                                 {formData.imageUrl ? (
                                     <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
                                         <img src={formData.imageUrl} alt="Card preview" className="w-full h-full object-cover" />
-                                        <button type="button" onClick={() => setFormData(prev => ({...prev, imageUrl: ''}))} className="absolute top-2 right-2 bg-rose-500 text-white p-2 sm:p-1.5 rounded-full shadow-lg opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} className="sm:w-4 sm:h-4"/></button>
+                                        <button type="button" onClick={() => setFormData(prev => ({...prev, imageUrl: ''}))} className="absolute top-2 right-2 bg-rose-500 text-white p-1.5 rounded-full shadow-lg opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"><Trash2 size={16}/></button>
                                     </div>
                                 ) : (
                                     <>
-                                        {isUploadingImage ? <Loader2 size={32} className="animate-spin text-indigo-500 mb-2" /> : <ImageIcon size={32} className="text-slate-300 dark:text-slate-600 mb-2 group-hover:text-indigo-400 transition-colors" />}
-                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Attach Reference Image</span>
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">PNG, JPG (Max 5MB)</span>
+                                        {isUploadingImage ? <Loader2 size={28} className="animate-spin text-indigo-500 mb-2" /> : <ImageIcon size={28} className="text-slate-400 dark:text-slate-600 mb-2 group-hover:text-indigo-500 transition-colors" />}
+                                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Attach Reference Image</span>
+                                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-1">PNG, JPG (Max 5MB)</span>
                                         <input type="file" accept="image/*" onChange={(e) => handleMediaUpload(e, 'image')} disabled={isUploadingImage} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
                                     </>
                                 )}
                             </div>
-                            <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center text-center relative hover:border-indigo-400 transition-colors group">
+                            <div className="bg-white dark:bg-slate-950 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-5 flex flex-col items-center justify-center text-center relative hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors group shadow-sm hover:shadow-md">
                                 {formData.audioUrl ? (
                                     <div className="w-full flex flex-col items-center gap-3">
-                                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center"><Music size={20} /></div>
+                                        <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20"><Music size={20} /></div>
                                         <audio src={formData.audioUrl} controls className="w-full h-8 opacity-80" />
-                                        <button type="button" onClick={() => setFormData(prev => ({...prev, audioUrl: ''}))} className="text-[10px] font-black uppercase text-rose-500 hover:text-rose-600 tracking-widest flex items-center gap-1 p-2"><Trash2 size={12}/> Remove Audio</button>
+                                        <button type="button" onClick={() => setFormData(prev => ({...prev, audioUrl: ''}))} className="text-[10px] font-bold uppercase text-rose-500 hover:text-rose-600 tracking-wider flex items-center gap-1 p-2 bg-rose-50 dark:bg-rose-500/10 rounded-lg transition-colors"><Trash2 size={12}/> Remove Audio</button>
                                     </div>
                                 ) : (
                                     <>
-                                        {isUploadingAudio ? <Loader2 size={32} className="animate-spin text-indigo-500 mb-2" /> : <Music size={32} className="text-slate-300 dark:text-slate-600 mb-2 group-hover:text-indigo-400 transition-colors" />}
-                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Attach Native Pronunciation</span>
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">MP3, WAV (Max 10MB)</span>
+                                        {isUploadingAudio ? <Loader2 size={28} className="animate-spin text-indigo-500 mb-2" /> : <Music size={28} className="text-slate-400 dark:text-slate-600 mb-2 group-hover:text-indigo-500 transition-colors" />}
+                                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Attach Pronunciation</span>
+                                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-1">MP3, WAV (Max 10MB)</span>
                                         <input type="file" accept="audio/*" onChange={(e) => handleMediaUpload(e, 'audio')} disabled={isUploadingAudio} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
                                     </>
                                 )}
@@ -993,22 +991,21 @@ export default function CardBuilderView({
                         </div>
                     </section>
 
-                    <section className="space-y-4 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-colors">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest flex items-center gap-2">
+                            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider flex items-center gap-2">
                                 <Paperclip size={16} className="text-indigo-500" /> Conjugation Forge
                             </h3>
-                            <span className="text-[9px] font-black uppercase text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">Beta</span>
+                            <span className="text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 px-2 py-0.5 rounded-md tracking-wider">Beta</span>
                         </div>
                         
-                        {/* 🔥 Mobile Grid Optimization: 2 columns on mobile, 4 on tablet+ */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-stretch">
-                            <input value={tempConj.tense} onChange={(e) => setTempConj({...tempConj, tense: e.target.value})} className="col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-black dark:text-white outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Tense" />
-                            <select value={tempConj.person} onChange={(e) => setTempConj({...tempConj, person: e.target.value})} className="col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-black dark:text-white outline-none min-h-[44px] bg-transparent">
+                            <input value={tempConj.tense} onChange={(e) => setTempConj({...tempConj, tense: e.target.value})} className="col-span-1 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 min-h-[44px]" placeholder="Tense" />
+                            <select value={tempConj.person} onChange={(e) => setTempConj({...tempConj, person: e.target.value})} className="col-span-1 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 min-h-[44px]">
                                 {['1s', '2s', '3s', '1p', '2p', '3p'].map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
-                            <input value={tempConj.verb} onChange={(e) => setTempConj({...tempConj, verb: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && addConjugation()} className="col-span-1 md:col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-bold dark:text-white outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Form (Amo)" />
-                            <button type="button" onClick={addConjugation} className="col-span-1 md:col-span-1 bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-500 transition-colors shadow-md active:scale-95 flex items-center justify-center min-h-[44px]"><Plus size={20}/></button>
+                            <input value={tempConj.verb} onChange={(e) => setTempConj({...tempConj, verb: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && addConjugation()} className="col-span-1 md:col-span-1 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 min-h-[44px]" placeholder="Form (Amo)" />
+                            <button type="button" onClick={addConjugation} className="col-span-1 md:col-span-1 bg-slate-900 dark:bg-indigo-600 text-white p-3 rounded-xl hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors shadow-sm active:scale-95 flex items-center justify-center min-h-[44px]"><Plus size={18}/></button>
                         </div>
 
                         {Object.keys(conjugations).length > 0 && (
@@ -1032,12 +1029,11 @@ export default function CardBuilderView({
                     </section>
 
                     <section className="space-y-4 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
-                        <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Morphology Breakdowns</h3>
-                        {/* 🔥 Mobile Flex Optimization: Columns on mobile, row on tablet+ */}
+                        <h3 className="font-bold text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Morphology Breakdowns</h3>
                         <div className="flex flex-col sm:flex-row gap-2 items-stretch">
                             <div className="flex gap-2 flex-1">
-                                <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="flex-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Root/Suffix" />
-                                <input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="flex-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Meaning" />
+                                <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="flex-1 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Root/Suffix" />
+                                <input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="flex-1 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Meaning" />
                             </div>
                             <button type="button" onClick={addMorphology} className="w-full sm:w-auto bg-slate-900 dark:bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-600 transition-colors shadow-md active:scale-95 flex justify-center items-center min-h-[44px]"><Plus size={20}/></button>
                         </div>
@@ -1051,7 +1047,7 @@ export default function CardBuilderView({
                         </div>
                     </section>
 
-                    <button onClick={handleSubmit} className={`w-full text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 ${editingId ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30'}`}>
+                    <button onClick={handleSubmit} className={`w-full text-white p-4 sm:p-5 rounded-2xl font-bold text-sm uppercase tracking-wider shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 ${editingId ? 'bg-emerald-500 hover:bg-emerald-600 hover:-translate-y-0.5' : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 hover:-translate-y-0.5'}`}>
                         {editingId ? <><Save size={20}/> Update Target</> : <><Plus size={20}/> Forge Target</>}
                     </button>
                 </div>
@@ -1060,46 +1056,45 @@ export default function CardBuilderView({
             {/* 🔥 TAB 2: NEURAL FORGE */}
             {builderTab === 'ai' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <section className="bg-gradient-to-br from-indigo-500 to-cyan-400 p-6 sm:p-8 rounded-3xl shadow-xl transition-colors text-white relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none"><Sparkles size={120}/></div>
+                    <section className="bg-gradient-to-br from-indigo-900 via-slate-900 to-violet-900 p-6 sm:p-8 rounded-3xl shadow-xl transition-colors text-white relative overflow-hidden ring-1 ring-white/10">
+                        <div className="absolute top-0 right-0 p-8 opacity-20 pointer-events-none mix-blend-overlay"><Sparkles size={140}/></div>
                         <div className="relative z-10">
-                            <h2 className="font-black text-2xl sm:text-3xl tracking-tighter mb-2">Neural Auto-Forge</h2>
-                            <p className="text-xs sm:text-sm font-bold opacity-90 max-w-sm mb-6">Describe the deck you want to build, and Magister OS will generate it instantly using AI.</p>
+                            <h2 className="font-black text-2xl sm:text-3xl tracking-tight mb-2">Neural Auto-Forge</h2>
+                            <p className="text-sm font-medium text-slate-300 max-w-sm mb-6">Describe the deck you want to build, and Magister OS will generate it instantly using AI.</p>
                             
                             <textarea 
                                 value={aiPrompt} 
                                 onChange={(e) => setAiPrompt(e.target.value)} 
                                 disabled={isImporting} 
                                 placeholder="e.g. '15 advanced medical terms in Spanish for emergency room nurses'" 
-                                className="w-full h-32 bg-white/10 backdrop-blur-md text-white placeholder-white/50 p-4 sm:p-5 rounded-2xl font-bold text-base sm:text-lg border-2 border-white/20 focus:border-white outline-none resize-none custom-scrollbar mb-4" 
+                                className="w-full h-32 bg-black/40 backdrop-blur-md text-white placeholder-white/40 p-4 sm:p-5 rounded-2xl font-medium text-base sm:text-lg border border-white/10 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 outline-none resize-none custom-scrollbar mb-4 shadow-inner" 
                             />
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="bg-black/20 p-4 rounded-xl border border-white/10">
-                                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 opacity-80">Target Language</label>
+                                <div className="bg-black/30 backdrop-blur-sm p-4 rounded-xl border border-white/10">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider block mb-1 text-slate-400">Target Language</label>
                                     <input 
                                         value={aiTargetLanguage} 
                                         onChange={(e) => setAiTargetLanguage(e.target.value)} 
                                         disabled={isImporting}
-                                        className="w-full bg-transparent text-white font-bold outline-none border-b border-white/30 focus:border-white pb-1"
+                                        className="w-full bg-transparent text-white font-semibold outline-none border-b border-white/20 focus:border-indigo-400 pb-1.5 transition-colors"
                                     />
                                 </div>
-                                <div className="bg-black/20 p-4 rounded-xl border border-white/10">
-                                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 opacity-80">Target Count</label>
+                                <div className="bg-black/30 backdrop-blur-sm p-4 rounded-xl border border-white/10">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider block mb-1 text-slate-400">Target Count</label>
                                     <input 
-                                        type="number"
-                                        min="5" max="30"
+                                        type="number" min="5" max="30"
                                         value={aiCardCount} 
                                         onChange={(e) => setAiCardCount(parseInt(e.target.value))} 
                                         disabled={isImporting}
-                                        className="w-full bg-transparent text-white font-bold outline-none border-b border-white/30 focus:border-white pb-1"
+                                        className="w-full bg-transparent text-white font-semibold outline-none border-b border-white/20 focus:border-indigo-400 pb-1.5 transition-colors"
                                     />
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <section className="bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4">Destination Deck</h3>
                         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
                             <button onClick={() => setBulkDestination('new')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center justify-center sm:justify-start gap-3 transition-colors ${bulkDestination === 'new' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
@@ -1121,8 +1116,8 @@ export default function CardBuilderView({
                             </select>
                         )}
                     </section>
-
-                    <button onClick={handleNeuralForge} disabled={!aiPrompt.trim() || isImporting} className={`w-full text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 ${isImporting ? 'bg-amber-500' : 'bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 dark:disabled:bg-slate-800'}`}>
+                    
+                    <button onClick={handleNeuralForge} disabled={!aiPrompt.trim() || isImporting} className={`w-full text-white p-4 sm:p-5 rounded-2xl font-bold text-sm uppercase tracking-wider shadow-lg transition-all flex items-center justify-center gap-3 ${isImporting ? 'bg-indigo-500/50 cursor-wait' : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 hover:shadow-xl hover:-translate-y-0.5 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:shadow-none'}`}>
                         {isImporting ? (
                             <><Loader2 size={20} className="animate-spin" /> Forging Targets... ({importProgress?.current || 0}/{importProgress?.total || 0})</>
                         ) : (
@@ -1135,7 +1130,7 @@ export default function CardBuilderView({
             {/* 🔥 TAB 3: BULK JSON IMPORT */}
             {builderTab === 'bulk' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <section className="bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4">Destination Deck</h3>
                         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
                             <button onClick={() => setBulkDestination('new')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center justify-center sm:justify-start gap-3 transition-colors ${bulkDestination === 'new' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
@@ -1158,7 +1153,7 @@ export default function CardBuilderView({
                         )}
                     </section>
 
-                    <section className="bg-slate-900 dark:bg-black p-4 sm:p-6 rounded-3xl border-4 border-slate-800 shadow-xl transition-colors">
+                    <section className="bg-slate-900 dark:bg-black p-4 sm:p-6 rounded-3xl border border-slate-800 shadow-xl transition-colors">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
                             <h3 className="font-black text-white text-sm uppercase tracking-widest">JSON Payload</h3>
                             <button disabled={isImporting} onClick={() => setJsonInput(jsonTemplate)} className="w-full sm:w-auto text-[10px] font-black uppercase text-indigo-400 hover:text-white transition-colors tracking-widest bg-white/5 px-3 py-2 sm:py-1.5 rounded-lg border border-white/10 active:scale-95">Paste Template</button>
@@ -1172,16 +1167,16 @@ export default function CardBuilderView({
                 </div>
             )}
 
-            {/* 🔥 DECK INVENTORY LIST */}
+            {/* 🔥 DECK INVENTORY LIST (Updated Cards) */}
             {formData.deckId && (
-                <div className="pt-10 mt-10 border-t-2 border-slate-100 dark:border-slate-800 transition-colors">
+                <div className="pt-10 mt-10 border-t border-slate-200/60 dark:border-slate-800 transition-colors">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                        <h3 className="font-black text-slate-400 uppercase tracking-widest text-xs">Deck Inventory</h3>
+                        <h3 className="font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-xs">Deck Inventory</h3>
                         <div className="flex items-center gap-3">
-                            <button onClick={() => setShowShareModal(true)} className="bg-indigo-100 dark:bg-indigo-900/40 hover:bg-indigo-600 dark:hover:bg-indigo-600 text-indigo-600 dark:text-indigo-400 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm">
+                            <button onClick={() => setShowShareModal(true)} className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm">
                                 <Share2 size={14} /> Network Access
                             </button>
-                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-2 rounded-xl text-[10px] font-black tracking-widest transition-colors flex items-center gap-2">
+                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-xl text-[11px] font-bold tracking-wider transition-colors flex items-center gap-2">
                                 {isFetchingCards ? <Loader2 size={12} className="animate-spin" /> : currentDeckCards.length} Targets
                             </span>
                         </div>
@@ -1194,23 +1189,22 @@ export default function CardBuilderView({
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {currentDeckCards.map((card: any) => (
-                                <div key={card.id} onClick={() => !isImporting && handleSelectCard(card)} className={`p-4 rounded-2xl border-2 flex justify-between items-center cursor-pointer transition-all group ${editingId === card.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
+                                <div key={card.id} onClick={() => !isImporting && handleSelectCard(card)} className={`p-5 rounded-2xl border flex justify-between items-center cursor-pointer transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg ${editingId === card.id ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-400 shadow-sm ring-1 ring-indigo-400' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50'}`}>
                                     <div className="flex flex-col pr-4">
-                                        <span className="font-black text-slate-800 dark:text-white transition-colors">{card.front}</span>
-                                        <span className="text-xs font-bold text-slate-400 mt-0.5">{card.back}</span>
+                                        <span className="font-bold text-slate-900 dark:text-white transition-colors">{card.front}</span>
+                                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">{card.back}</span>
                                         
-                                        <div className="flex flex-wrap items-center gap-2 mt-2">
-                                            {card.imageUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><ImageIcon size={10} /> Image</span>}
-                                            {card.audioUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Music size={10} /> Audio</span>}
-                                            {card.conjugations && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Paperclip size={10}/> Conjs</span>}
+                                        <div className="flex flex-wrap items-center gap-2.5 mt-3">
+                                            {card.imageUrl && <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md"><ImageIcon size={10} /> Image</span>}
+                                            {card.audioUrl && <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md"><Music size={10} /> Audio</span>}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900 transition-colors">
+                                        <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-indigo-500 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/50 transition-colors border border-slate-200 dark:border-slate-700/50 group-hover:border-indigo-200 dark:group-hover:border-indigo-500/30">
                                             <Edit3 size={14} />
                                         </div>
                                         {!(INITIAL_SYSTEM_DECKS as any)[formData.deckId] && (
-                                            <button onClick={(e) => { e.stopPropagation(); !isImporting && handleDeleteCard(card.id); }} className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 hover:bg-rose-500 hover:text-white transition-all">
+                                            <button onClick={(e) => { e.stopPropagation(); !isImporting && handleDeleteCard(card.id); }} className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all border border-slate-200 dark:border-slate-700/50">
                                                 <Trash2 size={14}/>
                                             </button>
                                         )}
