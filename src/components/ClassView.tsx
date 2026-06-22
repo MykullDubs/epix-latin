@@ -14,7 +14,7 @@ import {
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
 import LiveRoleplayArena from './LiveRoleplayArena';
-import MarbleScrabble from './MarbleScrabble'; // 🔥 IMPORTED MARBLE SCRABBLE
+import MarbleScrabble from './MarbleScrabble';
 
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode with Keyboard Nav)
@@ -472,7 +472,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   return (
     <div 
         ref={classViewRef}
-        className="fixed inset-0 z-[9999] flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500"
+        className="fixed inset-0 z-[9999] flex flex-col bg-slate-950 text-white overflow-hidden font-sans selection:bg-indigo-500/30"
         onContextMenu={handleRightClick} 
     >
       {activeRoleplayBlock && (
@@ -497,7 +497,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       {/* Instant Scratchpad (Whiteboard Background) */}
       <div 
           className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
-          style={{ backgroundColor: '#f8fafc', backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', backgroundSize: '40px 40px' }}
+          style={{ backgroundColor: '#0f172a', backgroundImage: 'radial-gradient(#334155 2px, transparent 2px)', backgroundSize: '40px 40px' }}
       >
           <canvas ref={boardCanvasRef} className="absolute inset-0 w-full h-full" />
           {boardTexts.map(t => (
@@ -546,7 +546,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               style={{ left: toolbarPos.x, top: toolbarPos.y, transform: `scale(${toolbarScale})`, transformOrigin: 'top left' }}
               onMouseDown={(e) => e.stopPropagation()}
           >
-              <div className="bg-slate-900/95 backdrop-blur-2xl p-3 pl-1 pr-8 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-row gap-5 items-center relative overflow-hidden">
+              <div className="bg-slate-900/90 backdrop-blur-2xl p-3 pl-1 pr-8 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-slate-700/50 flex flex-row gap-5 items-center relative overflow-hidden">
                   
                   <div 
                       className="h-16 w-8 cursor-grab active:cursor-grabbing flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity bg-slate-800/50 rounded-l-full -ml-1 mr-1"
@@ -556,15 +556,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       <div className="w-1.5 h-8 bg-slate-400 rounded-full" />
                   </div>
 
-                  <div className="flex flex-row gap-2 bg-slate-800/80 p-2 rounded-3xl items-center border border-slate-700">
+                  <div className="flex flex-row gap-2 bg-slate-800/50 p-2 rounded-3xl items-center border border-slate-700/50">
                       <button onClick={() => { setMarkerStyle('pen'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'pen' ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'text-slate-400 hover:text-white'}`}>
-                          <PenTool size={24} />
+                          <PenTool size={24} strokeWidth={2.5}/>
                       </button>
                       <button onClick={() => { setMarkerStyle('highlighter'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'highlighter' ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.6)]' : 'text-slate-400 hover:text-white'}`}>
-                          <Highlighter size={24} />
+                          <Highlighter size={24} strokeWidth={2.5}/>
                       </button>
                       <button onClick={() => { setMarkerStyle('text'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'text' ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.6)]' : 'text-slate-400 hover:text-white'}`}>
-                          <Type size={24} />
+                          <Type size={24} strokeWidth={2.5}/>
                       </button>
                   </div>
 
@@ -575,7 +575,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           <button 
                               key={c} 
                               onClick={() => { setMarkerColor(c); if(activeText) setActiveText({...activeText}); }} 
-                              className={`w-10 h-10 rounded-full border-4 transition-transform ${markerColor === c ? 'scale-125 border-white shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'border-slate-800 hover:scale-110 shadow-sm'}`} 
+                              className={`w-10 h-10 rounded-full transition-all border-2 ${markerColor === c ? 'scale-125 border-white shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'border-slate-800 hover:scale-110 shadow-sm'}`} 
                               style={{ backgroundColor: c }} 
                           />
                       ))}
@@ -583,7 +583,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
                   <div className="w-px h-10 bg-slate-700" />
 
-                  <div className="flex flex-row items-center gap-3 bg-slate-800/80 p-2 rounded-3xl border border-slate-700">
+                  <div className="flex flex-row items-center gap-3 bg-slate-800/50 p-2 rounded-3xl border border-slate-700/50">
                       {[4, 8, 14].map(s => (
                           <button key={s} onClick={() => { setMarkerSize(s); if(activeText) setActiveText({...activeText}); }} className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-colors ${markerSize === s ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}>
                               <div className={`rounded-full transition-all ${markerStyle === 'text' ? 'bg-emerald-500' : 'bg-slate-300'}`} style={{ width: s, height: s }} />
@@ -591,8 +591,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
                   
-                  <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-full transition-all flex items-center justify-center ml-2">
-                      <Eraser size={24} />
+                  <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800/50 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-full transition-all flex items-center justify-center ml-2 border border-slate-700/50 hover:border-rose-500">
+                      <Eraser size={24} strokeWidth={2.5}/>
                   </button>
 
                   <div 
@@ -608,7 +608,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
       {showTools && (
           <div 
-              className="absolute z-[8900] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 pt-10 pb-8 shadow-[0_40px_80px_rgba(0,0,0,0.6)] flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 w-72 pointer-events-auto overflow-hidden"
+              className="absolute z-[8900] bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-[2.5rem] p-6 pt-10 pb-8 shadow-[0_40px_80px_rgba(0,0,0,0.6)] flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 w-72 pointer-events-auto overflow-hidden"
               style={{ left: mainToolsPos.x, top: mainToolsPos.y, transform: `scale(${mainToolsScale})`, transformOrigin: 'top left' }}
               onMouseDown={(e) => e.stopPropagation()} 
           >
@@ -621,30 +621,30 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               </div>
 
               <div className="flex items-center justify-between mb-2 px-2 relative z-10">
-                  <span className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Smartboard Tools</span>
-                  <button onClick={() => setShowTools(false)} className="text-slate-500 hover:text-white transition-colors"><X size={20} strokeWidth={3} /></button>
+                  <span className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Smartboard Tools</span>
+                  <button onClick={() => setShowTools(false)} className="text-slate-500 hover:text-white transition-colors"><X size={20} strokeWidth={2.5} /></button>
               </div>
 
-              <button onClick={() => { setShowQR(true); setShowTools(false); }} className="flex items-center gap-4 px-6 py-4 bg-slate-800 hover:bg-indigo-600 text-white rounded-2xl transition-all font-bold shadow-sm active:scale-95 border border-slate-700 hover:border-indigo-500 text-left relative z-10">
-                  <QrCode size={20} /> <span className="flex-1">QR Code Menu</span> <span className="text-slate-500 text-xs font-black">Q</span>
+              <button onClick={() => { setShowQR(true); setShowTools(false); }} className="flex items-center gap-4 px-6 py-4 bg-slate-800/50 hover:bg-indigo-600 text-white rounded-2xl transition-all font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 border border-slate-700/50 hover:border-indigo-500/50 text-left relative z-10">
+                  <QrCode size={20} /> <span className="flex-1">QR Code Menu</span> <span className="text-slate-500 text-xs font-bold">Q</span>
               </button>
-              <button onClick={() => { setShowTimer(p => !p); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${showTimer ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 hover:bg-amber-600 text-slate-300 hover:text-white border-slate-700 hover:border-amber-500'}`}>
-                  <Hourglass size={20} /> <span className="flex-1">Focus Timer</span> <span className="text-amber-500/50 text-xs font-black">T</span>
+              <button onClick={() => { setShowTimer(p => !p); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 border text-left relative z-10 ${showTimer ? 'bg-amber-600 text-white border-amber-500/50' : 'bg-slate-800/50 hover:bg-amber-600 text-slate-300 hover:text-white border-slate-700/50 hover:border-amber-500/50'}`}>
+                  <Hourglass size={20} /> <span className="flex-1">Focus Timer</span> <span className="text-amber-500/50 text-xs font-bold">T</span>
               </button>
-              <button onClick={() => { setIsAnnotating(p => !p); setIsSpotlight(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${isAnnotating ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-slate-700 hover:border-rose-500'}`}>
-                  <PenTool size={20} /> <span className="flex-1">Digital Tools</span> <span className="text-rose-500/50 text-xs font-black">A</span>
+              <button onClick={() => { setIsAnnotating(p => !p); setIsSpotlight(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 border text-left relative z-10 ${isAnnotating ? 'bg-rose-600 text-white border-rose-500/50' : 'bg-slate-800/50 hover:bg-rose-600 text-slate-300 hover:text-white border-slate-700/50 hover:border-rose-500/50'}`}>
+                  <PenTool size={20} /> <span className="flex-1">Digital Tools</span> <span className="text-rose-500/50 text-xs font-bold">A</span>
               </button>
               
-              <button onClick={() => { setShowWhiteboard(p => !p); setIsAnnotating(true); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${showWhiteboard ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white border-slate-700 hover:border-blue-500'}`}>
-                  <Presentation size={20} /> <span className="flex-1">Whiteboard</span> <span className="text-blue-500/50 text-xs font-black">C</span>
+              <button onClick={() => { setShowWhiteboard(p => !p); setIsAnnotating(true); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 border text-left relative z-10 ${showWhiteboard ? 'bg-blue-600 text-white border-blue-500/50' : 'bg-slate-800/50 hover:bg-blue-600 text-slate-300 hover:text-white border-slate-700/50 hover:border-blue-500/50'}`}>
+                  <Presentation size={20} /> <span className="flex-1">Whiteboard</span> <span className="text-blue-500/50 text-xs font-bold">C</span>
               </button>
 
-              <button onClick={() => { setIsSpotlight(p => !p); setIsAnnotating(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${isSpotlight ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border-slate-700 hover:border-emerald-500'}`}>
-                  <Crosshair size={20} /> <span className="flex-1">Spotlight</span> <span className="text-emerald-500/50 text-xs font-black">S</span>
+              <button onClick={() => { setIsSpotlight(p => !p); setIsAnnotating(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 border text-left relative z-10 ${isSpotlight ? 'bg-emerald-600 text-white border-emerald-500/50' : 'bg-slate-800/50 hover:bg-emerald-600 text-slate-300 hover:text-white border-slate-700/50 hover:border-emerald-500/50'}`}>
+                  <Crosshair size={20} /> <span className="flex-1">Spotlight</span> <span className="text-emerald-500/50 text-xs font-bold">S</span>
               </button>
-              <div className="h-px w-full bg-slate-700 my-1 relative z-10" />
-              <button onClick={() => setIsBlanked(p => !p)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${isBlanked ? 'bg-white text-black border-slate-200' : 'bg-slate-950 text-slate-400 hover:bg-black hover:text-white border-slate-800'}`}>
-                  <EyeOff size={20} /> <span className="flex-1">{isBlanked ? 'Restore Screen' : 'Blackout Screen'}</span> <span className="text-slate-600 text-xs font-black">B</span>
+              <div className="h-px w-full bg-slate-700/50 my-1 relative z-10" />
+              <button onClick={() => setIsBlanked(p => !p)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 border text-left relative z-10 ${isBlanked ? 'bg-white text-black border-slate-200' : 'bg-slate-950/50 text-slate-400 hover:bg-black hover:text-white border-slate-800/50'}`}>
+                  <EyeOff size={20} /> <span className="flex-1">{isBlanked ? 'Restore Screen' : 'Blackout Screen'}</span> <span className="text-slate-600 text-xs font-bold">B</span>
               </button>
 
               <div 
@@ -658,36 +658,36 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       )}
 
       {showQR && (
-          <div className="absolute inset-0 z-[9999] bg-slate-900/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300 pointer-events-auto">
-              <button onClick={() => setShowQR(false)} className="absolute top-12 right-12 p-6 bg-white/10 hover:bg-rose-500 rounded-full text-white transition-all hover:scale-110 active:scale-95"><X size={40} strokeWidth={3} /></button>
-              <h2 className="text-[6vh] font-black text-white uppercase tracking-widest mb-4">Join Live Session</h2>
-              <p className="text-[3vh] text-indigo-300 font-bold tracking-widest uppercase mb-16">Scan to sync your device</p>
-              <div className="p-10 bg-white rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.4)] animate-in slide-in-from-bottom-8">
+          <div className="absolute inset-0 z-[9999] bg-slate-950/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300 pointer-events-auto">
+              <button onClick={() => setShowQR(false)} className="absolute top-12 right-12 p-5 bg-white/10 border border-white/20 hover:bg-rose-500 hover:border-rose-500 rounded-full text-white transition-all hover:scale-110 active:scale-95 shadow-lg"><X size={32} strokeWidth={2.5} /></button>
+              <h2 className="text-[6vh] font-bold text-white uppercase tracking-widest mb-4">Join Live Session</h2>
+              <p className="text-[3vh] text-indigo-300 font-medium tracking-widest uppercase mb-16">Scan to sync your device</p>
+              <div className="p-10 bg-white rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.4)] animate-in slide-in-from-bottom-8 border-8 border-indigo-500/20">
                   <img src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(joinUrl)}&margin=10`} alt="Join QR" className="w-[40vh] h-[40vh] object-contain" />
               </div>
               <div className="mt-16 text-center">
                   <p className="text-[2vh] font-bold text-slate-400 uppercase tracking-[0.4em] mb-4">Or enter room code</p>
-                  <div className="text-[8vh] font-black text-indigo-400 tracking-[0.2em] leading-none bg-indigo-500/10 py-6 px-12 rounded-[2rem] border-2 border-indigo-500/20">{String(classId || '').substring(0,6).toUpperCase()}</div>
+                  <div className="text-[8vh] font-black text-indigo-400 tracking-[0.2em] leading-none bg-indigo-500/10 py-6 px-12 rounded-[2rem] border border-indigo-500/30">{String(classId || '').substring(0,6).toUpperCase()}</div>
               </div>
           </div>
       )}
 
       {showTimer && (
-          <div className="absolute z-[9500] bg-slate-900/90 backdrop-blur-xl border-4 border-slate-700 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto" style={{ left: timerPos.x, top: timerPos.y, width: 320 }}>
-              <div className="bg-slate-800/80 p-3 cursor-grab active:cursor-grabbing flex justify-between items-center" onMouseDown={startTimerDrag}>
-                  <div className="flex items-center gap-2 text-slate-400 px-2"><Hourglass size={14} /><span className="text-[10px] font-black uppercase tracking-widest">Focus Timer</span></div>
-                  <button onClick={() => setShowTimer(false)} className="text-slate-400 hover:text-rose-400 transition-colors"><X size={18} strokeWidth={3} /></button>
+          <div className="absolute z-[9500] bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto" style={{ left: timerPos.x, top: timerPos.y, width: 320 }}>
+              <div className="bg-slate-800/50 p-3 border-b border-slate-700/50 cursor-grab active:cursor-grabbing flex justify-between items-center" onMouseDown={startTimerDrag}>
+                  <div className="flex items-center gap-2 text-slate-400 px-2"><Hourglass size={14} /><span className="text-[10px] font-bold uppercase tracking-widest">Focus Timer</span></div>
+                  <button onClick={() => setShowTimer(false)} className="text-slate-400 hover:text-rose-400 transition-colors"><X size={18} strokeWidth={2.5} /></button>
               </div>
               <div className="p-8 flex flex-col items-center">
-                  <div className={`text-7xl font-black font-mono tracking-tighter mb-6 ${timeLeft === 0 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>{formatTime(timeLeft)}</div>
+                  <div className={`text-7xl font-bold font-mono tracking-tighter mb-6 ${timeLeft === 0 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>{formatTime(timeLeft)}</div>
                   <div className="grid grid-cols-2 gap-3 w-full mb-4">
-                      <button onClick={() => setTimeLeft(t => Math.max(0, t - 60))} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-bold flex justify-center items-center gap-1 transition-all active:scale-95"><Minus size={16} /> 1m</button>
-                      <button onClick={() => setTimeLeft(t => t + 60)} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-bold flex justify-center items-center gap-1 transition-all active:scale-95"><Plus size={16} /> 1m</button>
+                      <button onClick={() => setTimeLeft(t => Math.max(0, t - 60))} className="p-3 bg-slate-800/50 hover:bg-slate-700 border border-slate-700/50 rounded-xl text-slate-300 font-semibold flex justify-center items-center gap-1 transition-all active:scale-95"><Minus size={16} /> 1m</button>
+                      <button onClick={() => setTimeLeft(t => t + 60)} className="p-3 bg-slate-800/50 hover:bg-slate-700 border border-slate-700/50 rounded-xl text-slate-300 font-semibold flex justify-center items-center gap-1 transition-all active:scale-95"><Plus size={16} /> 1m</button>
                   </div>
                   <div className="flex gap-3 w-full">
-                      <button onClick={() => { setTimeLeft(300); setTimerRunning(false); }} className="p-4 bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 rounded-2xl text-slate-400 font-bold flex justify-center items-center transition-all active:scale-95 w-1/3"><RotateCcw size={20} /></button>
-                      <button onClick={() => setTimerRunning(!timerRunning)} className={`p-4 rounded-2xl font-black uppercase tracking-widest flex justify-center items-center gap-2 transition-all active:scale-95 w-2/3 ${timerRunning ? 'bg-amber-500 text-slate-900 hover:bg-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'bg-emerald-500 text-white hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]'}`}>
-                          {timerRunning ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+                      <button onClick={() => { setTimeLeft(300); setTimerRunning(false); }} className="p-4 bg-slate-800/50 border border-slate-700/50 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 rounded-2xl text-slate-400 font-bold flex justify-center items-center transition-all active:scale-95 w-1/3"><RotateCcw size={20} strokeWidth={2.5}/></button>
+                      <button onClick={() => setTimerRunning(!timerRunning)} className={`p-4 rounded-2xl font-bold uppercase tracking-widest flex justify-center items-center gap-2 transition-all active:scale-95 w-2/3 ${timerRunning ? 'bg-amber-500 text-slate-900 hover:bg-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'bg-emerald-500 text-white hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]'}`}>
+                          {timerRunning ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1"/>}
                           {timerRunning ? 'Pause' : 'Start'}
                       </button>
                   </div>
@@ -696,31 +696,31 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       )}
 
       {/* CORE PRESENTATION LAYER */}
-      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0 w-full h-full">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-950 text-white z-0 w-full h-full transition-colors duration-500">
         
         {/* Navigation Buttons */}
         {(!isLobby && activePageIdx >= 0) && (
-            <button onClick={handlePrev} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronLeft size={48} /></button>
+            <button onClick={handlePrev} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronLeft size={36} strokeWidth={2.5}/></button>
         )}
         {(isLobby || activePageIdx < pages.length - 1) && (
-            <button onClick={handleNext} className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronRight size={48} /></button>
+            <button onClick={handleNext} className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronRight size={36} strokeWidth={2.5}/></button>
         )}
 
         {/* 🔥 LOBBY SCREEN (HERO IMAGE) OR SLIDE STAGE */}
         {isLobby ? (
             <div className="w-full h-full flex flex-col items-center justify-center text-center p-8 animate-in fade-in zoom-in-95 duration-700 relative bg-slate-950 text-white z-10">
                 {heroImage ? (
-                    <div className="w-full max-w-5xl aspect-video rounded-[3rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-10 border-4 border-slate-800/50 relative">
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent z-10" />
+                    <div className="w-full max-w-5xl aspect-video rounded-[3rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-10 border border-slate-800 relative">
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent z-10" />
                         <img src={heroImage} alt="Lesson Cover" className="w-full h-full object-cover" />
                     </div>
                 ) : (
-                    <div className="w-40 h-40 bg-indigo-500/20 rounded-[3rem] flex items-center justify-center mb-10 border border-indigo-500/30 shadow-2xl">
-                        <BookOpen size={64} className="text-indigo-400" />
+                    <div className="w-40 h-40 bg-indigo-500/10 rounded-[3rem] flex items-center justify-center mb-10 border border-indigo-500/20 shadow-2xl">
+                        <BookOpen size={64} className="text-indigo-400" strokeWidth={1.5}/>
                     </div>
                 )}
 
-                <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter mb-6 relative z-20 drop-shadow-lg">
+                <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight mb-6 relative z-20 drop-shadow-lg">
                     {lesson.title || 'Untitled Lesson'}
                 </h1>
                 <p className="text-xl text-slate-400 font-medium max-w-2xl mx-auto mb-12 relative z-20">
@@ -729,13 +729,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
                 <button 
                     onClick={() => setIsLobby(false)}
-                    className="px-10 py-5 bg-white text-slate-900 hover:bg-indigo-50 hover:text-indigo-600 hover:scale-105 active:scale-95 rounded-full font-black text-lg uppercase tracking-widest transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)] flex items-center gap-3 relative z-20"
+                    className="px-10 py-4 bg-white/10 hover:bg-white text-white hover:text-slate-900 border border-white/20 hover:scale-105 active:scale-95 rounded-full font-bold text-sm uppercase tracking-widest transition-all shadow-lg flex items-center gap-3 relative z-20"
                 >
-                    Start Broadcast <Zap size={20} fill="currentColor" />
+                    Start Broadcast <Zap size={18} fill="currentColor" />
                 </button>
             </div>
         ) : (
-            <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
+            <div ref={stageRef} className={`flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
               <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32 pb-24">
                 <div className="w-full max-w-7xl space-y-24 my-auto">
                   {activePage.blocks.map((block: any, i: number) => {
@@ -747,31 +747,31 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                     return (
                       <div key={i} className="animate-in fade-in zoom-in-95 duration-700 w-full">
                         {isQuiz ? (
-                          <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl my-12 relative overflow-hidden">
-                              <div className="absolute top-0 right-0 -mr-16 -mt-16 text-slate-800 opacity-50 rotate-12"><HelpCircle size={250} /></div>
+                          <div className="bg-slate-900 text-white border border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl my-12 relative overflow-hidden">
+                              <div className="absolute top-0 right-0 -mr-16 -mt-16 text-slate-800 opacity-30 rotate-12"><HelpCircle size={250} strokeWidth={1.5} /></div>
                               <div className="relative z-10">
-                                  <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
-                                  <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{String(block.content?.question || block.question || '')}</h2>
+                                  <span className="text-[2vh] font-bold text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
+                                  <h2 className="text-[5vh] md:text-[6vh] font-bold mb-12 leading-tight tracking-tight">{String(block.content?.question || block.question || '')}</h2>
                                   
                                   {liveState?.quizState === 'waiting' && (
-                                      <button onClick={() => triggerQuiz('active')} className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto"><Zap size={40} fill="currentColor" /> Launch Trivia Protocol</button>
+                                      <button onClick={() => triggerQuiz('active')} className="bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 text-white px-12 py-5 rounded-full font-bold text-[2.5vh] uppercase tracking-wider shadow-[0_0_40px_rgba(244,63,94,0.4)] transition-transform hover:-translate-y-0.5 active:scale-95 flex items-center gap-3 mx-auto"><Zap size={32} fill="currentColor" /> Launch Trivia Protocol</button>
                                   )}
 
                                   {liveState?.quizState === 'active' && (
                                       <div className="space-y-12 animate-in fade-in duration-500">
-                                          <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
-                                              <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
-                                                  <Users size={64} className="animate-pulse" /> <span>{answerCount} Students Locked In</span>
+                                          <div className="flex flex-col items-center justify-center gap-4 text-[5vh] font-bold text-indigo-400">
+                                              <div className="flex items-center gap-5 bg-slate-800/80 px-10 py-5 rounded-[2rem] shadow-inner border border-slate-700/50">
+                                                  <Users size={48} className="animate-pulse" /> <span>{answerCount} Students Locked In</span>
                                               </div>
                                           </div>
-                                          <button onClick={() => triggerQuiz('revealed')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto">Reveal Correct Answer</button>
+                                          <button onClick={() => triggerQuiz('revealed')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-5 rounded-full font-bold text-[2.5vh] uppercase tracking-wider transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-indigo-500/20 mx-auto">Reveal Correct Answer</button>
                                       </div>
                                   )}
 
                                   {liveState?.quizState === 'revealed' && (
                                       <div className="animate-in zoom-in duration-500 flex flex-col items-center">
-                                          <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]"><CheckCircle2 size={48} /> Correct Answer Displayed!</div>
-                                          <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">{String(block.content?.options?.find((o:any) => String(o.id) === String(block.content?.correctId))?.text || "Answer Revealed on Devices")}</div>
+                                          <div className="inline-flex items-center gap-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-8 py-4 rounded-[2rem] text-[3.5vh] font-bold mb-10 shadow-[0_0_30px_rgba(16,185,129,0.1)]"><CheckCircle2 size={40} strokeWidth={2.5}/> Correct Answer Displayed!</div>
+                                          <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold min-w-[50%]">{String(block.content?.options?.find((o:any) => String(o.id) === String(block.content?.correctId))?.text || "Answer Revealed on Devices")}</div>
                                       </div>
                                   )}
                               </div>
@@ -788,7 +788,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                               
                               {/* 🔥 NEW MARBLE SCRABBLE INTEGRATION */}
                               {blockType === 'game' && block.gameType === 'marble-scrabble' && (
-                                  <div className="w-full h-[80vh] pointer-events-auto rounded-[3rem] overflow-hidden shadow-2xl">
+                                  <div className="w-full h-[80vh] pointer-events-auto rounded-[3rem] overflow-hidden shadow-2xl border border-slate-800">
                                       <MarbleScrabble 
                                           block={block} 
                                           isProjector={true} 
@@ -807,27 +807,27 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                               
                               {blockType === 'code' && (
                                   <div className="py-12 w-full max-w-6xl mx-auto">
-                                    <div className="bg-[#0D1117] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-slate-800">
-                                      <div className="bg-white/5 px-8 py-6 flex justify-between items-center border-b border-white/5">
-                                          <div className="flex gap-3"><div className="w-4 h-4 rounded-full bg-rose-500"></div><div className="w-4 h-4 rounded-full bg-amber-500"></div><div className="w-4 h-4 rounded-full bg-emerald-500"></div></div>
-                                          <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest">{String(block.language || 'Terminal')}</span>
+                                    <div className="bg-[#0D1117] rounded-[3rem] overflow-hidden shadow-2xl border border-slate-800">
+                                      <div className="bg-white/5 px-8 py-5 flex justify-between items-center border-b border-white/5">
+                                          <div className="flex gap-2.5"><div className="w-3.5 h-3.5 rounded-full bg-rose-500"></div><div className="w-3.5 h-3.5 rounded-full bg-amber-500"></div><div className="w-3.5 h-3.5 rounded-full bg-emerald-500"></div></div>
+                                          <span className="text-[1.8vh] font-bold text-slate-400 uppercase tracking-widest">{String(block.language || 'Terminal')}</span>
                                       </div>
-                                      <div className="p-12 overflow-x-auto"><pre className="text-emerald-400 font-mono text-[3vh] leading-relaxed"><code>{String(block.content || '')}</code></pre></div>
+                                      <div className="p-10 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"><pre className="text-emerald-400 font-mono text-[2.5vh] leading-relaxed"><code>{String(block.content || '')}</code></pre></div>
                                     </div>
                                   </div>
                               )}
 
                               {blockType === 'timeline' && (
                                  <div className="py-12 w-full max-w-6xl mx-auto">
-                                    {block.title && (<div className="flex items-center gap-6 mb-16 justify-center"><div className="p-6 bg-amber-50 text-amber-600 rounded-[2rem]"><BookOpen size={48} /></div><h3 className="text-[5vh] font-black text-slate-800 tracking-tight">{String(block.title)}</h3></div>)}
-                                    <div className="space-y-12 relative before:absolute before:inset-0 before:mx-auto before:h-full before:w-2 before:bg-slate-200 before:rounded-full">
+                                    {block.title && (<div className="flex items-center gap-5 mb-16 justify-center"><div className="p-5 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-2xl"><BookOpen size={40} strokeWidth={2.5}/></div><h3 className="text-[5vh] font-bold text-white tracking-tight">{String(block.title)}</h3></div>)}
+                                    <div className="space-y-12 relative before:absolute before:inset-0 before:mx-auto before:h-full before:w-1 before:bg-slate-800 before:rounded-full">
                                        {(Array.isArray(block.events) ? block.events : []).map((event: any, evIdx: number) => (
                                           <div key={evIdx} className="relative flex items-center justify-between odd:flex-row-reverse group">
-                                              <div className="flex items-center justify-center w-20 h-20 rounded-full border-8 border-white bg-indigo-600 text-white shadow-xl shrink-0 order-1 group-odd:-translate-x-1/2 group-even:translate-x-1/2 z-10 transition-transform group-hover:scale-110"><div className="w-4 h-4 bg-white rounded-full" /></div>
-                                              <div className="w-[calc(50%-4rem)] p-10 rounded-[3rem] bg-white border-2 border-slate-100 shadow-lg hover:shadow-2xl transition-all group-hover:border-indigo-200 group-hover:-translate-y-2">
-                                                  <span className="font-black text-indigo-600 text-[2vh] tracking-[0.2em] uppercase mb-4 block">{String(event.date || '')}</span>
-                                                  <h4 className="font-black text-slate-800 text-[4vh] leading-tight mb-4">{String(event.title || '')}</h4>
-                                                  <p className="text-slate-600 text-[2.5vh] font-medium leading-relaxed">{String(event.description || '')}</p>
+                                              <div className="flex items-center justify-center w-16 h-16 rounded-full border-[6px] border-slate-950 bg-indigo-600 text-white shadow-xl shrink-0 order-1 group-odd:-translate-x-1/2 group-even:translate-x-1/2 z-10 transition-transform group-hover:scale-110"><div className="w-3 h-3 bg-white rounded-full" /></div>
+                                              <div className="w-[calc(50%-3rem)] p-8 rounded-[2.5rem] bg-slate-900 border border-slate-800 shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 group-hover:border-indigo-500/50">
+                                                  <span className="font-bold text-indigo-400 text-[1.8vh] tracking-widest uppercase mb-3 block">{String(event.date || '')}</span>
+                                                  <h4 className="font-bold text-white text-[3.5vh] leading-tight mb-3 tracking-tight">{String(event.title || '')}</h4>
+                                                  <p className="text-slate-400 text-[2.2vh] font-medium leading-relaxed">{String(event.description || '')}</p>
                                               </div>
                                           </div>
                                        ))}
@@ -851,43 +851,43 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         )}
 
         {showForum && (
-          <aside className="absolute right-0 top-0 bottom-0 w-[450px] bg-slate-50 border-l border-slate-200 p-8 z-10 animate-in slide-in-from-right shadow-2xl">
-             <h3 className="text-2xl font-black mb-6 flex items-center gap-2"><MessageSquare className="text-indigo-600" aria-hidden="true"/> FORUM</h3>
+          <aside className="absolute right-0 top-0 bottom-0 w-[450px] bg-slate-900/95 backdrop-blur-md border-l border-slate-800 p-8 z-10 animate-in slide-in-from-right shadow-2xl">
+             <h3 className="text-2xl font-bold mb-6 flex items-center gap-2"><MessageSquare className="text-indigo-500" aria-hidden="true"/> FORUM</h3>
              {classId ? <p className="text-slate-400">Forum Component Here</p> : <p className="text-slate-400">Class chat unavailable.</p>}
           </aside>
         )}
       </main>
 
       {/* ABSOLUTE GLASSMORPHISM FOOTER OVERLAY */}
-      <footer className="absolute bottom-0 left-0 right-0 h-16 bg-slate-900/60 backdrop-blur-xl border-t border-white/10 flex items-center justify-between px-8 shrink-0 z-[8800] hover:bg-slate-900/90 transition-colors duration-500">
+      <footer className="absolute bottom-0 left-0 right-0 h-16 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800/60 flex items-center justify-between px-8 shrink-0 z-[8800] hover:bg-slate-900 transition-colors duration-500">
           <div className="flex items-center gap-4 md:gap-6">
-              <h2 className="text-sm font-black text-slate-200 uppercase tracking-widest drop-shadow-md">{String(lesson?.title || '')}</h2>
-              <div className="h-5 w-px bg-white/20" />
-              <span className="flex items-center gap-2 font-mono text-sm font-bold text-slate-300 drop-shadow-md"><Clock size={14} /> {formatTime(elapsedTime)}</span>
+              <h2 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">{String(lesson?.title || '')}</h2>
+              <div className="h-4 w-px bg-slate-700" />
+              <span className="flex items-center gap-1.5 font-mono text-xs font-semibold text-slate-400"><Clock size={12} /> {formatTime(elapsedTime)}</span>
               
-              <div className="h-5 w-px bg-white/20 mx-2" />
+              <div className="h-4 w-px bg-slate-700 mx-2" />
               
               <button 
                   onClick={() => setShowTools(prev => !prev)} 
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border backdrop-blur-lg ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600/90 text-white border-indigo-400/50 shadow-[0_0_15px_rgba(79,70,229,0.4)]' : 'bg-black/30 hover:bg-indigo-600/80 text-white border-white/10 hover:border-indigo-500/50'}`}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all text-[10px] font-bold uppercase tracking-wider shadow-sm border ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-500/20' : 'bg-slate-800/50 hover:bg-indigo-600/80 text-slate-300 hover:text-white border-slate-700/50 hover:border-indigo-500/50'}`}
               >
-                  <Wrench size={14} /> Tools (W)
+                  <Wrench size={12} strokeWidth={2.5}/> Tools (W)
               </button>
 
               <button 
                   onClick={onExit} 
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white transition-colors ml-2 border border-rose-500/30 font-black text-[10px] uppercase tracking-widest"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors ml-1 border border-rose-500/20 hover:border-rose-500 font-bold text-[10px] uppercase tracking-wider"
               >
-                  <X size={14} strokeWidth={3} /> Exit
+                  <X size={12} strokeWidth={3} /> Exit
               </button>
           </div>
           
           <div className="flex items-center gap-4">
-              <div ref={progressBarRef} onClick={handleProgressBarClick} className="w-48 h-2 bg-black/40 rounded-full overflow-hidden cursor-pointer group relative backdrop-blur-sm border border-white/10">
-                  <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div ref={progressBarRef} onClick={handleProgressBarClick} className="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden cursor-pointer group relative border border-slate-700/50 shadow-inner">
+                  <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="h-full bg-indigo-500 transition-all duration-300 relative z-10" style={{ width: `${isLobby ? 0 : ((activePageIdx + 1) / pages.length) * 100}%` }} />
               </div>
-              <span className="font-black text-slate-300 tracking-widest uppercase w-28 text-right text-[10px] drop-shadow-md">
+              <span className="font-bold text-slate-400 tracking-wider uppercase w-24 text-right text-[9px]">
                   {isLobby ? 'LOBBY' : `Slide ${activePageIdx + 1} of ${pages.length}`}
               </span>
           </div>
@@ -902,17 +902,17 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
 const TextBlock = ({ block }: { block: any }) => (
   <div className="text-center py-12 max-w-6xl mx-auto">
-    {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-8">{String(block.title)}</h3>}
-    <p className="text-[6vh] font-black text-slate-800 leading-[1.1] tracking-tight">{String(block.content || '')}</p>
+    {block.title && <h3 className="text-[2.5vh] font-bold text-indigo-500 uppercase tracking-wider mb-6">{String(block.title)}</h3>}
+    <p className="text-[5.5vh] font-bold text-white leading-[1.2] tracking-tight">{String(block.content || '')}</p>
   </div>
 );
 
 const EssayBlock = ({ block }: { block: any }) => (
   <div className="w-full max-w-7xl mx-auto py-12">
-    <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-16 text-center">{String(block.title || '')}</h1>
+    <h1 className="text-[7vh] font-bold text-white leading-none mb-16 text-center tracking-tight">{String(block.title || '')}</h1>
     <div className="columns-1 xl:columns-2 gap-20 space-y-[4vh]">
         {String(block.content || '').split('\n\n').map((para: string, pIdx: number) => (
-          <p key={pIdx} className="text-[3.5vh] leading-[1.7] text-slate-700 font-serif text-justify first-letter:text-[7vh] first-letter:font-black first-letter:text-indigo-600 first-letter:float-left first-letter:mr-3 break-inside-avoid">{para.trim()}</p>
+          <p key={pIdx} className="text-[3vh] leading-[1.7] text-slate-300 font-serif text-justify first-letter:text-[6vh] first-letter:font-bold first-letter:text-indigo-400 first-letter:float-left first-letter:mr-3 break-inside-avoid">{para.trim()}</p>
         ))}
     </div>
   </div>
@@ -920,22 +920,22 @@ const EssayBlock = ({ block }: { block: any }) => (
 
 const ImageBlock = ({ block }: { block: any }) => (
   <figure className="w-full flex flex-col items-center py-12">
-    <div className="relative group overflow-hidden rounded-[3rem] shadow-2xl border-8 border-slate-50">
+    <div className="relative group overflow-hidden rounded-[3rem] shadow-2xl border border-slate-800">
         <img src={String(block.url || block.imageUrl || '')} alt="presentation slide" className="max-h-[65vh] object-cover animate-in zoom-in-105 duration-[20s]" />
     </div>
-    {block.caption && <figcaption className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{String(block.caption)}</figcaption>}
+    {block.caption && <figcaption className="text-[2.5vh] text-slate-400 font-semibold mt-8 text-center max-w-4xl tracking-wider uppercase">{String(block.caption)}</figcaption>}
   </figure>
 );
 
 const CalloutBlock = ({ block }: { block: any }) => (
-    <div className="my-12 p-12 md:p-16 rounded-[4rem] bg-amber-50 border-4 border-amber-100 relative overflow-hidden group shadow-lg max-w-6xl mx-auto w-full">
-      <Zap size={250} className="absolute -right-12 -top-12 text-amber-200/40 rotate-12 group-hover:scale-110 transition-transform duration-700" fill="currentColor" />
+    <div className="my-12 p-12 md:p-16 rounded-[4rem] bg-amber-500/5 border border-amber-500/20 relative overflow-hidden group shadow-lg max-w-6xl mx-auto w-full transition-colors">
+      <Zap size={200} className="absolute -right-8 -top-8 text-amber-500/10 rotate-12 group-hover:scale-110 transition-transform duration-700" fill="currentColor" />
       <div className="relative z-10 flex flex-col items-center text-center">
         <div className="flex items-center gap-4 mb-8">
-          <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md"><Info size={32} strokeWidth={3} /></div>
-          <span className="text-[3vh] font-black text-amber-600 uppercase tracking-widest">{String(block.label || block.title || 'Spotlight')}</span>
+          <div className="p-3 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl shadow-sm"><Info size={28} strokeWidth={2.5} /></div>
+          <span className="text-[2.5vh] font-bold text-amber-500 uppercase tracking-wider">{String(block.label || block.title || 'Spotlight')}</span>
         </div>
-        <p className="text-[4.5vh] text-slate-700 font-bold leading-relaxed italic max-w-4xl">"{String(block.content || block.text || '')}"</p>
+        <p className="text-[4vh] text-white font-semibold leading-relaxed italic max-w-4xl">"{String(block.content || block.text || '')}"</p>
       </div>
     </div>
 );
@@ -943,16 +943,16 @@ const CalloutBlock = ({ block }: { block: any }) => (
 const AudioStoryBlock = ({ block }: { block: any }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     return (
-        <div className="bg-white rounded-[4rem] overflow-hidden shadow-2xl border-8 border-indigo-50 my-12 w-full max-w-6xl mx-auto">
+        <div className="bg-slate-900 rounded-[4rem] overflow-hidden shadow-2xl border border-slate-800 my-12 w-full max-w-6xl mx-auto transition-colors">
             <div className="relative">
                 <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1518152006812-edab29b069ac?q=80&w=800&auto=format&fit=crop')} alt="Story visual" className="w-full h-[40vh] object-cover" />
-                <button onClick={() => setIsPlaying(!isPlaying)} className={`absolute -bottom-12 right-16 w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${isPlaying ? 'bg-rose-500 text-white scale-110' : 'bg-indigo-600 text-white hover:scale-105'}`}>
-                    {isPlaying ? <Square fill="currentColor" size={40} /> : <Play fill="currentColor" size={48} className="ml-2" />}
+                <button onClick={() => setIsPlaying(!isPlaying)} className={`absolute -bottom-10 right-16 w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 border-4 border-slate-900 ${isPlaying ? 'bg-rose-500 text-white scale-110' : 'bg-indigo-600 text-white hover:scale-105'}`}>
+                    {isPlaying ? <Square fill="currentColor" size={32} /> : <Play fill="currentColor" size={40} className="ml-2" />}
                 </button>
             </div>
-            <div className="p-12 md:p-16 pt-20">
-                <h3 className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest mb-6 flex items-center gap-3"><Volume2 size={24} /> Read Along</h3>
-                <p className={`text-[5vh] font-bold text-slate-800 leading-snug transition-colors duration-500 ${isPlaying ? 'text-indigo-600' : ''}`}>{String(block.text || "The legend says they looked for an eagle on a cactus...")}</p>
+            <div className="p-12 md:p-16 pt-16">
+                <h3 className="text-[1.8vh] font-bold text-indigo-400 uppercase tracking-wider mb-5 flex items-center gap-3"><Volume2 size={20} strokeWidth={2.5}/> Read Along</h3>
+                <p className={`text-[4.5vh] font-bold text-white leading-snug tracking-tight transition-colors duration-500 ${isPlaying ? 'text-indigo-400' : ''}`}>{String(block.text || "The legend says they looked for an eagle on a cactus...")}</p>
             </div>
         </div>
     );
@@ -961,20 +961,20 @@ const AudioStoryBlock = ({ block }: { block: any }) => {
 const ImageHotspotBlock = ({ block }: { block: any }) => {
     const [activeSpot, setActiveSpot] = useState<number | null>(null);
     return (
-        <div className="bg-slate-900 p-12 rounded-[4rem] shadow-2xl my-12 w-full max-w-7xl mx-auto">
-            <div className="flex items-center justify-center gap-4 mb-10"><Search className="text-cyan-400" size={40} /><h3 className="text-[5vh] font-black text-white text-center">{String(block.title || 'Explore the Map!')}</h3></div>
-            <div className="relative rounded-[3rem] overflow-hidden border-8 border-slate-700 bg-slate-800">
-                <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1565670119853-23910c2830f3?q=80&w=800&auto=format&fit=crop')} className="w-full h-auto opacity-80" alt="Explorer Map" />
+        <div className="bg-slate-900 p-12 rounded-[4rem] shadow-2xl my-12 w-full max-w-7xl mx-auto border border-slate-800">
+            <div className="flex items-center justify-center gap-4 mb-10"><Search className="text-cyan-400" size={36} strokeWidth={2.5}/><h3 className="text-[4.5vh] font-bold text-white text-center tracking-tight">{String(block.title || 'Explore the Map!')}</h3></div>
+            <div className="relative rounded-[3rem] overflow-hidden border border-slate-800 bg-black">
+                <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1565670119853-23910c2830f3?q=80&w=800&auto=format&fit=crop')} className="w-full h-auto opacity-70" alt="Explorer Map" />
                 {(Array.isArray(block.hotspots) ? block.hotspots : []).map((spot: any, i: number) => (
                     <React.Fragment key={i}>
-                        <button onClick={() => setActiveSpot(activeSpot === i ? null : i)} className="absolute w-16 h-16 bg-rose-500 rounded-full border-4 border-white shadow-[0_0_30px_rgba(244,63,94,0.8)] flex items-center justify-center animate-pulse hover:scale-110 transition-transform z-10" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -50%)' }}>
-                            <Search size={24} className="text-white" strokeWidth={3} />
+                        <button onClick={() => setActiveSpot(activeSpot === i ? null : i)} className="absolute w-14 h-14 bg-rose-500 rounded-full border-2 border-white shadow-[0_0_25px_rgba(244,63,94,0.7)] flex items-center justify-center animate-pulse hover:scale-110 transition-transform z-10" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -50%)' }}>
+                            <Search size={24} className="text-white" strokeWidth={2.5} />
                         </button>
                         {activeSpot === i && (
-                            <div className="absolute z-20 bg-white p-8 rounded-[2.5rem] shadow-2xl w-96 text-center animate-in zoom-in-95 duration-200" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -115%)' }}>
-                                <h4 className="text-[3.5vh] font-black text-indigo-600 mb-4 leading-tight">{String(spot.title || '')}</h4>
-                                <p className="text-[2vh] font-bold text-slate-600 leading-snug">{String(spot.description || '')}</p>
-                                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-white rotate-45"></div>
+                            <div className="absolute z-20 bg-white/95 backdrop-blur-md p-8 rounded-[2.5rem] shadow-2xl w-96 text-center animate-in zoom-in-95 duration-200 border border-slate-200/50" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -115%)' }}>
+                                <h4 className="text-[3vh] font-bold text-indigo-700 mb-3 leading-tight tracking-tight">{String(spot.title || '')}</h4>
+                                <p className="text-[1.8vh] font-medium text-slate-600 leading-relaxed">{String(spot.description || '')}</p>
+                                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-white/95 border-r border-b border-slate-200/50 rotate-45"></div>
                             </div>
                         )}
                     </React.Fragment>
@@ -986,25 +986,25 @@ const ImageHotspotBlock = ({ block }: { block: any }) => {
 
 const DrawingBlock = ({ block }: { block: any }) => {
     return (
-        <div className="bg-white p-12 rounded-[4rem] border-8 border-slate-100 shadow-2xl my-12 w-full max-w-6xl mx-auto text-center flex flex-col items-center">
-            <div className="inline-flex items-center justify-center p-6 bg-fuchsia-50 text-fuchsia-600 rounded-3xl mb-8 shadow-inner"><Palette size={64} /></div>
-            <h3 className="text-[6vh] font-black text-slate-800 leading-none">{String(block.title || "Let's Draw!")}</h3>
-            <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Look at your device</p>
+        <div className="bg-slate-900 p-12 rounded-[4rem] border border-slate-800 shadow-2xl my-12 w-full max-w-6xl mx-auto text-center flex flex-col items-center transition-colors">
+            <div className="inline-flex items-center justify-center p-6 bg-fuchsia-500/10 text-fuchsia-500 border border-fuchsia-500/20 rounded-3xl mb-8 shadow-sm"><Palette size={56} strokeWidth={2}/></div>
+            <h3 className="text-[5.5vh] font-bold text-white leading-none tracking-tight">{String(block.title || "Let's Draw!")}</h3>
+            <p className="text-[2.5vh] font-bold text-slate-500 uppercase tracking-widest mt-5">Look at your device</p>
         </div>
     );
 };
 
 const DialogueBlock = ({ block }: { block: any }) => (
-  <div className="w-full max-w-5xl mx-auto space-y-12 py-12">
+  <div className="w-full max-w-5xl mx-auto space-y-10 py-12">
     {(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => {
       const sideRight = String(line.side) === 'right';
       const speakerInitial = typeof line.speaker === 'string' && line.speaker.trim().length > 0 ? line.speaker.trim()[0].toUpperCase() : '?';
       return (
-      <div key={j} className={`flex items-end gap-6 animate-in slide-in-from-bottom-8 fade-in fill-mode-both ${sideRight ? 'flex-row-reverse' : ''}`} style={{ animationDelay: `${j * 300}ms`, animationDuration: '600ms' }}>
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${sideRight ? 'bg-indigo-600' : 'bg-slate-800'}`}>{speakerInitial}</div>
-        <div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${sideRight ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'}`}>
+      <div key={j} className={`flex items-end gap-5 animate-in slide-in-from-bottom-8 fade-in fill-mode-both ${sideRight ? 'flex-row-reverse' : ''}`} style={{ animationDelay: `${j * 300}ms`, animationDuration: '600ms' }}>
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-[2.5vh] font-bold text-white shrink-0 shadow-sm border ${sideRight ? 'bg-indigo-500 border-indigo-400' : 'bg-slate-700 border-slate-600'}`}>{speakerInitial}</div>
+        <div className={`max-w-[80%] p-8 rounded-[2.5rem] shadow-md text-[3.5vh] font-medium leading-relaxed ${sideRight ? 'bg-indigo-500/10 text-indigo-100 border border-indigo-500/20 rounded-br-sm' : 'bg-slate-800/80 border border-slate-700 text-slate-200 rounded-bl-sm'}`}>
           {String(line.text || '')}
-          {line.translation && <p className={`text-[2.5vh] mt-6 italic opacity-80 font-bold border-t pt-4 ${sideRight ? 'border-indigo-400' : 'border-slate-200'}`}>{String(line.translation)}</p>}
+          {line.translation && <p className={`text-[2vh] mt-5 italic opacity-80 font-semibold border-t pt-4 ${sideRight ? 'border-indigo-500/30' : 'border-slate-700'}`}>{String(line.translation)}</p>}
         </div>
       </div>
     )})}
@@ -1012,28 +1012,28 @@ const DialogueBlock = ({ block }: { block: any }) => (
 );
 
 const VocabListBlock = ({ block }: { block: any }) => (
-  <div className="grid grid-cols-2 gap-10 py-12 w-full max-w-7xl mx-auto">
+  <div className="grid grid-cols-2 gap-8 py-12 w-full max-w-7xl mx-auto">
     {(Array.isArray(block.items) ? block.items : []).map((item: any, j: number) => (
-      <div key={j} className="bg-gradient-to-br from-slate-50 to-slate-100 p-12 rounded-[3rem] border-2 border-white shadow-xl text-left relative overflow-hidden group hover:-translate-y-2 transition-transform duration-300">
-        <div className="absolute -right-12 -top-12 opacity-5 text-indigo-900 rotate-12 group-hover:scale-110 transition-transform duration-700"><Layers size={200} /></div>
-        <p className="text-[5vh] font-black text-indigo-600 mb-4 relative z-10">{String(item.term || '')}</p>
-        <p className="text-[3vh] text-slate-600 font-medium leading-relaxed relative z-10">{String(item.definition || '')}</p>
+      <div key={j} className="bg-slate-900 p-10 rounded-[3rem] border border-slate-800 shadow-xl text-left relative overflow-hidden group hover:-translate-y-1 transition-all duration-300">
+        <div className="absolute -right-8 -top-8 opacity-5 text-indigo-400 rotate-12 group-hover:scale-110 transition-transform duration-700"><Layers size={180} /></div>
+        <p className="text-[4.5vh] font-bold text-indigo-400 mb-3 relative z-10 tracking-tight">{String(item.term || '')}</p>
+        <p className="text-[2.5vh] text-slate-300 font-medium leading-relaxed relative z-10">{String(item.definition || '')}</p>
       </div>
     ))}
   </div>
 );
 
 const DiscussionBlock = ({ block }: { block: any }) => (
-  <div className="w-full max-w-6xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl my-12">
-    <div className="flex items-center gap-6 mb-16 justify-center">
-      <div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl animate-bounce" style={{ animationDuration: '3s' }} aria-hidden="true"><MessageCircle size={48} /></div>
-      <h3 className="text-[5vh] font-black text-indigo-900">{String(block.title || "Let's Discuss")}</h3>
+  <div className="w-full max-w-6xl mx-auto bg-indigo-500/5 rounded-[4rem] p-16 border border-indigo-500/20 shadow-2xl my-12 transition-colors">
+    <div className="flex items-center gap-5 mb-14 justify-center">
+      <div className="p-5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-[2rem] shadow-sm animate-bounce shrink-0" style={{ animationDuration: '3s' }} aria-hidden="true"><MessageCircle size={40} strokeWidth={2.5}/></div>
+      <h3 className="text-[4.5vh] font-bold text-indigo-300 tracking-tight">{String(block.title || "Let's Discuss")}</h3>
     </div>
-    <div className="space-y-8">
+    <div className="space-y-6">
       {(Array.isArray(block.questions) ? block.questions : []).map((q: any, j: number) => (
-        <div key={j} className="bg-white p-10 rounded-[2.5rem] shadow-md border-4 border-indigo-50 flex gap-8 items-start hover:-translate-y-2 transition-transform duration-300">
-          <span className="text-[5vh] font-black text-indigo-200 leading-none">{j + 1}</span>
-          <p className="text-[4vh] font-bold text-slate-800 leading-tight">{String(q || '')}</p>
+        <div key={j} className="bg-slate-900/80 p-8 rounded-[2rem] shadow-sm border border-slate-800 flex gap-6 items-start hover:-translate-y-1 transition-transform duration-300">
+          <span className="text-[4vh] font-bold text-indigo-500 leading-none shrink-0">{j + 1}</span>
+          <p className="text-[3.5vh] font-medium text-slate-200 leading-tight">{String(q || '')}</p>
         </div>
       ))}
     </div>
@@ -1042,12 +1042,12 @@ const DiscussionBlock = ({ block }: { block: any }) => (
 
 const GameBlock = ({ block, lessonVocab }: { block: any, lessonVocab: any }) => (
   <div className="w-full max-w-6xl mx-auto flex flex-col items-center py-12">
-    <div className="text-center mb-12">
-      <div className="inline-flex items-center justify-center p-6 bg-indigo-50 text-indigo-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true"><Gamepad2 size={64} /></div>
-      <h3 className="text-[6vh] font-black text-slate-800 leading-none">{String(block.title || "Vocabulary Battle")}</h3>
-      <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Local Multiplayer Mode</p>
+    <div className="text-center mb-10">
+      <div className="inline-flex items-center justify-center p-5 bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 rounded-[2rem] mb-6 shadow-sm" aria-hidden="true"><Gamepad2 size={48} strokeWidth={2}/></div>
+      <h3 className="text-[5vh] font-bold text-white leading-none tracking-tight">{String(block.title || "Vocabulary Battle")}</h3>
+      <p className="text-[2.5vh] font-bold text-slate-500 uppercase tracking-widest mt-4">Local Multiplayer Mode</p>
     </div>
-    <div className="scale-[1.2] origin-top mt-8 w-full flex justify-center pointer-events-auto">
+    <div className="scale-[1.2] origin-top mt-6 w-full flex justify-center pointer-events-auto">
       <ConnectThreeVocab vocabList={lessonVocab} />
     </div>
   </div>
@@ -1056,15 +1056,15 @@ const GameBlock = ({ block, lessonVocab }: { block: any, lessonVocab: any }) => 
 const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const activeNodeId = liveState?.currentNodeId || block.nodes?.[0]?.id;
   const currentNode = Array.isArray(block.nodes) ? block.nodes.find((n:any) => String(n.id) === String(activeNodeId)) || block.nodes[0] : null;
-  const bgColors: any = { neutral: 'bg-emerald-900 border-emerald-500', success: 'bg-indigo-900 border-indigo-500', failure: 'bg-rose-900 border-rose-500' };
+  const bgColors: any = { neutral: 'bg-emerald-950/40 border-emerald-500/30 text-emerald-100', success: 'bg-indigo-950/40 border-indigo-500/30 text-indigo-100', failure: 'bg-rose-950/40 border-rose-500/30 text-rose-100' };
   const style = bgColors[currentNode?.color || 'neutral'];
 
   return (
-    <div className={`w-full max-w-5xl mx-auto rounded-[4rem] p-16 text-white shadow-2xl border-8 text-center transition-colors duration-500 my-12 ${style}`}>
-      <span className="text-[2vh] font-black uppercase tracking-widest block mb-8 opacity-70">Interactive Scenario • {String(currentNode?.speaker || 'Character')}</span>
-      <h3 className="text-[5vh] font-serif italic mb-12 leading-tight">"{String(currentNode?.text || '')}"</h3>
-      <div className="inline-block px-8 py-4 bg-black/20 rounded-full border-2 border-white/20 backdrop-blur-md animate-pulse">
-        <p className="text-[3vh] font-bold text-white">Look at your device to make a choice!</p>
+    <div className={`w-full max-w-5xl mx-auto rounded-[4rem] p-16 shadow-2xl border text-center transition-colors duration-500 my-12 ${style}`}>
+      <span className="text-[1.8vh] font-bold uppercase tracking-widest block mb-8 opacity-70">Interactive Scenario • {String(currentNode?.speaker || 'Character')}</span>
+      <h3 className="text-[4.5vh] font-serif italic mb-12 leading-tight">"{String(currentNode?.text || '')}"</h3>
+      <div className="inline-block px-8 py-3.5 bg-black/40 rounded-full border border-white/10 backdrop-blur-md animate-pulse">
+        <p className="text-[2.5vh] font-semibold text-white/90">Look at your device to make a choice!</p>
       </div>
     </div>
   );
@@ -1137,29 +1137,29 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   const isEntirelyCorrect = isChecked && filledBlanks.every((item, i) => item?.word === correctAnswers[i]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible pointer-events-auto">
+    <div className="w-full max-w-7xl mx-auto bg-slate-900 rounded-[4rem] border border-slate-800 shadow-2xl my-12 flex flex-col relative overflow-visible pointer-events-auto transition-colors">
       <div className="p-12 md:p-16 pb-8">
-          <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
-            <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
+          <h3 className="text-[3.5vh] font-bold text-white flex items-center justify-center gap-4 tracking-tight">
+            <span className="bg-amber-500/10 text-amber-500 p-4 rounded-2xl border border-amber-500/20" aria-hidden="true"><Puzzle size={36} strokeWidth={2.5}/></span>
             {String(block.question || "Fill in the blanks")}
           </h3>
       </div>
 
       {!isChecked && (
         <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
-            <div className={`bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-4 transition-all duration-500 relative overflow-hidden ${isExpanded ? 'max-h-[60vh]' : 'max-h-[22vh] min-h-[22vh]'}`}>
-                <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Word Bank Options</span>
+            <div className={`bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] p-6 border border-slate-700/50 shadow-xl flex flex-col items-center gap-4 transition-all duration-500 relative overflow-hidden ${isExpanded ? 'max-h-[60vh]' : 'max-h-[22vh] min-h-[22vh]'}`}>
+                <span className="text-[1.8vh] font-bold text-slate-500 uppercase tracking-widest shrink-0 text-center">Word Bank Options</span>
                 
-                <div className={`flex flex-wrap gap-4 justify-center items-start w-full transition-all duration-500 ${isExpanded ? 'overflow-y-auto custom-scrollbar pb-12' : 'overflow-hidden pb-4'}`}>
+                <div className={`flex flex-wrap gap-4 justify-center items-start w-full transition-all duration-500 ${isExpanded ? 'overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-12' : 'overflow-hidden pb-4'}`}>
                   {wordBank.length === 0 ? (
-                      <span className="text-[2.5vh] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                          <CheckCircle2 size={24} className="text-emerald-500" /> All placed
+                      <span className="text-[2vh] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                          <CheckCircle2 size={24} className="text-emerald-500" strokeWidth={2.5}/> All placed
                       </span>
                   ) : (
                       wordBank.map((item) => (
                           <button 
                               key={item.id} onClick={() => handleBankClick(item)} disabled={isChecked}
-                              className="px-6 py-3 rounded-xl border-4 text-[2.5vh] font-bold transition-all duration-300 bg-white border-slate-200 text-slate-700 shadow-sm hover:border-indigo-400 hover:text-indigo-600 hover:-translate-y-1 active:scale-95"
+                              className="px-6 py-3 rounded-xl border text-[2.2vh] font-semibold transition-all duration-300 bg-slate-800 border-slate-700 text-slate-300 shadow-sm hover:border-indigo-500/50 hover:text-indigo-300 hover:-translate-y-0.5 active:scale-95"
                           >
                               {item.word}
                           </button>
@@ -1168,12 +1168,12 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
                 </div>
 
                 {wordBank.length > 6 && (
-                    <div className={`absolute bottom-0 left-0 right-0 flex justify-center pb-3 pt-12 pointer-events-none transition-all ${!isExpanded ? 'bg-gradient-to-t from-white via-white/95 to-transparent' : ''}`}>
+                    <div className={`absolute bottom-0 left-0 right-0 flex justify-center pb-3 pt-12 pointer-events-none transition-all ${!isExpanded ? 'bg-gradient-to-t from-slate-900 via-slate-900/95 to-transparent' : ''}`}>
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
-                            className="pointer-events-auto bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-8 py-3 rounded-full font-black text-[2vh] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all active:scale-95 border-2 border-indigo-200 hover:border-indigo-300"
+                            className="pointer-events-auto bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-6 py-2.5 rounded-full font-bold text-[1.5vh] uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all active:scale-95 border border-indigo-500/30"
                         >
-                            {isExpanded ? <><ChevronUp size={24} /> Collapse</> : <><ChevronDown size={24} /> View All {wordBank.length} Options</>}
+                            {isExpanded ? <><ChevronUp size={20} /> Collapse</> : <><ChevronDown size={20} /> View All {wordBank.length} Options</>}
                         </button>
                     </div>
                 )}
@@ -1182,23 +1182,23 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
       )}
 
       <div className="px-12 md:px-16 pb-16 flex-1">
-          <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-8 justify-center text-center">
+          <div className="text-[4vh] md:text-[4.5vh] font-medium leading-loose text-slate-300 flex flex-wrap items-center gap-y-8 justify-center text-center tracking-tight">
             {textParts.map((part: string, idx: number) => {
               const isLast = idx === textParts.length - 1;
               const filledItem = filledBlanks[idx];
               const filledWord = filledItem?.word;
               const isRight = filledWord === correctAnswers[idx];
 
-              let style = "border-dashed border-slate-300 bg-slate-50 text-slate-400";
-              if (filledItem && !isChecked) style = "border-solid border-indigo-400 bg-indigo-100 text-indigo-700 shadow-lg scale-110 -translate-y-2 cursor-pointer hover:bg-rose-100 hover:border-rose-400 hover:text-rose-600";
-              if (isChecked && isRight) style = "border-solid border-emerald-500 bg-emerald-100 text-emerald-700 shadow-lg";
-              if (isChecked && !isRight) style = "border-solid border-rose-500 bg-rose-100 text-rose-700 shadow-lg cursor-pointer";
+              let style = "border-b-2 border-slate-700 bg-slate-950 text-slate-500 rounded-t-lg";
+              if (filledItem && !isChecked) style = "border border-indigo-500/50 bg-indigo-500/10 text-indigo-300 shadow-lg scale-110 -translate-y-1 cursor-pointer hover:bg-rose-500/10 hover:border-rose-500/50 hover:text-rose-400 rounded-xl";
+              if (isChecked && isRight) style = "border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-lg rounded-xl";
+              if (isChecked && !isRight) style = "border border-rose-500/50 bg-rose-500/10 text-rose-400 shadow-lg cursor-pointer rounded-xl";
 
               return (
                 <React.Fragment key={`part_${idx}`}>
                     <span className="mx-2 py-2">{String(part)}</span>
                     {!isLast && (
-                        <button onClick={() => handleBlankClick(filledItem, idx)} disabled={isChecked} className={`min-w-[120px] h-16 px-6 mx-3 rounded-2xl border-4 flex items-center justify-center text-[3.5vh] font-bold transition-all duration-300 ${style}`}>
+                        <button onClick={() => handleBlankClick(filledItem, idx)} disabled={isChecked} className={`min-w-[120px] h-14 px-6 mx-3 flex items-center justify-center text-[3vh] font-bold transition-all duration-300 ${style}`}>
                             {filledWord || " "}
                         </button>
                     )}
@@ -1209,7 +1209,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
           
           {isComplete && !isChecked && (
               <div className="mt-12 flex justify-center animate-in slide-in-from-bottom-4">
-                  <button onClick={() => setIsChecked(true)} className="px-12 py-6 bg-slate-900 text-white rounded-2xl font-black text-[3vh] uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all hover:-translate-y-1">
+                  <button onClick={() => setIsChecked(true)} className="px-10 py-5 bg-emerald-600 text-white rounded-2xl font-bold text-[2.5vh] uppercase tracking-wider shadow-lg shadow-emerald-500/20 hover:bg-emerald-500 transition-all hover:-translate-y-0.5 active:scale-95">
                       Check Answers
                   </button>
               </div>
@@ -1218,15 +1218,15 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
           {isChecked && (
               <div className="mt-12 flex justify-center animate-in zoom-in-95">
                   {isEntirelyCorrect ? (
-                      <div className="px-12 py-6 bg-emerald-50 text-emerald-700 border-4 border-emerald-200 rounded-2xl font-black text-[3vh] uppercase tracking-widest flex items-center gap-3">
-                          <CheckCircle2 size={32}/> Perfectly Placed!
+                      <div className="px-10 py-5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-2xl font-bold text-[2.5vh] uppercase tracking-wider flex items-center gap-3">
+                          <CheckCircle2 size={28} strokeWidth={2.5}/> Perfectly Placed!
                       </div>
                   ) : (
                       <button onClick={() => { 
                           setFilledBlanks(Array(correctAnswers.length).fill(null)); 
                           setWordBank(initialWordBank); 
                           setIsChecked(false); 
-                      }} className="px-12 py-6 bg-rose-50 text-rose-600 border-4 border-rose-200 rounded-2xl font-black text-[3vh] uppercase tracking-widest shadow-sm hover:bg-rose-100 active:scale-95 transition-all">
+                      }} className="px-10 py-5 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-2xl font-bold text-[2.5vh] uppercase tracking-wider shadow-sm hover:bg-rose-500/20 active:scale-95 transition-all">
                           Try Again
                       </button>
                   )}
@@ -1285,27 +1285,27 @@ const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => 
     };
 
     return (
-        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible pointer-events-auto">
+        <div className="w-full max-w-7xl mx-auto bg-slate-900 rounded-[4rem] border border-slate-800 shadow-2xl my-12 flex flex-col relative overflow-visible pointer-events-auto transition-colors">
             <div className="p-12 md:p-16 pb-8">
-                <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
-                    <span className="bg-amber-100 text-amber-600 p-4 rounded-2xl"><MousePointerClick size={40}/></span>
+                <h3 className="text-[3.5vh] font-bold text-white flex items-center justify-center gap-4 tracking-tight">
+                    <span className="bg-amber-500/10 text-amber-500 p-4 rounded-2xl border border-amber-500/20"><MousePointerClick size={36} strokeWidth={2.5}/></span>
                     {String(block.title || 'Sort the Items!')}
                 </h3>
             </div>
 
             <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
-               <div className={`bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-3 transition-all duration-500 relative overflow-hidden ${isExpanded ? 'max-h-[60vh]' : 'max-h-[22vh] min-h-[22vh]'}`}>
-                   <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center shrink-0">Items to Sort</span>
+               <div className={`bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] p-6 border border-slate-700/50 shadow-xl flex flex-col items-center gap-4 transition-all duration-500 relative overflow-hidden ${isExpanded ? 'max-h-[60vh]' : 'max-h-[22vh] min-h-[22vh]'}`}>
+                   <span className="text-[1.8vh] font-bold text-amber-500/80 uppercase tracking-widest text-center shrink-0">Items to Sort</span>
                    
-                   <div className={`flex flex-wrap justify-center gap-4 w-full transition-all duration-500 ${isExpanded ? 'overflow-y-auto custom-scrollbar pb-12' : 'overflow-hidden pb-4'}`}>
+                   <div className={`flex flex-wrap justify-center gap-3 w-full transition-all duration-500 ${isExpanded ? 'overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-12' : 'overflow-hidden pb-4'}`}>
                         {items.length === 0 ? (
-                            <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={24}/> All sorted!</p>
+                            <p className="text-amber-500/80 font-bold uppercase tracking-widest my-auto flex items-center gap-2 text-[2vh]"><CheckCircle2 size={24} strokeWidth={2.5}/> All sorted!</p>
                         ) : (
                             items.map((item) => (
                                 <button 
                                     key={item.id} 
                                     onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
-                                    className={`px-6 py-3 rounded-2xl font-black text-[2.5vh] transition-all duration-300 shadow-md border-4 ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-1 border-indigo-400' : 'bg-white text-slate-700 hover:scale-105 active:scale-95 border-slate-200 hover:border-amber-300'}`}
+                                    className={`px-5 py-2.5 rounded-xl font-semibold text-[2vh] transition-all duration-300 shadow-sm border ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-0.5 border-indigo-500 shadow-indigo-500/20' : 'bg-slate-800 text-slate-300 hover:scale-105 active:scale-95 border-slate-700 hover:border-amber-500/50'}`}
                                 >
                                     {item.emoji} {item.label}
                                 </button>
@@ -1314,34 +1314,34 @@ const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => 
                    </div>
 
                    {items.length > 6 && (
-                       <div className={`absolute bottom-0 left-0 right-0 flex justify-center pb-3 pt-12 pointer-events-none transition-all ${!isExpanded ? 'bg-gradient-to-t from-white via-white/95 to-transparent' : ''}`}>
+                       <div className={`absolute bottom-0 left-0 right-0 flex justify-center pb-3 pt-12 pointer-events-none transition-all ${!isExpanded ? 'bg-gradient-to-t from-slate-900 via-slate-900/95 to-transparent' : ''}`}>
                            <button
                                onClick={() => setIsExpanded(!isExpanded)}
-                               className="pointer-events-auto bg-amber-100 hover:bg-amber-200 text-amber-700 px-8 py-3 rounded-full font-black text-[2vh] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all active:scale-95 border-2 border-amber-200 hover:border-amber-300"
+                               className="pointer-events-auto bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 px-6 py-2.5 rounded-full font-bold text-[1.5vh] uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all active:scale-95 border border-amber-500/30"
                            >
-                               {isExpanded ? <><ChevronUp size={24} /> Collapse</> : <><ChevronDown size={24} /> View All {items.length} Items</>}
+                               {isExpanded ? <><ChevronUp size={20} /> Collapse</> : <><ChevronDown size={20} /> View All {items.length} Items</>}
                            </button>
                        </div>
                    )}
                </div>
             </div>
 
-            <div className="px-12 md:px-16 pb-24 grid grid-cols-1 sm:grid-cols-2 gap-10 flex-1">
+            <div className="px-12 md:px-16 pb-24 grid grid-cols-1 sm:grid-cols-2 gap-8 flex-1">
                 {parsedCategories.map((cat: string) => {
                     const isPlacedEmpty = !placed[cat] || placed[cat].length === 0;
                     return (
                         <div 
                             key={cat} 
                             onClick={() => handleBucketClick(cat)} 
-                            className={`p-8 rounded-[3rem] border-4 transition-colors duration-300 flex flex-col items-center gap-6 ${selectedItem ? 'border-indigo-400 bg-indigo-50 animate-pulse cursor-pointer shadow-xl' : 'border-amber-200 bg-amber-50 cursor-default'}`}
+                            className={`p-8 rounded-[3rem] border transition-colors duration-300 flex flex-col items-center gap-6 ${selectedItem ? 'border-indigo-500/50 bg-indigo-500/10 animate-pulse cursor-pointer shadow-lg' : 'border-slate-800 bg-slate-950 cursor-default'}`}
                         >
-                            <h4 className="font-black text-amber-900 text-[4vh] text-center leading-tight">{cat}</h4>
+                            <h4 className="font-bold text-amber-500 text-[3.5vh] text-center leading-tight tracking-tight">{cat}</h4>
                             <div className="flex flex-wrap justify-center gap-3">
                                 {isPlacedEmpty ? (
-                                    <span className="text-amber-400/50 text-[3vh] font-bold uppercase tracking-widest mt-4">Drop Zone</span>
+                                    <span className="text-slate-600 text-[2.5vh] font-bold uppercase tracking-wider mt-4">Drop Zone</span>
                                 ) : (
                                     (placed[cat] || []).map((item) => (
-                                        <div key={item.id} className="px-5 py-2.5 bg-white rounded-xl text-[2.5vh] font-black shadow-sm border-2 border-amber-100 flex items-center gap-2">
+                                        <div key={item.id} className="px-4 py-2 bg-slate-800 rounded-xl text-[2vh] font-semibold shadow-sm border border-slate-700 flex items-center gap-2 text-slate-200">
                                             {item.emoji} <span>{item.label}</span>
                                         </div>
                                     ))
@@ -1357,37 +1357,37 @@ const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => 
 
 // 🔥 LIVE AUDIO ROLEPLAY RENDERER
 const LiveRoleplayBlock = ({ block, onLaunch }: { block: any, onLaunch: (prompt: string) => void }) => (
-    <div className="bg-slate-950 p-12 md:p-16 rounded-[4rem] shadow-2xl my-12 text-white relative overflow-hidden group w-full max-w-5xl mx-auto text-center border-8 border-cyan-500/20">
-        <div className="absolute -right-20 -top-20 w-96 h-96 bg-cyan-500/20 rounded-full blur-[100px] pointer-events-none group-hover:bg-cyan-500/30 transition-colors duration-700" />
-        <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none group-hover:bg-indigo-500/30 transition-colors duration-700" />
+    <div className="bg-slate-950 p-12 md:p-16 rounded-[4rem] shadow-2xl my-12 text-white relative overflow-hidden group w-full max-w-5xl mx-auto text-center border border-slate-800">
+        <div className="absolute -right-20 -top-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none group-hover:bg-cyan-500/20 transition-colors duration-700" />
+        <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none group-hover:bg-indigo-500/20 transition-colors duration-700" />
         
         <div className="relative z-10 flex flex-col items-center">
-            <div className="w-32 h-32 bg-slate-900 border-4 border-cyan-500/30 rounded-3xl flex items-center justify-center text-cyan-400 mb-8 shadow-[0_0_50px_rgba(6,182,212,0.3)] animate-pulse">
-                <Mic size={64} />
+            <div className="w-24 h-24 bg-slate-900 border border-cyan-500/30 rounded-[2rem] flex items-center justify-center text-cyan-400 mb-8 shadow-[0_0_30px_rgba(6,182,212,0.15)] animate-pulse">
+                <Mic size={48} strokeWidth={2}/>
             </div>
             
-            <h3 className="text-[6vh] font-black mb-4 leading-tight">
+            <h3 className="text-[5vh] font-bold mb-4 leading-tight tracking-tight">
                 {String(block.title || "Live Simulation")}
             </h3>
             
-            <div className="flex gap-6 items-center justify-center mb-8">
-                <div className="px-6 py-2 bg-slate-800 rounded-xl text-[2.5vh] font-black uppercase tracking-widest text-slate-400">
+            <div className="flex gap-4 items-center justify-center mb-8">
+                <div className="px-5 py-2 bg-slate-800/80 border border-slate-700/50 rounded-xl text-[2vh] font-bold uppercase tracking-wider text-slate-400">
                     AI: <span className="text-cyan-400">{block.metadata?.aiPersona || 'Unknown'}</span>
                 </div>
-                <div className="px-6 py-2 bg-slate-800 rounded-xl text-[2.5vh] font-black uppercase tracking-widest text-slate-400">
+                <div className="px-5 py-2 bg-slate-800/80 border border-slate-700/50 rounded-xl text-[2vh] font-bold uppercase tracking-wider text-slate-400">
                     You: <span className="text-indigo-400">{block.metadata?.studentRole || 'Unknown'}</span>
                 </div>
             </div>
 
-            <p className="text-slate-300 font-medium text-[3.5vh] leading-relaxed max-w-3xl mb-12">
+            <p className="text-slate-300 font-medium text-[3vh] leading-relaxed max-w-3xl mb-12">
                 Your Objective: <strong className="text-white">{block.metadata?.objective || 'Complete the scenario successfully.'}</strong>
             </p>
 
             <button 
                 onClick={() => onLaunch(block.prompt)}
-                className="px-16 py-8 bg-gradient-to-r from-cyan-500 to-indigo-500 text-white rounded-[2rem] font-black text-[3vh] uppercase tracking-[0.2em] shadow-lg hover:shadow-cyan-500/25 active:scale-95 transition-all flex items-center justify-center gap-4"
+                className="px-12 py-5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-[2rem] font-bold text-[2.5vh] uppercase tracking-wider shadow-lg hover:shadow-cyan-500/25 active:scale-95 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3"
             >
-                <Mic size={32} /> Start Call on Smartboard
+                <Mic size={28} strokeWidth={2.5}/> Start Call on Smartboard
             </button>
         </div>
     </div>
@@ -1406,20 +1406,20 @@ const GrammarBlock = ({ block }: { block: any }) => {
     return (
         <div className="w-full max-w-6xl mx-auto my-12 animate-in fade-in slide-in-from-bottom-8 duration-700 pointer-events-auto">
             {/* The "Whiteboard" */}
-            <div className="bg-slate-900 rounded-[4rem] p-12 md:p-16 shadow-[0_30px_60px_rgba(0,0,0,0.5)] border-8 border-slate-800 relative overflow-hidden">
+            <div className="bg-slate-900 rounded-[4rem] p-12 md:p-16 shadow-2xl border border-slate-800 relative overflow-hidden">
                 {/* Decorative background glow */}
-                <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400" />
-                <div className="absolute -top-32 -right-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-cyan-500 to-emerald-500" />
+                <div className="absolute -top-32 -right-32 w-96 h-96 bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
 
-                <header className="mb-12 relative z-10 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
-                    <div className="p-6 bg-indigo-500/20 text-indigo-400 rounded-[2rem] shrink-0 border border-indigo-500/30">
-                        <Presentation size={64} />
+                <header className="mb-12 relative z-10 flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left">
+                    <div className="p-5 bg-indigo-500/10 text-indigo-400 rounded-3xl shrink-0 border border-indigo-500/20">
+                        <Presentation size={48} strokeWidth={2}/>
                     </div>
                     <div>
-                        <h2 className="text-[5vh] font-black text-white tracking-tight mb-4 leading-none">
+                        <h2 className="text-[4.5vh] font-bold text-white tracking-tight mb-3 leading-none">
                             {block.title || 'Grammar Focus'}
                         </h2>
-                        <p className="text-[3vh] text-slate-300 font-medium leading-relaxed">
+                        <p className="text-[2.5vh] text-slate-300 font-medium leading-relaxed">
                             {block.rule}
                         </p>
                     </div>
@@ -1427,20 +1427,20 @@ const GrammarBlock = ({ block }: { block: any }) => {
 
                 {/* The Formula Box */}
                 {block.formula && (
-                    <div className="bg-slate-950/50 border border-slate-800 rounded-[2rem] p-10 mb-12 relative z-10 shadow-inner">
-                        <div className="text-[2vh] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center justify-center md:justify-start gap-3">
-                            <AlertCircle size={20} className="text-amber-400" /> Structure Formula
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-[2.5rem] p-8 mb-12 relative z-10 shadow-inner">
+                        <div className="text-[1.8vh] font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center justify-center md:justify-start gap-2">
+                            <AlertCircle size={18} className="text-amber-500" /> Structure Formula
                         </div>
-                        <p className="text-[4.5vh] md:text-[5vh] font-mono font-bold text-cyan-400 tracking-wide text-center md:text-left leading-snug">
+                        <p className="text-[4vh] md:text-[4.5vh] font-mono font-bold text-cyan-400 tracking-tight text-center md:text-left leading-snug">
                             {block.formula}
                         </p>
                     </div>
                 )}
 
                 {/* The Drill Examples */}
-                <div className="space-y-6 relative z-10">
-                    <div className="text-[2vh] font-black uppercase tracking-widest text-slate-500 mb-6 flex items-center justify-center md:justify-start gap-3">
-                        <AlertCircle size={20} /> Drill Examples
+                <div className="space-y-5 relative z-10">
+                    <div className="text-[1.8vh] font-bold uppercase tracking-wider text-slate-500 mb-5 flex items-center justify-center md:justify-start gap-2">
+                        <AlertCircle size={18} /> Drill Examples
                     </div>
                     
                     {block.examples?.map((ex: any, idx: number) => {
@@ -1449,13 +1449,13 @@ const GrammarBlock = ({ block }: { block: any }) => {
                         const isRevealed = revealed[idx];
                         
                         return (
-                            <div key={idx} className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 p-8 bg-slate-800/50 hover:bg-slate-800 rounded-[2rem] border border-slate-700/50 transition-colors group">
-                                <p className="text-[4vh] font-medium text-white flex-1 leading-snug cursor-pointer" onClick={() => toggleReveal(idx)}>
+                            <div key={idx} className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 p-6 bg-slate-800/40 hover:bg-slate-800/60 rounded-[2rem] border border-slate-700/50 transition-colors group">
+                                <p className="text-[3.5vh] font-medium text-white flex-1 leading-snug cursor-pointer" onClick={() => toggleReveal(idx)}>
                                     {parts.map((part: string, i: number) => 
                                         part.toLowerCase() === (ex.target || '').toLowerCase() ? (
                                             <span 
                                                 key={i} 
-                                                className={`inline-block mx-2 font-black border-b-4 transition-all duration-300 px-3 py-1 rounded-xl ${isRevealed ? 'text-amber-400 border-amber-400/50 bg-amber-400/10' : 'text-transparent border-slate-600 bg-slate-700/50 hover:bg-slate-600 w-32'}`}
+                                                className={`inline-block mx-1.5 font-bold transition-all duration-300 px-3 py-0.5 rounded-xl ${isRevealed ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20' : 'text-transparent bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 w-24'}`}
                                             >
                                                 {isRevealed ? part : ''}
                                             </span>
@@ -1465,7 +1465,7 @@ const GrammarBlock = ({ block }: { block: any }) => {
                                     )}
                                 </p>
                                 {ex.note && (
-                                    <p className="text-[2.5vh] font-bold text-slate-400 xl:max-w-md text-left xl:text-right border-l-4 xl:border-l-0 border-slate-700 pl-6 xl:pl-0 pt-4 xl:pt-0">
+                                    <p className="text-[2.2vh] font-medium text-slate-400 xl:max-w-md text-left xl:text-right border-l-2 xl:border-l-0 border-slate-700 pl-5 xl:pl-0 pt-3 xl:pt-0">
                                         {ex.note}
                                     </p>
                                 )}
