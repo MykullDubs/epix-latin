@@ -3,22 +3,22 @@ import React, { useState, useEffect } from 'react';
 import { 
     Code, Trash2, AlignLeft, FileText, MessageSquare, 
     List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag, ChevronUp, ChevronDown,
-    Wand2, Presentation, Crown, Search // 🔥 IMPORTED CROWN ICON
+    Wand2, Presentation, Crown, Search
 } from 'lucide-react';
 import AiGeneratorModal from './AiGeneratorModal'; 
-import ProUpgradeModal from '../ProUpgradeModal'; // 🔥 IMPORTED THE PRO UPGRADE MODAL
+import ProUpgradeModal from '../ProUpgradeModal'; 
 
 export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'indigo', isPremium = false }: any) {
-    const themeMap: Record<string, { bg: string, text: string, ring: string, iconBg: string, iconText: string }> = {
-        indigo: { bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-900 dark:text-indigo-100', ring: 'ring-1 ring-indigo-100 dark:ring-indigo-500/20 hover:ring-indigo-300', iconBg: 'bg-indigo-200 dark:bg-indigo-500/30', iconText: 'text-indigo-700 dark:text-indigo-300' },
-        emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-900 dark:text-emerald-100', ring: 'ring-1 ring-emerald-100 dark:ring-emerald-500/20 hover:ring-emerald-300', iconBg: 'bg-emerald-200 dark:bg-emerald-500/30', iconText: 'text-emerald-700 dark:text-emerald-300' },
-        blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-900 dark:text-blue-100', ring: 'ring-1 ring-blue-100 dark:ring-blue-500/20 hover:ring-blue-300', iconBg: 'bg-blue-200 dark:bg-blue-500/30', iconText: 'text-blue-700 dark:text-blue-300' },
-        fuchsia: { bg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10', text: 'text-fuchsia-900 dark:text-fuchsia-100', ring: 'ring-1 ring-fuchsia-100 dark:ring-fuchsia-500/20 hover:ring-fuchsia-300', iconBg: 'bg-fuchsia-200 dark:bg-fuchsia-500/30', iconText: 'text-fuchsia-700 dark:text-fuchsia-300' },
-        violet: { bg: 'bg-violet-50 dark:bg-violet-500/10', text: 'text-violet-900 dark:text-violet-100', ring: 'ring-1 ring-violet-100 dark:ring-violet-500/20 hover:ring-violet-300', iconBg: 'bg-violet-200 dark:bg-violet-500/30', iconText: 'text-violet-700 dark:text-violet-300' },
-        rose: { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-900 dark:text-rose-100', ring: 'ring-1 ring-rose-100 dark:ring-rose-500/20 hover:ring-rose-300', iconBg: 'bg-rose-200 dark:bg-rose-500/30', iconText: 'text-rose-700 dark:text-rose-300' },
-        amber: { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-900 dark:text-amber-100', ring: 'ring-1 ring-amber-100 dark:ring-amber-500/20 hover:ring-amber-300', iconBg: 'bg-amber-200 dark:bg-amber-500/30', iconText: 'text-amber-700 dark:text-amber-300' },
-        cyan: { bg: 'bg-cyan-50 dark:bg-cyan-500/10', text: 'text-cyan-900 dark:text-cyan-100', ring: 'ring-1 ring-cyan-100 dark:ring-cyan-500/20 hover:ring-cyan-300', iconBg: 'bg-cyan-200 dark:bg-cyan-500/30', iconText: 'text-cyan-700 dark:text-cyan-300' },
-        slate: { bg: 'bg-slate-50 dark:bg-slate-800/50', text: 'text-slate-900 dark:text-slate-100', ring: 'ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-slate-300 dark:hover:ring-slate-500', iconBg: 'bg-slate-200 dark:bg-slate-700', iconText: 'text-slate-700 dark:text-slate-300' },
+    const themeMap: Record<string, { bg: string, text: string, border: string, iconBg: string, iconText: string }> = {
+        indigo: { bg: 'bg-indigo-50/50 dark:bg-indigo-500/5', text: 'text-indigo-900 dark:text-indigo-100', border: 'border border-indigo-100 dark:border-indigo-500/20 hover:border-indigo-300 dark:hover:border-indigo-500/50', iconBg: 'bg-indigo-100 dark:bg-indigo-500/20', iconText: 'text-indigo-600 dark:text-indigo-400' },
+        emerald: { bg: 'bg-emerald-50/50 dark:bg-emerald-500/5', text: 'text-emerald-900 dark:text-emerald-100', border: 'border border-emerald-100 dark:border-emerald-500/20 hover:border-emerald-300 dark:hover:border-emerald-500/50', iconBg: 'bg-emerald-100 dark:bg-emerald-500/20', iconText: 'text-emerald-600 dark:text-emerald-400' },
+        blue: { bg: 'bg-blue-50/50 dark:bg-blue-500/5', text: 'text-blue-900 dark:text-blue-100', border: 'border border-blue-100 dark:border-blue-500/20 hover:border-blue-300 dark:hover:border-blue-500/50', iconBg: 'bg-blue-100 dark:bg-blue-500/20', iconText: 'text-blue-600 dark:text-blue-400' },
+        fuchsia: { bg: 'bg-fuchsia-50/50 dark:bg-fuchsia-500/5', text: 'text-fuchsia-900 dark:text-fuchsia-100', border: 'border border-fuchsia-100 dark:border-fuchsia-500/20 hover:border-fuchsia-300 dark:hover:border-fuchsia-500/50', iconBg: 'bg-fuchsia-100 dark:bg-fuchsia-500/20', iconText: 'text-fuchsia-600 dark:text-fuchsia-400' },
+        violet: { bg: 'bg-violet-50/50 dark:bg-violet-500/5', text: 'text-violet-900 dark:text-violet-100', border: 'border border-violet-100 dark:border-violet-500/20 hover:border-violet-300 dark:hover:border-violet-500/50', iconBg: 'bg-violet-100 dark:bg-violet-500/20', iconText: 'text-violet-600 dark:text-violet-400' },
+        rose: { bg: 'bg-rose-50/50 dark:bg-rose-500/5', text: 'text-rose-900 dark:text-rose-100', border: 'border border-rose-100 dark:border-rose-500/20 hover:border-rose-300 dark:hover:border-rose-500/50', iconBg: 'bg-rose-100 dark:bg-rose-500/20', iconText: 'text-rose-600 dark:text-rose-400' },
+        amber: { bg: 'bg-amber-50/50 dark:bg-amber-500/5', text: 'text-amber-900 dark:text-amber-100', border: 'border border-amber-100 dark:border-amber-500/20 hover:border-amber-300 dark:hover:border-amber-500/50', iconBg: 'bg-amber-100 dark:bg-amber-500/20', iconText: 'text-amber-600 dark:text-amber-400' },
+        cyan: { bg: 'bg-cyan-50/50 dark:bg-cyan-500/5', text: 'text-cyan-900 dark:text-cyan-100', border: 'border border-cyan-100 dark:border-cyan-500/20 hover:border-cyan-300 dark:hover:border-cyan-500/50', iconBg: 'bg-cyan-100 dark:bg-cyan-500/20', iconText: 'text-cyan-600 dark:text-cyan-400' },
+        slate: { bg: 'bg-slate-50/50 dark:bg-slate-800/30', text: 'text-slate-900 dark:text-slate-100', border: 'border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500', iconBg: 'bg-slate-200 dark:bg-slate-700/50', iconText: 'text-slate-700 dark:text-slate-300' },
     };
 
     const t = themeMap[colorTheme] || themeMap.indigo;
@@ -26,22 +26,21 @@ export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'i
     return (
         <button 
             onClick={onClick} 
-            className={`w-full p-4 md:p-5 ${t.bg} rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-32 md:h-36 ${t.ring} relative overflow-hidden`}
+            className={`w-full p-4 md:p-5 ${t.bg} rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] transition-all h-32 md:h-36 ${t.border} relative overflow-hidden`}
         >
-            {/* 🔥 NEW: PREMIUM CROWN BADGE */}
             {isPremium && (
-                <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 px-2 py-1 rounded-bl-xl font-black flex items-center justify-center shadow-sm z-10">
+                <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 px-2 py-1 rounded-bl-xl font-bold flex items-center justify-center shadow-sm z-10">
                     <Crown size={12} strokeWidth={3} />
                 </div>
             )}
             
-            <div className={`w-10 h-10 md:w-12 md:h-12 ${t.iconBg} rounded-2xl flex items-center justify-center transition-colors group-hover:scale-110 relative z-10`}>
+            <div className={`w-10 h-10 md:w-12 md:h-12 ${t.iconBg} rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 relative z-10`}>
                 {React.cloneElement(icon, { className: t.iconText, size: 20 })}
             </div>
             
             <div className="text-left mt-auto relative z-10">
-                <span className={`font-black text-sm md:text-base uppercase tracking-tighter block leading-none mb-1 ${t.text}`}>{label}</span>
-                <span className={`text-[9px] font-bold ${t.iconText} uppercase tracking-widest opacity-80`}>{subtitle}</span>
+                <span className={`font-bold text-sm md:text-base tracking-tight block leading-none mb-1 ${t.text}`}>{label}</span>
+                <span className={`text-[10px] font-semibold ${t.iconText} uppercase tracking-wider opacity-80`}>{subtitle}</span>
             </div>
         </button>
     );
@@ -62,9 +61,8 @@ export default function LessonBuilderView({
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [newlyAddedIndices, setNewlyAddedIndices] = useState<number[]>([]);
 
-// 🔥 DEV HACK: Hardcoded to true so we can test premium features!
-const isPro = true; 
-// const isPro = userData?.subscriptionTier === 'pro';
+  // 🔥 DEV HACK: Hardcoded to true so we can test premium features!
+  const isPro = true; 
 
   const handleMagicGenerateClick = () => {
       const aiUses = userData?.magicGenerationsCount || 0;
@@ -137,7 +135,6 @@ const isPro = true;
       }
     };
     
-    const newIndex = (data.blocks || []).length;
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
     
     setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
@@ -195,8 +192,8 @@ const isPro = true;
     if (!jsonMode) setJsonInput(JSON.stringify(data, null, 2));
   }, [data, jsonMode]);
 
- return (
-    <div className="max-w-4xl mx-auto space-y-10 pb-64 relative">
+  return (
+    <div className="max-w-4xl mx-auto space-y-10 pb-64 relative font-sans">
       
       {/* 🔥 THE GENERATOR MODAL WITH THE NEW UPGRADE PROP */}
       <AiGeneratorModal 
@@ -213,19 +210,18 @@ const isPro = true;
           onClose={() => setIsUpgradeModalOpen(false)} 
           onCheckout={(cycle: 'monthly' | 'annual') => {
               console.log(`Initiating Stripe checkout for ${cycle} plan from Builder...`);
-              // TODO: Wire this up to the Stripe Redirect logic
           }}
       />
 
       {/* STICKY HEADER WITH TOGGLES */}
-      <div className="sticky top-4 z-50 flex justify-between items-center bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl p-3 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
+      <div className="sticky top-4 z-50 flex justify-between items-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-3 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-colors">
          <div className="flex gap-2">
-             <button onClick={() => setJsonMode(!jsonMode)} className={`flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${jsonMode ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+             <button onClick={() => setJsonMode(!jsonMode)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${jsonMode ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
                 <Code size={16} /> {jsonMode ? 'Exit JSON' : 'Advanced JSON'}
              </button>
              
              {!jsonMode && (
-                 <button onClick={handleMagicGenerateClick} className="flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:scale-105 active:scale-95">
+                 <button onClick={handleMagicGenerateClick} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-500/20 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0">
                     <Wand2 size={16} /> Magic Generate
                  </button>
              )}
@@ -233,7 +229,7 @@ const isPro = true;
          
          <div className="flex gap-2">
              {onTogglePreview && (
-                 <button onClick={onTogglePreview} className={`flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isPreviewActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200'}`}>
+                 <button onClick={onTogglePreview} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${isPreviewActive ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-500/20'}`}>
                      <Play size={16} fill={isPreviewActive ? "currentColor" : "none"} /> {isPreviewActive ? 'Close Preview' : 'Live Preview'}
                  </button>
              )}
@@ -242,24 +238,24 @@ const isPro = true;
 
       {jsonMode ? (
         <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="bg-slate-950 rounded-[3rem] p-8 shadow-2xl">
-            <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} className="w-full h-[60vh] bg-transparent text-emerald-400 font-mono text-sm outline-none resize-none" />
+          <div className="bg-slate-900 dark:bg-black rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800">
+            <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} className="w-full h-[60vh] bg-transparent text-emerald-400 font-mono text-sm outline-none resize-none custom-scrollbar" />
           </div>
-          <button onClick={handleImportJson} className="w-full py-6 bg-emerald-500 text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] shadow-xl hover:bg-emerald-400 active:scale-95 transition-all">Inject Architecture</button>
+          <button onClick={handleImportJson} className="w-full py-5 bg-emerald-500 text-white rounded-2xl font-bold uppercase text-sm tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all">Inject Architecture</button>
         </div>
       ) : (
         <div className="space-y-12 animate-in fade-in duration-300">
           
           <div className="space-y-4 px-2">
-            <input className="text-4xl md:text-5xl font-black border-none w-full focus:ring-0 p-0 tracking-tighter bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="Unit Title..." value={data.title || ''} onChange={e => setData({...data, title: e.target.value})} />
-            <input className="text-lg md:text-xl font-bold text-slate-400 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="Subtitle..." value={data.subtitle || ''} onChange={e => setData({...data, subtitle: e.target.value})} />
+            <input className="text-4xl md:text-5xl font-extrabold border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700 transition-colors" placeholder="Unit Title..." value={data.title || ''} onChange={e => setData({...data, title: e.target.value})} />
+            <input className="text-lg md:text-xl font-medium text-slate-500 dark:text-slate-400 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700 transition-colors" placeholder="Subtitle..." value={data.subtitle || ''} onChange={e => setData({...data, subtitle: e.target.value})} />
             
             {/* SMART TAGS UI */}
             <div className="flex flex-wrap items-center gap-2 pt-2">
                 {(data.tags || []).map((tag: string) => (
-                    <span key={tag} className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 dark:border-indigo-500/20 shadow-sm animate-in zoom-in-95 duration-200">
+                    <span key={tag} className="flex items-center gap-1 px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 rounded-lg text-[11px] font-bold uppercase tracking-wider border border-indigo-200 dark:border-indigo-500/30 shadow-sm animate-in zoom-in-95 duration-200">
                         {tag}
-                        <button onClick={() => handleRemoveTag(tag)} className="hover:text-rose-500 ml-1 transition-colors"><X size={12} strokeWidth={3} /></button>
+                        <button onClick={() => handleRemoveTag(tag)} className="hover:text-rose-500 dark:hover:text-rose-400 ml-1 transition-colors"><X size={14} strokeWidth={2.5} /></button>
                     </span>
                 ))}
                 <div className="flex items-center relative">
@@ -270,7 +266,7 @@ const isPro = true;
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
                         onKeyDown={handleAddTag}
-                        className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-indigo-500 transition-colors w-48 shadow-sm"
+                        className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all w-48 shadow-sm"
                     />
                 </div>
             </div>
@@ -280,39 +276,39 @@ const isPro = true;
             {(data.blocks || []).map((block: any, idx: number) => {
               const isNewlyAdded = newlyAddedIndices.includes(idx);
               return (
-              <div key={idx} className={`group bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border-2 transition-all relative shadow-sm ${isNewlyAdded ? 'border-purple-400 shadow-[0_0_30px_rgba(168,85,247,0.3)] scale-[1.02]' : 'border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
+              <div key={idx} className={`group bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border transition-all relative shadow-sm ${isNewlyAdded ? 'border-violet-400 shadow-[0_0_20px_rgba(139,92,246,0.2)] scale-[1.01]' : 'border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md'}`}>
                 
                 {/* 🔥 BLOCK HEADER WITH MOVEMENT & DELETE CONTROLS */}
-                <div className="flex justify-between items-center mb-6 pb-6 border-b border-slate-50 dark:border-slate-800/50">
+                <div className="flex justify-between items-center mb-6 pb-5 border-b border-slate-100 dark:border-slate-800/60">
                    <div className="flex items-center gap-3">
-                       <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black ${isNewlyAdded ? 'bg-purple-100 text-purple-700' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'}`}>{idx + 1}</span>
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{block.type}</span>
-                       {isNewlyAdded && <span className="ml-2 px-2 py-1 bg-purple-500 text-white text-[8px] font-black uppercase tracking-widest rounded-md animate-pulse">AI Generated</span>}
+                       <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold ${isNewlyAdded ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>{idx + 1}</span>
+                       <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{block.type}</span>
+                       {isNewlyAdded && <span className="ml-2 px-2 py-0.5 bg-violet-500 text-white text-[9px] font-bold uppercase tracking-wider rounded-md animate-pulse">AI Generated</span>}
                    </div>
                    
                    <div className="flex items-center gap-2">
                        {/* 🔥 REORDER CONTROLS */}
-                       <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700">
+                       <div className="flex items-center bg-slate-50 dark:bg-slate-800/50 rounded-xl p-1 border border-slate-200 dark:border-slate-700/50">
                            <button 
                                onClick={() => moveBlock(idx, 'up')}
                                disabled={idx === 0}
-                               className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-900 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                               className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                                title="Move Block Up"
                            >
-                               <ChevronUp size={16} strokeWidth={3} />
+                               <ChevronUp size={16} strokeWidth={2.5} />
                            </button>
                            <button 
                                onClick={() => moveBlock(idx, 'down')}
                                disabled={idx === (data.blocks || []).length - 1}
-                               className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-900 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                               className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                                title="Move Block Down"
                            >
-                               <ChevronDown size={16} strokeWidth={3} />
+                               <ChevronDown size={16} strokeWidth={2.5} />
                            </button>
                        </div>
                        
-                       <button onClick={() => removeBlock(idx)} className="p-3 bg-rose-50 dark:bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-colors" title="Delete Block">
-                           <Trash2 size={18} strokeWidth={2.5} />
+                       <button onClick={() => removeBlock(idx)} className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white dark:hover:bg-rose-600 transition-colors border border-slate-200 dark:border-slate-700/50 hover:border-rose-500" title="Delete Block">
+                           <Trash2 size={16} strokeWidth={2} />
                        </button>
                    </div>
                 </div>
@@ -320,7 +316,7 @@ const isPro = true;
                 {/* TEXT EDITOR */}
                 {block.type === 'text' && (
                   <textarea 
-                    className="w-full bg-slate-50 dark:bg-slate-950 dark:text-white rounded-2xl p-6 font-bold text-xl border border-slate-100 dark:border-slate-800 focus:ring-2 focus:ring-indigo-200 resize-none h-32 outline-none" 
+                    className="w-full bg-slate-50 dark:bg-slate-950 dark:text-white rounded-2xl p-5 font-semibold text-lg border border-slate-200 dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 resize-none h-32 outline-none transition-all shadow-sm" 
                     placeholder="Punchy text content..."
                     value={block.content} 
                     onChange={e => updateBlock(idx, 'content', e.target.value)} 
@@ -330,26 +326,26 @@ const isPro = true;
                 {/* ESSAY EDITOR */}
                 {block.type === 'essay' && (
                   <div className="space-y-4">
-                    <input className="w-full font-black text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 px-6 py-4 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-200 outline-none" placeholder="Essay Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
-                    <textarea className="w-full h-64 bg-slate-50 dark:bg-slate-950 dark:text-slate-300 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl text-sm font-serif leading-relaxed focus:ring-2 focus:ring-indigo-200 outline-none resize-none" placeholder="Paragraph 1...\n\nParagraph 2..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
+                    <input className="w-full font-bold text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-5 py-4 rounded-2xl text-sm focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all shadow-sm" placeholder="Essay Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
+                    <textarea className="w-full h-64 bg-slate-50 dark:bg-slate-950 dark:text-slate-200 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl text-sm font-serif leading-relaxed focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none resize-none transition-all shadow-sm" placeholder="Paragraph 1...\n\nParagraph 2..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
                   </div>
                 )}
 
                 {/* CALLOUT EDITOR */}
                 {block.type === 'callout' && (
-                  <div className="space-y-4 bg-amber-50 dark:bg-amber-500/10 p-6 rounded-3xl border border-amber-100 dark:border-amber-900/50">
+                  <div className="space-y-4 bg-amber-50/50 dark:bg-amber-500/5 p-6 rounded-3xl border border-amber-200 dark:border-amber-900/30">
                     <div className="flex items-center gap-2 mb-2">
-                        <Info size={18} className="text-amber-500" strokeWidth={3} />
-                        <span className="text-xs font-black text-amber-800 dark:text-amber-500 uppercase tracking-widest">Grammar Spotlight / Pro-Tip</span>
+                        <Info size={16} className="text-amber-600 dark:text-amber-500" strokeWidth={2.5} />
+                        <span className="text-xs font-bold text-amber-800 dark:text-amber-500 uppercase tracking-wider">Grammar Spotlight / Pro-Tip</span>
                     </div>
                     <input 
-                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-amber-100 dark:border-amber-800/50 p-4 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-amber-300 outline-none shadow-sm" 
+                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-amber-200 dark:border-amber-800/50 p-4 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 outline-none shadow-sm transition-all" 
                         placeholder="Label (e.g. Pro Tip, Grammar Focus)" 
                         value={block.label || ''} 
                         onChange={e => updateBlock(idx, 'label', e.target.value)} 
                     />
                     <textarea 
-                        className="w-full bg-white dark:bg-slate-900 dark:text-slate-300 border border-amber-100 dark:border-amber-800/50 p-4 rounded-2xl text-sm italic focus:ring-2 focus:ring-amber-300 outline-none resize-none h-32 shadow-sm" 
+                        className="w-full bg-white dark:bg-slate-900 dark:text-slate-200 border border-amber-200 dark:border-amber-800/50 p-4 rounded-2xl text-sm italic focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 outline-none resize-none h-32 shadow-sm transition-all" 
                         placeholder="Callout content..." 
                         value={block.content || ''} 
                         onChange={e => updateBlock(idx, 'content', e.target.value)} 
@@ -360,8 +356,8 @@ const isPro = true;
                 {/* IMAGE EDITOR */}
                 {block.type === 'image' && (
                   <div className="space-y-4">
-                    <input className="w-full bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-100 dark:border-slate-800 p-4 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-200 outline-none" placeholder="Unsplash Image URL" value={block.url || ''} onChange={e => updateBlock(idx, 'url', e.target.value)} />
-                    <input className="w-full bg-slate-50 dark:bg-slate-950 dark:text-slate-400 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-200 outline-none" placeholder="Image Caption (Optional)" value={block.caption || ''} onChange={e => updateBlock(idx, 'caption', e.target.value)} />
+                    <input className="w-full bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-200 dark:border-slate-800 p-4 rounded-2xl text-sm font-semibold focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all shadow-sm" placeholder="Unsplash Image URL" value={block.url || ''} onChange={e => updateBlock(idx, 'url', e.target.value)} />
+                    <input className="w-full bg-slate-50 dark:bg-slate-950 dark:text-slate-400 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all shadow-sm" placeholder="Image Caption (Optional)" value={block.caption || ''} onChange={e => updateBlock(idx, 'caption', e.target.value)} />
                   </div>
                 )}
 
@@ -369,33 +365,33 @@ const isPro = true;
                 {block.type === 'vocab-list' && (
                   <div className="space-y-3">
                     {(block.items || []).map((item: any, iIdx: number) => (
-                       <div key={iIdx} className="flex gap-2">
-                          <input className="w-1/3 bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-100 dark:border-slate-800 p-4 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-fuchsia-200 outline-none" placeholder="Term" value={item.term} onChange={e => { const newItems = [...block.items]; newItems[iIdx].term = e.target.value; updateBlock(idx, 'items', newItems); }} />
-                          <input className="flex-1 bg-slate-50 dark:bg-slate-950 dark:text-slate-300 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl text-sm focus:ring-2 focus:ring-fuchsia-200 outline-none" placeholder="Definition" value={item.definition} onChange={e => { const newItems = [...block.items]; newItems[iIdx].definition = e.target.value; updateBlock(idx, 'items', newItems); }} />
-                          <button onClick={() => { const newItems = block.items.filter((_:any, i:number) => i !== iIdx); updateBlock(idx, 'items', newItems); }} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/20 transition-colors"><X size={18}/></button>
+                       <div key={iIdx} className="flex gap-3">
+                          <input className="w-1/3 bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-200 dark:border-slate-800 p-4 rounded-2xl text-sm font-semibold focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-fuchsia-500/30 focus:border-fuchsia-500 outline-none transition-all shadow-sm" placeholder="Term" value={item.term} onChange={e => { const newItems = [...block.items]; newItems[iIdx].term = e.target.value; updateBlock(idx, 'items', newItems); }} />
+                          <input className="flex-1 bg-slate-50 dark:bg-slate-950 dark:text-slate-300 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl text-sm focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-fuchsia-500/30 focus:border-fuchsia-500 outline-none transition-all shadow-sm" placeholder="Definition" value={item.definition} onChange={e => { const newItems = [...block.items]; newItems[iIdx].definition = e.target.value; updateBlock(idx, 'items', newItems); }} />
+                          <button onClick={() => { const newItems = block.items.filter((_:any, i:number) => i !== iIdx); updateBlock(idx, 'items', newItems); }} className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-400 hover:text-white hover:border-rose-500 hover:bg-rose-500 dark:hover:bg-rose-600 transition-colors shadow-sm"><X size={18}/></button>
                        </div>
                     ))}
-                    <button onClick={() => updateBlock(idx, 'items', [...(block.items||[]), {term:'', definition:''}])} className="w-full py-4 mt-2 border-2 border-dashed border-fuchsia-200 dark:border-fuchsia-900/50 rounded-2xl text-xs font-black tracking-widest uppercase text-fuchsia-500 hover:text-fuchsia-600 hover:border-fuchsia-400 hover:bg-fuchsia-50 dark:hover:bg-fuchsia-500/10 transition-colors">+ Add Word</button>
+                    <button onClick={() => updateBlock(idx, 'items', [...(block.items||[]), {term:'', definition:''}])} className="w-full py-4 mt-2 border border-dashed border-fuchsia-300 dark:border-fuchsia-500/30 rounded-2xl text-xs font-bold tracking-wider uppercase text-fuchsia-600 dark:text-fuchsia-400 hover:border-fuchsia-500 hover:bg-fuchsia-50 dark:hover:bg-fuchsia-500/10 transition-all">+ Add Word</button>
                   </div>
                 )}
 
                 {/* QUIZ EDITOR */}
                 {block.type === 'quiz' && (
-                  <div className="space-y-4 bg-indigo-50/50 dark:bg-indigo-500/10 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-900/50">
-                     <textarea className="w-full bg-white dark:bg-slate-900 dark:text-white border border-indigo-100 dark:border-indigo-800/50 p-4 rounded-2xl text-sm font-bold resize-none h-24 outline-none focus:ring-2 focus:ring-indigo-300 shadow-sm" placeholder="Quiz Question..." value={block.content?.question || block.question || ''} onChange={e => updateBlock(idx, 'question', e.target.value)} />
+                  <div className="space-y-4 bg-indigo-50/50 dark:bg-indigo-500/5 p-6 rounded-3xl border border-indigo-200 dark:border-indigo-900/30">
+                     <textarea className="w-full bg-white dark:bg-slate-900 dark:text-white border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-2xl text-sm font-semibold resize-none h-24 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 shadow-sm transition-all" placeholder="Quiz Question..." value={block.content?.question || block.question || ''} onChange={e => updateBlock(idx, 'question', e.target.value)} />
                      <div className="space-y-3 mt-4">
-                       <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">Options (Select Correct)</span>
+                       <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider ml-1 block">Options (Select Correct)</span>
                        {(block.content?.options || block.options || []).map((opt: any, oIdx: number) => {
                            const isCorrect = (block.content?.correctId || block.correctId) === opt.id;
                            return (
                            <div key={oIdx} className="flex items-center gap-3">
-                              <input type="radio" className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer" checked={isCorrect} onChange={() => updateBlock(idx, 'correctId', opt.id)} />
-                              <input className="w-16 bg-white dark:bg-slate-900 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800/50 p-3 rounded-xl text-xs font-mono font-bold text-center outline-none shadow-sm" placeholder="ID" value={opt.id} onChange={e => { const newOpts = [...(block.content?.options || block.options)]; newOpts[oIdx].id = e.target.value; updateBlock(idx, 'options', newOpts); }} />
-                              <input className="flex-1 bg-white dark:bg-slate-900 dark:text-white border border-indigo-100 dark:border-indigo-800/50 p-3 rounded-xl text-sm font-medium outline-none shadow-sm" placeholder="Answer Text" value={opt.text} onChange={e => { const newOpts = [...(block.content?.options || block.options)]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} />
+                              <input type="radio" className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer" checked={isCorrect} onChange={() => updateBlock(idx, 'correctId', opt.id)} />
+                              <input className="w-16 bg-white dark:bg-slate-900 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50 p-3.5 rounded-xl text-xs font-mono font-bold text-center outline-none shadow-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all" placeholder="ID" value={opt.id} onChange={e => { const newOpts = [...(block.content?.options || block.options)]; newOpts[oIdx].id = e.target.value; updateBlock(idx, 'options', newOpts); }} />
+                              <input className="flex-1 bg-white dark:bg-slate-900 dark:text-white border border-indigo-200 dark:border-indigo-800/50 p-3.5 rounded-xl text-sm font-medium outline-none shadow-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all" placeholder="Answer Text" value={opt.text} onChange={e => { const newOpts = [...(block.content?.options || block.options)]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} />
                            </div>
                            );
                        })}
-                       <button onClick={() => updateBlock(idx, 'options', [...(block.content?.options || block.options || []), {id: String.fromCharCode(97 + ((block.content?.options || block.options)?.length || 0)), text: ''}])} className="text-xs font-black text-indigo-500 mt-2 hover:text-indigo-700 transition-colors uppercase tracking-widest">+ Add Option</button>
+                       <button onClick={() => updateBlock(idx, 'options', [...(block.content?.options || block.options || []), {id: String.fromCharCode(97 + ((block.content?.options || block.options)?.length || 0)), text: ''}])} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-2 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors uppercase tracking-wider block">+ Add Option</button>
                      </div>
                   </div>
                 )}
@@ -404,31 +400,31 @@ const isPro = true;
                 {block.type === 'dialogue' && (
                   <div className="space-y-4">
                      {(block.lines || []).map((line: any, lIdx: number) => (
-                        <div key={lIdx} className="p-5 bg-blue-50/50 dark:bg-blue-500/10 rounded-[2rem] space-y-3 border border-blue-100 dark:border-blue-900/50 relative group/line">
+                        <div key={lIdx} className="p-5 bg-blue-50/50 dark:bg-blue-500/5 rounded-3xl space-y-3 border border-blue-200 dark:border-blue-900/30 relative group/line">
                            <button onClick={() => { const newLines = block.lines.filter((_:any, i:number) => i !== lIdx); updateBlock(idx, 'lines', newLines); }} className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition-colors opacity-0 group-hover/line:opacity-100"><X size={16}/></button>
                            <div className="flex gap-3 pr-8">
-                             <input className="w-1/4 bg-white dark:bg-slate-900 dark:text-white border border-blue-100 dark:border-blue-800/50 p-3 rounded-xl text-xs font-black outline-none shadow-sm" placeholder="Speaker" value={line.speaker} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].speaker = e.target.value; updateBlock(idx, 'lines', newLines); }} />
-                             <select className="bg-white dark:bg-slate-900 dark:text-blue-300 border border-blue-100 dark:border-blue-800/50 p-3 rounded-xl text-xs font-bold text-slate-500 outline-none shadow-sm cursor-pointer" value={line.side} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].side = e.target.value; updateBlock(idx, 'lines', newLines); }}>
+                             <input className="w-1/4 bg-white dark:bg-slate-900 dark:text-white border border-blue-200 dark:border-blue-800/50 p-3.5 rounded-xl text-xs font-bold outline-none shadow-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all" placeholder="Speaker" value={line.speaker} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].speaker = e.target.value; updateBlock(idx, 'lines', newLines); }} />
+                             <select className="bg-white dark:bg-slate-900 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 p-3.5 rounded-xl text-xs font-semibold text-slate-600 outline-none shadow-sm cursor-pointer focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all" value={line.side} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].side = e.target.value; updateBlock(idx, 'lines', newLines); }}>
                                 <option value="left">Left Side</option><option value="right">Right Side</option>
                              </select>
                            </div>
-                           <textarea className="w-full bg-white dark:bg-slate-900 dark:text-white border border-blue-100 dark:border-blue-800/50 p-4 rounded-xl text-sm font-medium resize-none outline-none shadow-sm h-24" placeholder="What are they saying?" value={line.text} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].text = e.target.value; updateBlock(idx, 'lines', newLines); }} />
-                           <input className="w-full bg-white/50 dark:bg-slate-900/50 dark:text-slate-400 border border-blue-100/50 dark:border-blue-800/30 p-3 rounded-xl text-xs italic text-slate-500 outline-none" placeholder="Translation / Context note" value={line.translation || ''} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].translation = e.target.value; updateBlock(idx, 'lines', newLines); }} />
+                           <textarea className="w-full bg-white dark:bg-slate-900 dark:text-white border border-blue-200 dark:border-blue-800/50 p-4 rounded-xl text-sm font-medium resize-none outline-none shadow-sm h-24 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all" placeholder="What are they saying?" value={line.text} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].text = e.target.value; updateBlock(idx, 'lines', newLines); }} />
+                           <input className="w-full bg-white/50 dark:bg-slate-900/50 dark:text-slate-300 border border-blue-200/50 dark:border-blue-800/30 p-3.5 rounded-xl text-xs italic text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all" placeholder="Translation / Context note" value={line.translation || ''} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].translation = e.target.value; updateBlock(idx, 'lines', newLines); }} />
                         </div>
                      ))}
-                     <button onClick={() => updateBlock(idx, 'lines', [...(block.lines||[]), {speaker:'A', text:'', side:'left'}])} className="w-full py-4 border-2 border-dashed border-blue-200 dark:border-blue-900/50 rounded-2xl text-xs font-black tracking-widest uppercase text-blue-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">+ Add Dialogue Line</button>
+                     <button onClick={() => updateBlock(idx, 'lines', [...(block.lines||[]), {speaker:'A', text:'', side:'left'}])} className="w-full py-4 border border-dashed border-blue-300 dark:border-blue-500/30 rounded-2xl text-xs font-bold tracking-wider uppercase text-blue-600 dark:text-blue-400 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">+ Add Dialogue Line</button>
                   </div>
                 )}
 
                 {/* DISCUSSION EDITOR */}
                 {block.type === 'discussion' && (
-                  <div className="space-y-4 bg-violet-50/50 dark:bg-violet-500/10 p-6 rounded-3xl border border-violet-100 dark:border-violet-900/50">
+                  <div className="space-y-4 bg-violet-50/50 dark:bg-violet-500/5 p-6 rounded-3xl border border-violet-200 dark:border-violet-900/30">
                      <div className="flex items-center gap-2 mb-4">
-                        <MessageCircle size={18} className="text-violet-600" strokeWidth={3} />
-                        <span className="text-xs font-black text-violet-800 dark:text-violet-400 uppercase tracking-widest">Discussion Block</span>
+                        <MessageCircle size={16} className="text-violet-600" strokeWidth={2.5} />
+                        <span className="text-xs font-bold text-violet-800 dark:text-violet-400 uppercase tracking-wider">Discussion Block</span>
                      </div>
                      <input 
-                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-violet-200 dark:border-violet-800/50 p-4 rounded-2xl text-sm font-black focus:ring-2 focus:ring-violet-300 outline-none shadow-sm" 
+                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-violet-200 dark:border-violet-800/50 p-4 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 outline-none shadow-sm transition-all" 
                         placeholder="Title (e.g. Talk about it!)" 
                         value={block.title || ''} 
                         onChange={e => updateBlock(idx, 'title', e.target.value)} 
@@ -436,9 +432,9 @@ const isPro = true;
                      <div className="space-y-3">
                        {(block.questions || []).map((q: string, qIdx: number) => (
                           <div key={qIdx} className="flex gap-3">
-                            <span className="flex-none w-12 h-12 flex items-center justify-center text-xs font-black text-violet-500 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-violet-100 dark:border-violet-800/50">{qIdx + 1}</span>
+                            <span className="flex-none w-12 h-12 flex items-center justify-center text-xs font-bold text-violet-600 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-violet-200 dark:border-violet-800/50">{qIdx + 1}</span>
                             <input 
-                              className="flex-1 bg-white dark:bg-slate-900 dark:text-white border border-violet-200 dark:border-violet-800/50 p-4 rounded-xl text-sm font-medium focus:ring-2 focus:ring-violet-300 outline-none shadow-sm" 
+                              className="flex-1 bg-white dark:bg-slate-900 dark:text-white border border-violet-200 dark:border-violet-800/50 p-4 rounded-xl text-sm font-medium focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 outline-none shadow-sm transition-all" 
                               placeholder={`Question ${qIdx + 1}`} 
                               value={q} 
                               onChange={e => {
@@ -455,30 +451,30 @@ const isPro = true;
 
                 {/* FILL BLANK EDITOR */}
                 {block.type === 'fill-blank' && (
-                  <div className="space-y-4 bg-emerald-50/30 dark:bg-emerald-500/5 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/30">
+                  <div className="space-y-4 bg-emerald-50/50 dark:bg-emerald-500/5 p-6 rounded-3xl border border-emerald-200 dark:border-emerald-900/30">
                      <div className="flex items-center gap-2 mb-4">
-                        <Puzzle size={18} className="text-emerald-600" strokeWidth={3} />
-                        <span className="text-xs font-black text-emerald-800 dark:text-emerald-500 uppercase tracking-widest">Drag & Drop Configurator</span>
+                        <Puzzle size={16} className="text-emerald-600" strokeWidth={2.5} />
+                        <span className="text-xs font-bold text-emerald-800 dark:text-emerald-500 uppercase tracking-wider">Drag & Drop Configurator</span>
                      </div>
                      <input 
-                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl text-sm font-black focus:ring-2 focus:ring-emerald-300 outline-none shadow-sm" 
+                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none shadow-sm transition-all" 
                         placeholder="Instruction (e.g., Fill in the missing verbs)" 
                         value={block.question || ''} 
                         onChange={e => updateBlock(idx, 'question', e.target.value)} 
                      />
                      <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 block">Sentence (Use [brackets] for blanks)</label>
+                       <label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider ml-1 block">Sentence (Use [brackets] for blanks)</label>
                        <textarea 
-                          className="w-full bg-white dark:bg-slate-900 dark:text-emerald-100 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl text-sm font-mono font-medium resize-none h-32 focus:ring-2 focus:ring-emerald-300 outline-none shadow-sm leading-relaxed" 
+                          className="w-full bg-white dark:bg-slate-900 dark:text-emerald-500 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl text-sm font-mono font-medium resize-none h-32 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none shadow-sm leading-relaxed transition-all" 
                           placeholder="I want to buy [apples] at the [store]." 
                           value={block.text || ''} 
                           onChange={e => updateBlock(idx, 'text', e.target.value)} 
                        />
                      </div>
                      <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 block">Distractor Words (Comma separated)</label>
+                       <label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider ml-1 block">Distractor Words (Comma separated)</label>
                        <input 
-                          className="w-full bg-white dark:bg-slate-900 dark:text-white border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-300 outline-none shadow-sm" 
+                          className="w-full bg-white dark:bg-slate-900 dark:text-white border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none shadow-sm transition-all" 
                           placeholder="oranges, bank, sell" 
                           value={(block.distractors || []).join(', ')} 
                           onChange={e => {
@@ -492,20 +488,20 @@ const isPro = true;
 
                 {/* PRONUNCIATION LAB EDITOR */}
                 {block.type === 'pronunciation' && (
-                  <div className="space-y-6 bg-emerald-50/50 dark:bg-emerald-500/10 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/50">
+                  <div className="space-y-6 bg-emerald-50/50 dark:bg-emerald-500/5 p-6 rounded-3xl border border-emerald-200 dark:border-emerald-900/30">
                      <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                           <Activity size={18} className="text-emerald-600" strokeWidth={3} />
-                           <span className="text-xs font-black uppercase tracking-widest text-emerald-800 dark:text-emerald-400">Pronunciation Lab Matrix</span>
+                           <Activity size={16} className="text-emerald-600" strokeWidth={2.5} />
+                           <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400">Pronunciation Lab Matrix</span>
                         </div>
                      </div>
                      
                      <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 flex items-center gap-2">
+                       <label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider ml-1 flex items-center gap-2">
                            <Activity size={12} /> Target Phonemes (Comma Separated IPA)
                        </label>
                        <input 
-                          className="w-full bg-white dark:bg-slate-900 dark:text-emerald-100 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl text-sm font-mono font-bold focus:ring-2 focus:ring-emerald-300 outline-none shadow-inner" 
+                          className="w-full bg-white dark:bg-slate-900 dark:text-emerald-600 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl text-sm font-mono font-bold focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none shadow-inner transition-all" 
                           placeholder="i, ɪ, b, v, θ, ð" 
                           value={(block.targetPhonemes || []).join(', ')} 
                           onChange={e => {
@@ -516,16 +512,16 @@ const isPro = true;
                      </div>
 
                      <div className="pt-2 space-y-4">
-                       <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 flex items-center gap-2">
+                       <label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider ml-1 flex items-center gap-2">
                            <Mic size={12} /> Minimal Pairs Validation
                        </label>
                        
                        {(block.pairs || []).map((pair: any, pIdx: number) => (
-                          <div key={pair.id || pIdx} className="flex flex-col gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 shadow-sm relative group/pair">
+                          <div key={pair.id || pIdx} className="flex flex-col gap-3 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800/50 shadow-sm relative group/pair transition-all hover:border-emerald-300 dark:hover:border-emerald-700">
                              <button onClick={() => { const newPairs = block.pairs.filter((_:any, i:number) => i !== pIdx); updateBlock(idx, 'pairs', newPairs); }} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 opacity-0 group-hover/pair:opacity-100 transition-opacity"><X size={16}/></button>
                              
                              <input 
-                                className="w-[85%] bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-100 dark:border-slate-800 p-3 rounded-xl text-xs font-black text-slate-700 focus:ring-2 focus:ring-emerald-200 outline-none" 
+                                className="w-[85%] bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-200 dark:border-slate-800 p-3 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none transition-all" 
                                 placeholder="Concept Focus (e.g. Vowel Tension)" 
                                 value={pair.focus || ''} 
                                 onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].focus = e.target.value; updateBlock(idx, 'pairs', newPairs); }} 
@@ -533,41 +529,41 @@ const isPro = true;
                              
                              <div className="flex gap-2 items-center">
                                 <div className="flex-1 flex gap-2">
-                                    <input className="w-14 bg-slate-100 dark:bg-slate-800 dark:text-emerald-400 text-slate-500 font-mono font-bold text-center border-none p-3 rounded-xl text-sm outline-none" placeholder="/p1/" value={pair.p1} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].p1 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
-                                    <input className="flex-1 bg-emerald-50 dark:bg-emerald-500/20 border border-emerald-100 dark:border-emerald-500/30 p-3 rounded-xl text-sm font-black text-emerald-900 dark:text-emerald-100 outline-none" placeholder="Word 1" value={pair.w1} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].w1 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
+                                    <input className="w-14 bg-slate-100 dark:bg-slate-800 dark:text-emerald-400 text-slate-500 font-mono font-bold text-center border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all" placeholder="/p1/" value={pair.p1} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].p1 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
+                                    <input className="flex-1 bg-emerald-50/50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 p-3 rounded-xl text-sm font-bold text-emerald-900 dark:text-emerald-100 outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all" placeholder="Word 1" value={pair.w1} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].w1 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
                                 </div>
                                 <span className="text-[10px] italic text-slate-400 px-1 font-serif">vs</span>
                                 <div className="flex-1 flex gap-2">
-                                    <input className="flex-1 bg-emerald-50 dark:bg-emerald-500/20 border border-emerald-100 dark:border-emerald-500/30 p-3 rounded-xl text-sm font-black text-emerald-900 dark:text-emerald-100 outline-none text-right" placeholder="Word 2" value={pair.w2} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].w2 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
-                                    <input className="w-14 bg-slate-100 dark:bg-slate-800 dark:text-emerald-400 text-slate-500 font-mono font-bold text-center border-none p-3 rounded-xl text-sm outline-none" placeholder="/p2/" value={pair.p2} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].p2 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
+                                    <input className="flex-1 bg-emerald-50/50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 p-3 rounded-xl text-sm font-bold text-emerald-900 dark:text-emerald-100 outline-none text-right focus:ring-2 focus:ring-emerald-500/30 transition-all" placeholder="Word 2" value={pair.w2} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].w2 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
+                                    <input className="w-14 bg-slate-100 dark:bg-slate-800 dark:text-emerald-400 text-slate-500 font-mono font-bold text-center border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all" placeholder="/p2/" value={pair.p2} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].p2 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
                                 </div>
                              </div>
                           </div>
                        ))}
-                       <button onClick={() => updateBlock(idx, 'pairs', [...(block.pairs||[]), { id: Date.now(), p1: '', p2: '', w1: '', w2: '', focus: '' }])} className="w-full py-4 border-2 border-dashed border-emerald-200 dark:border-emerald-800/50 rounded-2xl text-xs font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-600 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors">+ Add Minimal Pair</button>
+                       <button onClick={() => updateBlock(idx, 'pairs', [...(block.pairs||[]), { id: Date.now(), p1: '', p2: '', w1: '', w2: '', focus: '' }])} className="w-full py-4 border border-dashed border-emerald-300 dark:border-emerald-500/30 rounded-2xl text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all">+ Add Minimal Pair</button>
                      </div>
                   </div>
                 )}
 
                 {/* 🔥 GRAMMAR BLOCK EDITOR */}
                 {block.type === 'grammar' && (
-                  <div className="space-y-6 bg-cyan-50/50 dark:bg-cyan-500/10 p-6 rounded-3xl border border-cyan-100 dark:border-cyan-900/50">
+                  <div className="space-y-6 bg-cyan-50/50 dark:bg-cyan-500/5 p-6 rounded-3xl border border-cyan-200 dark:border-cyan-900/30">
                      <div className="flex items-center gap-2 mb-2">
-                        <Presentation size={18} className="text-cyan-600" strokeWidth={3} />
-                        <span className="text-xs font-black uppercase tracking-widest text-cyan-800 dark:text-cyan-400">Grammar Whiteboard</span>
+                        <Presentation size={16} className="text-cyan-600" strokeWidth={2.5} />
+                        <span className="text-xs font-bold uppercase tracking-wider text-cyan-800 dark:text-cyan-400">Grammar Whiteboard</span>
                      </div>
                      
                      <input 
-                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-lg font-black focus:ring-2 focus:ring-cyan-300 outline-none shadow-sm" 
+                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-lg font-bold focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none shadow-sm transition-all" 
                         placeholder="Title (e.g., The Present Perfect)" 
                         value={block.title || ''} 
                         onChange={e => updateBlock(idx, 'title', e.target.value)} 
                      />
                      
                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-cyan-600 uppercase tracking-widest ml-1">Rule / Explanation</label>
+                        <label className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider ml-1">Rule / Explanation</label>
                         <textarea 
-                           className="w-full bg-white dark:bg-slate-900 dark:text-slate-300 border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-sm font-medium resize-none h-20 focus:ring-2 focus:ring-cyan-300 outline-none shadow-sm" 
+                           className="w-full bg-white dark:bg-slate-900 dark:text-slate-300 border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-sm font-medium resize-none h-20 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none shadow-sm transition-all" 
                            placeholder="Explain when and why to use this grammar..." 
                            value={block.rule || ''} 
                            onChange={e => updateBlock(idx, 'rule', e.target.value)} 
@@ -575,9 +571,9 @@ const isPro = true;
                      </div>
 
                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-cyan-600 uppercase tracking-widest ml-1">Structure Formula</label>
+                        <label className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider ml-1">Structure Formula</label>
                         <input 
-                           className="w-full bg-slate-900 dark:bg-slate-950 text-cyan-400 border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-sm font-mono font-bold focus:ring-2 focus:ring-cyan-300 outline-none shadow-inner" 
+                           className="w-full bg-slate-900 dark:bg-slate-950 text-cyan-400 border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-sm font-mono font-bold focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none shadow-inner transition-all" 
                            placeholder="Subject + have/has + Past Participle" 
                            value={block.formula || ''} 
                            onChange={e => updateBlock(idx, 'formula', e.target.value)} 
@@ -585,26 +581,26 @@ const isPro = true;
                      </div>
 
                      <div className="pt-2 space-y-3">
-                        <label className="text-[10px] font-black text-cyan-600 uppercase tracking-widest ml-1">Drill Examples</label>
+                        <label className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider ml-1">Drill Examples</label>
                         {(block.examples || []).map((ex: any, eIdx: number) => (
-                           <div key={eIdx} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-cyan-100 dark:border-cyan-800/50 shadow-sm relative group/ex space-y-3">
+                           <div key={eIdx} className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-cyan-200 dark:border-cyan-800/50 shadow-sm relative group/ex space-y-3 transition-all hover:border-cyan-300 dark:hover:border-cyan-700">
                               <button onClick={() => { const newEx = block.examples.filter((_:any, i:number) => i !== eIdx); updateBlock(idx, 'examples', newEx); }} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 opacity-0 group-hover/ex:opacity-100 transition-opacity"><X size={16}/></button>
                               
                               <input 
-                                 className="w-[85%] bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-100 dark:border-slate-800 p-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-200 outline-none" 
+                                 className="w-[85%] bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-200 dark:border-slate-800 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none transition-all" 
                                  placeholder="Full sentence (e.g. I have eaten sushi.)" 
                                  value={ex.en || ''} 
                                  onChange={e => { const newEx = [...block.examples]; newEx[eIdx].en = e.target.value; updateBlock(idx, 'examples', newEx); }} 
                               />
                               <div className="flex gap-3">
                                  <input 
-                                    className="w-1/3 bg-cyan-50 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-100 dark:border-cyan-500/30 p-3 rounded-xl text-xs font-black outline-none" 
+                                    className="w-1/3 bg-cyan-50/50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/30 p-3 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-cyan-500/30 transition-all" 
                                     placeholder="Target words to highlight" 
                                     value={ex.target || ''} 
                                     onChange={e => { const newEx = [...block.examples]; newEx[eIdx].target = e.target.value; updateBlock(idx, 'examples', newEx); }} 
                                  />
                                  <input 
-                                    className="flex-1 bg-white dark:bg-slate-900 text-slate-500 border border-slate-100 dark:border-slate-800 p-3 rounded-xl text-xs italic outline-none" 
+                                    className="flex-1 bg-white dark:bg-slate-900 text-slate-500 border border-slate-200 dark:border-slate-800 p-3 rounded-xl text-xs italic outline-none focus:ring-2 focus:ring-cyan-500/30 transition-all" 
                                     placeholder="Context Note (Optional)" 
                                     value={ex.note || ''} 
                                     onChange={e => { const newEx = [...block.examples]; newEx[eIdx].note = e.target.value; updateBlock(idx, 'examples', newEx); }} 
@@ -612,7 +608,7 @@ const isPro = true;
                               </div>
                            </div>
                         ))}
-                        <button onClick={() => updateBlock(idx, 'examples', [...(block.examples||[]), { en: '', target: '', note: '' }])} className="w-full py-3 border-2 border-dashed border-cyan-200 dark:border-cyan-800/50 rounded-2xl text-xs font-black uppercase tracking-widest text-cyan-500 hover:text-cyan-600 hover:border-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 transition-colors">+ Add Example</button>
+                        <button onClick={() => updateBlock(idx, 'examples', [...(block.examples||[]), { en: '', target: '', note: '' }])} className="w-full py-4 border border-dashed border-cyan-300 dark:border-cyan-500/30 rounded-2xl text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 hover:border-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 transition-all">+ Add Example</button>
                      </div>
                   </div>
                 )}
@@ -623,7 +619,7 @@ const isPro = true;
           </div>
 
           {/* THE INJECTOR GRID */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-12 pb-12 border-t border-slate-100 dark:border-slate-800">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-12 pb-12 border-t border-slate-200/60 dark:border-slate-800">
              {/* 🟢 STANDARD BLOCKS (FREE) */}
              <InjectorButton icon={<AlignLeft/>} label="Text" subtitle="Paragraphs" colorTheme="slate" onClick={() => addBlock('text')} />
              <InjectorButton icon={<FileText/>} label="Essay" subtitle="Long Form" colorTheme="slate" onClick={() => addBlock('essay')} />
