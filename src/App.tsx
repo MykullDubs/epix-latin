@@ -16,7 +16,8 @@ import {
   PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, 
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, AlertTriangle, FlipVertical, HelpCircle, 
-  CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, Maximize2
+  CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, Maximize2,
+  Terminal, Code
 } from 'lucide-react';
 
 // 🔥 IMPORT YOUR SINGULAR EXAM COMPONENT & LANDING PAGE
@@ -87,7 +88,7 @@ function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: a
 }
 
 // ============================================================================
-//  LESSON VIEW SUB-COMPONENTS
+//  LESSON VIEW SUB-COMPONENTS (Upgraded for universal payload support)
 // ============================================================================
 const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
     const [isFlipped, setIsFlipped] = useState(false);
@@ -114,6 +115,7 @@ const JuicyDeckBlock = ({ items, title }: any) => {
     const [index, setIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const currentCard = items[index];
+    if (!currentCard) return null;
     const handleSwipe = (dir: number) => { setIsFlipped(false); setTimeout(() => { setIndex((prev) => (prev + dir + items.length) % items.length); }, 200); };
     return (
         <div className="my-8 w-[90%] max-w-sm mx-auto relative">
@@ -125,9 +127,9 @@ const JuicyDeckBlock = ({ items, title }: any) => {
 };
 
 const ScenarioBlock = ({ block, onComplete }: any) => {
-    const [currentNodeId, setCurrentNodeId] = useState(block.nodes[0].id);
+    const [currentNodeId, setCurrentNodeId] = useState(block.nodes?.[0]?.id);
     const [history, setHistory] = useState<string[]>([]);
-    const currentNode = block.nodes.find((n:any) => n.id === currentNodeId);
+    const currentNode = block.nodes?.find((n:any) => n.id === currentNodeId);
     if (!currentNode) return <div className="p-4 bg-red-50 text-red-500">Error: Broken Scenario Link</div>;
     const isEnd = !currentNode.options || currentNode.options.length === 0 || currentNode.options[0].nextNodeId === 'end';
     const bgColors: any = { neutral: 'bg-slate-900', success: 'bg-emerald-900', failure: 'bg-rose-900', critical: 'bg-amber-900' };
@@ -149,7 +151,7 @@ const QuizBlock = ({ block, onComplete }: any) => {
     return (
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-8">
             <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-start gap-2"><span className="bg-indigo-100 text-indigo-600 p-1 rounded-lg mt-1 shrink-0"><HelpCircle size={16}/></span>{block.question}</h3>
-            <div className="space-y-2">{block.options.map((opt:any) => { let style = "border-slate-200 hover:bg-slate-50"; if (submitted) { if (opt.id === block.correctId) style = "bg-emerald-100 border-emerald-500 text-emerald-800 font-bold"; else if (opt.id === selected) style = "bg-rose-100 border-rose-500 text-rose-800 opacity-60"; else style = "opacity-50 grayscale"; } else if (selected === opt.id) { style = "border-indigo-500 bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-500"; } return <button key={opt.id} disabled={submitted} onClick={() => setSelected(opt.id)} className={`w-full p-4 text-left border-2 rounded-xl transition-all ${style}`}>{opt.text}</button>; })}</div>
+            <div className="space-y-2">{(block.options || []).map((opt:any) => { let style = "border-slate-200 hover:bg-slate-50"; if (submitted) { if (opt.id === block.correctId) style = "bg-emerald-100 border-emerald-500 text-emerald-800 font-bold"; else if (opt.id === selected) style = "bg-rose-100 border-rose-500 text-rose-800 opacity-60"; else style = "opacity-50 grayscale"; } else if (selected === opt.id) { style = "border-indigo-500 bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-500"; } return <button key={opt.id} disabled={submitted} onClick={() => setSelected(opt.id)} className={`w-full p-4 text-left border-2 rounded-xl transition-all ${style}`}>{opt.text}</button>; })}</div>
             {!submitted ? (<button onClick={() => setSubmitted(true)} disabled={!selected} className="w-full mt-4 py-3 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 transition-all">Check Answer</button>) : (<div className={`mt-4 p-3 rounded-xl flex justify-between items-center animate-in zoom-in ${isCorrect ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}><span className="font-bold flex items-center gap-2">{isCorrect ? <><Check size={18}/> Correct!</> : <><X size={18}/> Incorrect</>}</span>{isCorrect ? <button onClick={onComplete} className="px-3 py-1 bg-white border border-emerald-200 rounded-lg text-xs font-bold shadow-sm">Continue</button> : <button onClick={() => { setSubmitted(false); setSelected(null); }} className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-xs font-bold shadow-sm">Try Again</button>}</div>)}
         </div>
     );
@@ -157,49 +159,128 @@ const QuizBlock = ({ block, onComplete }: any) => {
 
 const ChatDialogueBlock = ({ lines }: any) => (
     <div className="space-y-4 my-8 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-        {lines.map((line: any, i: number) => {
-            const isA = line.speaker === 'A' || i % 2 === 0;
+        {(lines || []).map((line: any, i: number) => {
+            const isA = line.speaker === 'A' || line.side === 'left' || i % 2 === 0;
             return (<div key={i} className={`flex ${isA ? 'justify-start' : 'justify-end'}`}><div className={`max-w-[85%] p-4 rounded-2xl text-sm relative shadow-sm ${isA ? 'bg-white border border-slate-200 text-slate-800 rounded-tl-none' : 'bg-indigo-600 text-white rounded-tr-none'}`}><p className="font-medium leading-relaxed text-base">{line.text}</p>{line.translation && <p className={`text-xs mt-2 pt-2 border-t ${isA ? 'border-slate-100 text-slate-400' : 'border-indigo-500/50 text-indigo-200'}`}>{line.translation}</p>}<span className={`absolute -top-5 text-[10px] font-bold text-slate-400 ${isA ? 'left-0' : 'right-0'}`}>{line.speaker}</span></div></div>);
         })}
     </div>
 );
 
-// --- MAIN LESSON VIEW (Sequential) ---
+// 🔥 NEW: UNIVERSAL GRAMMAR & ESSAY BLOCK RENDERERS
+const GrammarBlock = ({ block }: any) => (
+    <div className="my-8 bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-8 rounded-[2.5rem] shadow-xl border border-indigo-500/30">
+        <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest mb-4">
+            <Zap size={16} className="fill-amber-400"/> {block.title || "Grammar Blueprint"}
+        </div>
+        {block.rule && <p className="text-slate-300 text-base leading-relaxed mb-6 font-medium">{block.rule}</p>}
+        {block.formula && (
+            <div className="bg-black/40 border border-white/10 p-4 rounded-2xl mb-6 font-mono text-center text-indigo-300 font-bold tracking-wide">
+                {block.formula}
+            </div>
+        )}
+        {block.examples && (
+            <div className="space-y-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">In Context:</span>
+                {block.examples.map((ex: any, idx: number) => (
+                    <div key={idx} className="bg-white/5 border border-white/10 p-4 rounded-xl">
+                        <p className="font-bold text-white text-sm">{ex.en || ex.text}</p>
+                        {ex.note && <p className="text-xs text-indigo-300 mt-1">{ex.note}</p>}
+                    </div>
+                ))}
+            </div>
+        )}
+    </div>
+);
+
+// --- MAIN LESSON VIEW (Upgraded with Universal Payload & Page Flattening) ---
 function LessonView({ lesson, onFinish }: any) {
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
   const resetScroll = () => { window.scrollTo(0, 0); const container = document.getElementById('lesson-scroll-container'); if (container) container.scrollTop = 0; };
   useLayoutEffect(() => { resetScroll(); }, []);
   const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
-  const blocks = lesson.blocks || [];
-  const progress = ((currentBlockIdx + 1) / blocks.length) * 100;
+  
+  // 🔥 UNIVERSAL FLATTENING: Supports root blocks array OR paginated pages array
+  const blocks = useMemo(() => {
+      if (lesson.blocks && Array.isArray(lesson.blocks)) return lesson.blocks;
+      if (lesson.pages && Array.isArray(lesson.pages)) {
+          return lesson.pages.flatMap((p: any) => p.blocks || []);
+      }
+      return [];
+  }, [lesson]);
+
+  const progress = blocks.length > 0 ? ((currentBlockIdx + 1) / blocks.length) * 100 : 100;
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (bottomRef.current) { bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, [currentBlockIdx]);
-  const handleNextBlock = () => { if (currentBlockIdx < blocks.length - 1) { setCurrentBlockIdx(prev => prev + 1); } else { resetScroll(); onFinish(lesson.id, lesson.xp, lesson.title); } };
+  
+  const handleNextBlock = () => { 
+      if (currentBlockIdx < blocks.length - 1) { 
+          setCurrentBlockIdx(prev => prev + 1); 
+      } else { 
+          resetScroll(); 
+          onFinish(lesson.id || 'lesson', lesson.xp || 50, lesson.title || 'Completed Module'); 
+      } 
+  };
   const handleExit = () => { resetScroll(); onFinish(null, 0); };
 
   const renderBlockContent = (block: any) => {
+      if (!block) return null;
       switch (block.type) {
-          case 'text': return (<div className="my-6 prose prose-slate max-w-none animate-in fade-in slide-in-from-bottom-4 duration-700">{block.title && <h2 className="text-3xl font-black text-slate-800 mb-6 tracking-tight">{block.title}</h2>}<div className="text-lg text-slate-600 leading-loose whitespace-pre-wrap font-serif">{block.content}</div></div>);
-          case 'image': return (<div className="my-8 space-y-4 animate-in zoom-in-95 duration-500"><div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200">{block.url ? <img src={block.url} alt="Lesson" className="w-full object-cover" /> : <div className="h-48 bg-slate-100 flex items-center justify-center text-slate-400">Image Placeholder</div>}</div>{block.caption && <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-2 rounded-full inline-block px-4 mx-auto">{block.caption}</p>}</div>);
-          case 'vocab-list': return <JuicyDeckBlock items={block.items} title="Key Vocabulary" />;
-          case 'flashcard': return <ConceptCardBlock front={block.front} back={block.back} context={block.title || "Check Understanding"} />;
-          case 'quiz': return <QuizBlock block={block} onComplete={handleNextBlock} />;
-          case 'scenario': return <ScenarioBlock block={block} onComplete={handleNextBlock} />;
-          case 'dialogue': return <ChatDialogueBlock lines={block.lines} />;
+          case 'text':
+          case 'text_block':
+          case 'essay': 
+              return (<div className="my-6 prose prose-slate max-w-none animate-in fade-in slide-in-from-bottom-4 duration-700">{block.title && <h2 className="text-3xl font-black text-slate-800 mb-6 tracking-tight">{block.title}</h2>}<div className="text-lg text-slate-600 leading-loose whitespace-pre-wrap font-serif">{block.content}</div></div>);
+          case 'grammar':
+              return <GrammarBlock block={block} />;
+          case 'image': 
+              return (<div className="my-8 space-y-4 animate-in zoom-in-95 duration-500"><div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200">{block.url ? <img src={block.url} alt="Lesson" className="w-full object-cover" /> : <div className="h-48 bg-slate-100 flex items-center justify-center text-slate-400">Image Placeholder</div>}</div>{block.caption && <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-2 rounded-full inline-block px-4 mx-auto">{block.caption}</p>}</div>);
+          case 'vocab-list': 
+              return <JuicyDeckBlock items={block.items || []} title="Key Vocabulary" />;
+          case 'flashcard': 
+              return <ConceptCardBlock front={block.front} back={block.back} context={block.title || "Check Understanding"} />;
+          case 'quiz': 
+          case 'fill-blank':
+              return <QuizBlock block={block} onComplete={handleNextBlock} />;
+          case 'scenario': 
+              return <ScenarioBlock block={block} onComplete={handleNextBlock} />;
+          case 'dialogue':
+          case 'dialogue_block': 
+              return <ChatDialogueBlock lines={block.lines || block.turns || []} />;
+          case 'callout':
           case 'note':
               const styles: any = { info: { bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', border: 'border-blue-100', iconBg: 'bg-white', iconColor: 'text-blue-600', icon: <Info size={20}/> }, tip: { bg: 'bg-gradient-to-br from-emerald-50 to-teal-50', border: 'border-emerald-100', iconBg: 'bg-white', iconColor: 'text-emerald-600', icon: <Zap size={20} className="fill-current"/> }, warning: { bg: 'bg-gradient-to-br from-amber-50 to-orange-50', border: 'border-amber-100', iconBg: 'bg-white', iconColor: 'text-amber-600', icon: <AlertTriangle size={20}/> } };
               const s = styles[block.variant || 'info'];
-              return (<div className={`relative overflow-hidden rounded-2xl border ${s.border} ${s.bg} p-5 my-6 shadow-sm animate-in slide-in-from-left-2 duration-500`}><div className={`absolute -right-4 -top-4 opacity-10 pointer-events-none ${s.iconColor}`}>{React.cloneElement(s.icon, { size: 100 })}</div><div className="relative z-10 flex gap-4 items-start"><div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor} shadow-sm border border-white/50`}>{s.icon}</div><div><h4 className={`font-black text-[10px] uppercase tracking-widest mb-1 opacity-70 ${s.iconColor}`}>{block.title || block.variant}</h4><p className="text-slate-700 text-sm font-medium leading-relaxed">{block.content}</p></div></div></div>);
-          default: return <div className="p-4 bg-slate-100 rounded text-slate-500 italic">Unsupported block type: {block.type}</div>;
+              return (<div className={`relative overflow-hidden rounded-2xl border ${s.border} ${s.bg} p-5 my-6 shadow-sm animate-in slide-in-from-left-2 duration-500`}><div className={`absolute -right-4 -top-4 opacity-10 pointer-events-none ${s.iconColor}`}>{React.cloneElement(s.icon, { size: 100 })}</div><div className="relative z-10 flex gap-4 items-start"><div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor} shadow-sm border border-white/50`}>{s.icon}</div><div><h4 className={`font-black text-[10px] uppercase tracking-widest mb-1 opacity-70 ${s.iconColor}`}>{block.title || block.label || block.variant}</h4><p className="text-slate-700 text-sm font-medium leading-relaxed">{block.content}</p></div></div></div>);
+          case 'discussion':
+          case 'discussion_block':
+              return (
+                  <div className="my-8 bg-purple-500/10 border border-purple-500/30 rounded-3xl p-8 relative overflow-hidden">
+                      <div className="flex items-center gap-2 mb-4">
+                          <div className="w-2.5 h-2.5 rounded-full bg-purple-600 animate-pulse" />
+                          <span className="text-xs font-black text-purple-700 uppercase tracking-widest">{block.title || "Production Task"}</span>
+                      </div>
+                      <p className="text-slate-800 font-black text-xl mb-6">{block.prompt || block.content || "Analyze the target grammar in context."}</p>
+                      {block.questions && (
+                          <div className="space-y-2.5">
+                              {block.questions.map((q: string, i: number) => (
+                                  <div key={i} className="bg-white/80 border border-purple-100 p-4 rounded-xl text-sm font-bold text-slate-700 flex items-start gap-3">
+                                      <span className="text-purple-600 font-black">{i + 1}.</span> {q}
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              );
+          default: 
+              return <div className="p-4 bg-slate-100 rounded text-slate-500 italic font-mono text-xs">Dynamic Block Loaded: {block.type}</div>;
       }
   };
 
-  const activeBlock = blocks[currentBlockIdx];
-  const isInteractive = activeBlock.type === 'quiz' || (activeBlock.type === 'scenario' && activeBlock.nodes);
+  const activeBlock = blocks[currentBlockIdx] || {};
+  const isInteractive = activeBlock.type === 'quiz' || activeBlock.type === 'fill-blank' || (activeBlock.type === 'scenario' && activeBlock.nodes);
 
   return (
     <div id="lesson-scroll-container" className="h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden relative scroll-smooth">
-        <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-6 py-4 border-b border-slate-100 shadow-sm"><div className="flex justify-between items-center mb-2"><button onClick={handleExit} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} /></button><div className="flex flex-col items-end"><span className="text-[10px] font-black text-slate-300 tracking-widest uppercase">Progress</span><span className="text-xs font-bold text-slate-800">{currentBlockIdx + 1} <span className="text-slate-300">/</span> {blocks.length}</span></div></div><div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" style={{ width: `${progress}%` }}></div></div></div>
+        <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-6 py-4 border-b border-slate-100 shadow-sm"><div className="flex justify-between items-center mb-2"><button onClick={handleExit} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} /></button><div className="flex flex-col items-end"><span className="text-[10px] font-black text-slate-300 tracking-widest uppercase">Progress</span><span className="text-xs font-bold text-slate-800">{currentBlockIdx + 1} <span className="text-slate-300">/</span> {blocks.length || 1}</span></div></div><div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" style={{ width: `${progress}%` }}></div></div></div>
         <div className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full pb-32">{blocks.slice(0, currentBlockIdx + 1).map((block: any, idx: number) => (<div key={idx} className={idx === currentBlockIdx ? "min-h-[50vh] flex flex-col justify-center" : "opacity-40 hover:opacity-100 transition-opacity duration-500 mb-12 border-b border-slate-100 pb-12"}>{renderBlockContent(block)}{idx === currentBlockIdx && <div ref={bottomRef} className="h-1 w-1"></div>}</div>))}</div>
         {!isInteractive && (<div className="fixed bottom-6 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none"><button onClick={handleNextBlock} className="pointer-events-auto w-full max-w-md py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 animate-in slide-in-from-bottom-4 duration-500">{currentBlockIdx < blocks.length - 1 ? (<>Continue <ArrowRight size={20}/></>) : (<>Complete Lesson <Check size={20}/></>)}</button></div>)}
     </div>
@@ -309,11 +390,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
   );
 }
 
-// --- SUB-COMPONENTS (Keep existing implementations or simple stubs) ---
-function MatchingGame({ deckCards, onGameEnd }: any) { return <div className="p-10 text-center"><p>Matching Game Stub</p><button onClick={() => onGameEnd(50)} className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded">Finish</button></div>; }
-function QuizGame({ deckCards, onGameEnd }: any) { return <div className="p-10 text-center"><p>Quiz Game Stub</p><button onClick={() => onGameEnd(50)} className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded">Finish</button></div>; }
-function TowerMode({ allDecks, user, onExit, onXPUpdate }: any) { return <div className="fixed inset-0 bg-slate-900 z-[60] flex items-center justify-center text-white"><div className="text-center"><h1>The Tower</h1><p>Climb to the top!</p><button onClick={onExit} className="mt-4 bg-white text-black px-4 py-2 rounded">Exit</button></div></div>; }
-
 // ============================================================================
 //  4-BUTTON NAVIGATION BAR
 // ============================================================================
@@ -356,7 +432,7 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false); // 🔥 TO SUPPORT AUTH MODALS
+  const [showAuthModal, setShowAuthModal] = useState(false);
   
   // Content & State
   const [systemDecks, setSystemDecks] = useState<any>({});
@@ -453,6 +529,7 @@ function App() {
   }, [user, displayName]);
 
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
+    setActiveLesson(null); // 🔥 GUARANTEE STATE CLEAR CLEARance
     setActiveTab('home'); 
     if (xp > 0 && user) { 
         try { 
@@ -464,8 +541,8 @@ function App() {
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
 
-  // 🔥 INTERCEPT FULLSCREEN EXAMS BEFORE AUTH CHECK
-  // (Allows unauthenticated visitors clicking from LandingPage to take the exam immediately!)
+  // 🔥 1. INTERCEPT FULLSCREEN EXAMS AND LESSONS BEFORE ROLE CHECKS
+  // (Ensures both instructors and students can launch/deploy payloads instantly)
   if (activeExam === 'preposition') {
       return (
           <div className="relative min-h-screen w-full bg-slate-950">
@@ -480,20 +557,25 @@ function App() {
       );
   }
 
-  // 🔥 WIRED LANDING PAGE FOR UNAUTHENTICATED VISITORS
+  if (activeLesson) {
+      return (
+          <div className="relative min-h-screen w-full bg-white">
+              <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />
+          </div>
+      );
+  }
+
+  // 🔥 2. WIRED LANDING PAGE FOR UNAUTHENTICATED VISITORS
   if (!user) {
       if (showAuthModal) {
           return (
             <div className="relative min-h-screen w-full bg-slate-950">
-              {/* Floating Back Button in case they clicked Login by mistake */}
               <button 
                 onClick={() => setShowAuthModal(false)}
                 className="absolute top-6 left-6 z-50 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-800 backdrop-blur-md transition-all flex items-center gap-1.5 shadow-lg active:scale-95"
               >
                 <ArrowLeft size={14} strokeWidth={2.5} /> Back to Landing
               </button>
-              
-              {/* 🔥 Renders your actual login/signup screen */}
               <AuthView />
             </div>
           );
@@ -510,7 +592,19 @@ function App() {
 
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
+  // 🔥 3. PASS LAUNCH CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER
+  const commonHandlers = { 
+      onSaveCard: handleCreateCard, 
+      onUpdateCard: handleUpdateCard, 
+      onDeleteCard: handleDeleteCard, 
+      onSaveLesson: handleCreateLesson,
+      onSelectLesson: handleContentSelection,
+      onLaunchLesson: handleContentSelection,
+      onPreviewLesson: handleContentSelection,
+      onDeployLesson: handleContentSelection,
+      onSelectDeck: handleContentSelection
+  };
+
   const isInstructor = userData.role === 'instructor';
 
   if (isInstructor) {
@@ -521,10 +615,7 @@ function App() {
     let content;
     let viewKey; 
 
-    if (activeLesson) {
-        viewKey = `lesson-${activeLesson.id}`;
-        content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
-    } else if (activeTab === 'home' && activeStudentClass) {
+    if (activeTab === 'home' && activeStudentClass) {
         viewKey = `class-${activeStudentClass.id}`;
         content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} displayName={displayName} />;
     } else {
@@ -542,7 +633,7 @@ function App() {
                 content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
                 break;
             case 'create': 
-                content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+                content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} {...commonHandlers} />;
                 break;
             case 'profile': 
                 content = <ProfileView user={user} userData={userData} />;
@@ -552,7 +643,7 @@ function App() {
         }
     }
 
-    const isFullscreenMode = !!activeLesson || !!activeExam;
+    const isFullscreenMode = !!activeExam;
     return (
         <div key={viewKey} className={`h-full w-full animate-in fade-in duration-300 ${!isFullscreenMode ? 'pt-12' : ''}`}>
             {content}
@@ -560,7 +651,7 @@ function App() {
     );
   };
 
-  const isFullscreenMode = !!activeLesson || !!activeExam;
+  const isFullscreenMode = !!activeExam;
 
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
