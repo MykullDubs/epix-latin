@@ -27,8 +27,7 @@ import InstructorDashboard from './components/instructor/InstructorDashboard';
 import FlashcardView from './components/FlashcardView';
 import BuilderHub from './components/instructor/BuilderHub';
 import ProfileView from './components/ProfileView';
-import AuthView from './components/AuthView'; // If you also have AuthView separate
-// import AuthView from './components/AuthView'; // Uncomment if AuthView is in a separate file
+import AuthView from './components/AuthView';
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -484,8 +483,20 @@ function App() {
   // 🔥 WIRED LANDING PAGE FOR UNAUTHENTICATED VISITORS
   if (!user) {
       if (showAuthModal) {
-          // If you have AuthView in a separate file, render it here:
-          // return <AuthView onBack={() => setShowAuthModal(false)} />;
+          return (
+            <div className="relative min-h-screen w-full bg-slate-950">
+              {/* Floating Back Button in case they clicked Login by mistake */}
+              <button 
+                onClick={() => setShowAuthModal(false)}
+                className="absolute top-6 left-6 z-50 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-800 backdrop-blur-md transition-all flex items-center gap-1.5 shadow-lg active:scale-95"
+              >
+                <ArrowLeft size={14} strokeWidth={2.5} /> Back to Landing
+              </button>
+              
+              {/* 🔥 Renders your actual login/signup screen */}
+              <AuthView />
+            </div>
+          );
       }
       return (
           <LandingPage 
