@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { 
     ArrowRight, Sparkles, Wand2, MonitorPlay, 
     Smartphone, Zap, CheckCircle2, GraduationCap, 
-    QrCode, BrainCircuit, Play, X, Quote, ZapOff, Clock, Server, BookOpen, Users, ChevronRight, Mic, Terminal
+    QrCode, BrainCircuit, Play, X, Quote, ZapOff, Clock, Server, BookOpen, Users, ChevronRight, Mic, Terminal,
+    Compass // 🔥 ADDED COMPASS ICON
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────
@@ -193,7 +194,8 @@ function LivePlayground() {
 // ─────────────────────────────────────────────────────────────
 // COMPONENT 2: THE MAIN LANDING PAGE EXPORT
 // ─────────────────────────────────────────────────────────────
-export default function LandingPage({ onGetStarted, onLogin, onJoinGuest, onStartPlacement }: any) {
+// 🔥 ADDED `onStartPrepositions` TO PROPS
+export default function LandingPage({ onGetStarted, onLogin, onJoinGuest, onStartPlacement, onStartPrepositions }: any) {
     const [scrolled, setScrolled] = useState(false);
     const [activeTab, setActiveTab] = useState<'all' | 'survival' | 'professional' | 'grammar'>('all');
 
@@ -242,8 +244,10 @@ export default function LandingPage({ onGetStarted, onLogin, onJoinGuest, onStar
                 
                 <div className="max-w-5xl mx-auto relative z-10 animate-in slide-in-from-bottom-8 fade-in duration-1000">
                     
-                    {/* 🔥 BIG HERO PLACEMENT BANNER */}
-                    <div className="mb-16 md:mb-20">
+                    {/* 🔥 STACKED HERO BANNERS CONTAINER */}
+                    <div className="mb-16 md:mb-20 space-y-4">
+                        
+                        {/* BANNER 1: PLACEMENT EXAM */}
                         <div 
                             onClick={onStartPlacement}
                             className="bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900/40 rounded-[2rem] border border-indigo-500/30 p-1 cursor-pointer hover:border-indigo-400/60 transition-all duration-300 group overflow-hidden relative shadow-[0_0_40px_rgba(99,102,241,0.15)] hover:shadow-[0_0_60px_rgba(99,102,241,0.25)] hover:-translate-y-1"
@@ -264,6 +268,32 @@ export default function LandingPage({ onGetStarted, onLogin, onJoinGuest, onStar
                                 </button>
                             </div>
                         </div>
+
+                        {/* 🔥 BANNER 2: NEW PREPOSITIONS EXAM */}
+                        <div 
+                            onClick={onStartPrepositions}
+                            className="bg-gradient-to-r from-slate-900/40 via-cyan-900/40 to-blue-900/40 rounded-[2rem] border border-cyan-500/30 p-1 cursor-pointer hover:border-cyan-400/60 transition-all duration-300 group overflow-hidden relative shadow-[0_0_40px_rgba(6,182,212,0.15)] hover:shadow-[0_0_60px_rgba(6,182,212,0.25)] hover:-translate-y-1"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                            <div className="bg-slate-950/80 backdrop-blur-xl rounded-[1.8rem] p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
+                                <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+                                    <div className="w-14 h-14 rounded-2xl bg-cyan-500/20 flex items-center justify-center border border-cyan-500/40 shrink-0">
+                                        <Compass size={28} className="text-cyan-400 group-hover:scale-110 transition-transform duration-300" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center justify-center sm:justify-start gap-2.5 mb-1">
+                                            <h3 className="text-white font-black text-xl md:text-2xl tracking-tight">Prepositions Diagnostic</h3>
+                                            <span className="text-[10px] font-black uppercase tracking-widest bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-md">Time • Place • Direction</span>
+                                        </div>
+                                        <p className="text-slate-400 text-sm font-medium">Evaluate your spatial and temporal grammar across CEFR levels A1 through C1.</p>
+                                    </div>
+                                </div>
+                                <button className="shrink-0 bg-cyan-600 hover:bg-cyan-500 text-white px-8 py-4 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all group-hover:shadow-cyan-500/25 flex items-center gap-3 w-full sm:w-auto justify-center">
+                                    Launch Exam <ArrowRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+
                     </div>
 
                     <div className="text-center">
