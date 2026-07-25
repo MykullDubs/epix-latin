@@ -88,7 +88,7 @@ function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: a
 }
 
 // ============================================================================
-//  LESSON VIEW SUB-COMPONENTS (Upgraded for universal payload support)
+//  LESSON VIEW SUB-COMPONENTS
 // ============================================================================
 const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
     const [isFlipped, setIsFlipped] = useState(false);
@@ -166,7 +166,6 @@ const ChatDialogueBlock = ({ lines }: any) => (
     </div>
 );
 
-// 🔥 NEW: UNIVERSAL GRAMMAR & ESSAY BLOCK RENDERERS
 const GrammarBlock = ({ block }: any) => (
     <div className="my-8 bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-8 rounded-[2.5rem] shadow-xl border border-indigo-500/30">
         <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest mb-4">
@@ -192,14 +191,13 @@ const GrammarBlock = ({ block }: any) => (
     </div>
 );
 
-// --- MAIN LESSON VIEW (Upgraded with Universal Payload & Page Flattening) ---
+// --- MAIN LESSON VIEW ---
 function LessonView({ lesson, onFinish }: any) {
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
   const resetScroll = () => { window.scrollTo(0, 0); const container = document.getElementById('lesson-scroll-container'); if (container) container.scrollTop = 0; };
   useLayoutEffect(() => { resetScroll(); }, []);
   const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
   
-  // 🔥 UNIVERSAL FLATTENING: Supports root blocks array OR paginated pages array
   const blocks = useMemo(() => {
       if (lesson.blocks && Array.isArray(lesson.blocks)) return lesson.blocks;
       if (lesson.pages && Array.isArray(lesson.pages)) {
@@ -316,7 +314,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
 }
 
 // ============================================================================
-//  HOME VIEW (With Diagnostic Card for Logged-In Students)
+//  HOME VIEW
 // ============================================================================
 function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStartExam, userData, assignments, classes, user }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
@@ -343,7 +341,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
         </div>
         
         <div className="px-6 space-y-8 mt-8">
-          {/* 🔥 ADAPTIVE CEFR ASSESSMENTS SECTION */}
           <div className="animate-in slide-in-from-bottom-4 duration-500 delay-50">
             <div className="flex justify-between items-end mb-3 ml-1">
               <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
@@ -592,7 +589,7 @@ function App() {
 
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  // 🔥 3. PASS LAUNCH CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER
+  // 🔥 3. PASS LAUNCH CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER (No duplicates!)
   const commonHandlers = { 
       onSaveCard: handleCreateCard, 
       onUpdateCard: handleUpdateCard, 
@@ -633,7 +630,7 @@ function App() {
                 content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
                 break;
             case 'create': 
-                content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} {...commonHandlers} />;
+                content = <BuilderHub allDecks={allDecks} lessons={lessons} {...commonHandlers} />;
                 break;
             case 'profile': 
                 content = <ProfileView user={user} userData={userData} />;
