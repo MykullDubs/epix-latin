@@ -61,8 +61,6 @@ const INITIAL_SYSTEM_LESSONS: any[] = [
   { id: 'l1', title: "Salutationes", subtitle: "Greetings in the Forum", description: "Learn how to greet friends and elders.", xp: 50, vocab: ['Salve', 'Vale', 'Quid agis?'], blocks: [{ type: 'text', title: 'The Basics', content: 'In Latin, we distinguish between addressing one person ("Salve") and multiple people ("Salvete").' }, { type: 'dialogue', lines: [ { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" }, { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" } ] }, { type: 'quiz', question: "How do you say 'Hello' to a group?", options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }], correctId: 'b' }] }
 ];
 
-const TYPE_COLORS: any = { verb: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700' }, noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' }, adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' }, phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' }, adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' } };
-
 // --- ANALYTICS HOOK ---
 const useLearningTimer = (user: any, activityId: string, activityType: string, title: string) => {
     useEffect(() => {
@@ -83,12 +81,8 @@ function Toast({ message, onClose }: any) {
   return (<div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-sm text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300 border border-white/10"><Check size={16} className="text-emerald-400" /> <span className="text-sm font-medium tracking-wide">{message}</span></div>);
 }
 
-function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: any) {
-  return (<div className={`px-6 pt-12 pb-6 bg-white ${sticky ? 'sticky top-0' : ''} z-40 border-b border-slate-100 flex justify-between items-end`}><div onClick={onClickTitle} className={onClickTitle ? "cursor-pointer active:opacity-60 transition-opacity" : ""}><h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">{title} {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}</h1>{subtitle && <p className="text-sm text-slate-500 mt-1 font-medium">{subtitle}</p>}</div>{rightAction}</div>);
-}
-
 // ============================================================================
-//  LESSON VIEW SUB-COMPONENTS
+//  LESSON VIEW SUB-COMPONENTS (Upgraded for universal payload support)
 // ============================================================================
 const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
     const [isFlipped, setIsFlipped] = useState(false);
@@ -166,6 +160,7 @@ const ChatDialogueBlock = ({ lines }: any) => (
     </div>
 );
 
+// 🔥 UNIVERSAL GRAMMAR BLOCK RENDERER
 const GrammarBlock = ({ block }: any) => (
     <div className="my-8 bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-8 rounded-[2.5rem] shadow-xl border border-indigo-500/30">
         <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest mb-4">
@@ -191,19 +186,59 @@ const GrammarBlock = ({ block }: any) => (
     </div>
 );
 
-// --- MAIN LESSON VIEW ---
+// --- MAIN LESSON VIEW (Upgraded with Universal Payload Normalizer & Page Flattening) ---
 function LessonView({ lesson, onFinish }: any) {
-  useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
+  useLearningTimer(auth.currentUser, lesson?.id || 'demo', 'lesson', lesson?.title || 'Lesson');
   const resetScroll = () => { window.scrollTo(0, 0); const container = document.getElementById('lesson-scroll-container'); if (container) container.scrollTop = 0; };
   useLayoutEffect(() => { resetScroll(); }, []);
   const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
   
-  const blocks = useMemo(() => {
-      if (lesson.blocks && Array.isArray(lesson.blocks)) return lesson.blocks;
-      if (lesson.pages && Array.isArray(lesson.pages)) {
-          return lesson.pages.flatMap((p: any) => p.blocks || []);
+  // 🔥 UNIVERSAL PAYLOAD NORMALIZER: Unpacks strings, database wrappers, pages, and flat blocks
+  const { normalizedLesson, blocks } = useMemo(() => {
+      let obj: any = lesson;
+      
+      // 1. If lesson is a raw JSON string, parse it
+      if (typeof obj === 'string') {
+          try { obj = JSON.parse(obj); } catch (e) { console.error("Could not parse raw lesson string:", e); }
       }
-      return [];
+
+      // 2. If lesson has a stringified payload/content/data/json/body/raw field, unpack and merge it
+      const payloadFields = ['payload', 'content', 'data', 'json', 'body', 'raw', 'rawJson', 'code', 'lesson'];
+      for (const field of payloadFields) {
+          if (obj && obj[field]) {
+              if (typeof obj[field] === 'string') {
+                  try {
+                      const parsed = JSON.parse(obj[field]);
+                      obj = { ...obj, ...parsed };
+                  } catch (e) {}
+              } else if (typeof obj[field] === 'object' && !Array.isArray(obj[field])) {
+                  obj = { ...obj, ...obj[field] };
+              }
+          }
+      }
+
+      // 3. If blocks or pages are stringified arrays, parse them
+      if (obj && typeof obj.blocks === 'string') {
+          try { obj.blocks = JSON.parse(obj.blocks); } catch (e) {}
+      }
+      if (obj && typeof obj.pages === 'string') {
+          try { obj.pages = JSON.parse(obj.pages); } catch (e) {}
+      }
+
+      // 4. Extract blocks array
+      let extractedBlocks: any[] = [];
+      if (obj && obj.blocks && Array.isArray(obj.blocks)) {
+          extractedBlocks = obj.blocks;
+      } else if (obj && obj.pages && Array.isArray(obj.pages)) {
+          extractedBlocks = obj.pages.flatMap((p: any) => p.blocks || p.content || []);
+      } else if (obj && Array.isArray(obj)) {
+          extractedBlocks = obj;
+      } else if (obj && (obj.type || obj.title || obj.content || obj.questions || obj.prompt || obj.lines || obj.rule)) {
+          // If a single unwrapped block was passed, wrap it in an array!
+          extractedBlocks = [obj];
+      }
+
+      return { normalizedLesson: obj || {}, blocks: extractedBlocks };
   }, [lesson]);
 
   const progress = blocks.length > 0 ? ((currentBlockIdx + 1) / blocks.length) * 100 : 100;
@@ -215,7 +250,7 @@ function LessonView({ lesson, onFinish }: any) {
           setCurrentBlockIdx(prev => prev + 1); 
       } else { 
           resetScroll(); 
-          onFinish(lesson.id || 'lesson', lesson.xp || 50, lesson.title || 'Completed Module'); 
+          onFinish(normalizedLesson.id || 'lesson', normalizedLesson.xp || 50, normalizedLesson.title || 'Completed Module'); 
       } 
   };
   const handleExit = () => { resetScroll(); onFinish(null, 0); };
@@ -264,6 +299,28 @@ function LessonView({ lesson, onFinish }: any) {
                                       <span className="text-purple-600 font-black">{i + 1}.</span> {q}
                                   </div>
                               ))}
+                          </div>
+                      )}
+                  </div>
+              );
+          case 'wrap_up_block':
+              return (
+                  <div className="my-8 bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-8 text-slate-800">
+                      <div className="flex items-center gap-2 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 text-emerald-600 font-bold">✓</div>
+                          <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">Lesson Wrap-Up</span>
+                      </div>
+                      <p className="font-bold text-lg mb-4">{block.summary}</p>
+                      {block.objectivesMet && (
+                          <div className="pt-4 border-t border-emerald-500/20">
+                              <span className="text-[10px] uppercase tracking-widest font-black text-emerald-600 block mb-2">Objectives Confirmed:</span>
+                              <ul className="space-y-1.5">
+                                  {block.objectivesMet.map((obj: string, i: number) => (
+                                      <li key={i} className="text-sm font-medium text-slate-600 flex items-center gap-2">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"/> {obj}
+                                      </li>
+                                  ))}
+                              </ul>
                           </div>
                       )}
                   </div>
@@ -466,17 +523,22 @@ function App() {
       return 'Scholar';
   }, [userData, user]);
 
-  const handleContentSelection = (item: any) => { 
-      setActiveExam(null); 
-      if (item.contentType === 'deck') { 
-          setSelectedDeckKey(item.id); 
+  const handleContentSelection = useCallback((rawItem: any) => { 
+      setActiveExam(null);
+      let item = rawItem;
+      if (typeof rawItem === 'string') {
+          try { item = JSON.parse(rawItem); } catch (e) { item = { title: "Custom Payload", blocks: [] }; }
+      }
+      
+      if (item && (item.contentType === 'deck' || item.type === 'deck' || (item.cards && !item.blocks && !item.pages && !item.payload))) { 
+          setSelectedDeckKey(item.id || 'salutationes'); 
           setActiveTab('flashcards'); 
           setActiveStudentClass(null); 
           setActiveLesson(null); 
       } else { 
-          setActiveLesson(item); 
+          setActiveLesson(item || { title: "Untitled Module", blocks: [] }); 
       } 
-  };
+  }, []);
 
   // --- EFFECTS ---
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
@@ -526,7 +588,7 @@ function App() {
   }, [user, displayName]);
 
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
-    setActiveLesson(null); // 🔥 GUARANTEE STATE CLEAR CLEARance
+    setActiveLesson(null); 
     setActiveTab('home'); 
     if (xp > 0 && user) { 
         try { 
@@ -539,7 +601,6 @@ function App() {
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
 
   // 🔥 1. INTERCEPT FULLSCREEN EXAMS AND LESSONS BEFORE ROLE CHECKS
-  // (Ensures both instructors and students can launch/deploy payloads instantly)
   if (activeExam === 'preposition') {
       return (
           <div className="relative min-h-screen w-full bg-slate-950">
@@ -599,7 +660,20 @@ function App() {
       onLaunchLesson: handleContentSelection,
       onPreviewLesson: handleContentSelection,
       onDeployLesson: handleContentSelection,
-      onSelectDeck: handleContentSelection
+      onSelectDeck: handleContentSelection,
+      onPlayLesson: handleContentSelection,
+      onStartLesson: handleContentSelection,
+      onRunLesson: handleContentSelection,
+      onTestLesson: handleContentSelection,
+      onPlay: handleContentSelection,
+      onStart: handleContentSelection,
+      onLaunch: handleContentSelection,
+      onPreview: handleContentSelection,
+      onDeploy: handleContentSelection,
+      onSelect: handleContentSelection,
+      onOpen: handleContentSelection,
+      onOpenLesson: handleContentSelection,
+      onClickLesson: handleContentSelection
   };
 
   const isInstructor = userData.role === 'instructor';
