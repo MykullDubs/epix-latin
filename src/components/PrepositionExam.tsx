@@ -1,13 +1,15 @@
 // src/components/PrepositionsExam.tsx
 import React, { useState } from 'react';
 import { 
-    Target, Zap, CheckCircle2, BrainCircuit, ArrowRight, Server, AlertTriangle, Loader2, BookOpen, BarChart3
+    Target, Zap, CheckCircle2, BrainCircuit, ArrowRight, Server, AlertTriangle, Loader2, BookOpen, BarChart3, RefreshCw
 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
 
-// --- DATA: DIAGNOSTIC QUESTION MATRIX ---
+// --- DATA: STRICT TYPE SAFETY ---
 export type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
+
+export type QuestionTuple = [string, string, string, string, string, number, string];
 
 const CEFR_DESCRIPTIONS: Record<CEFRLevel, string> = {
     A1: "Beginner — Basic understanding of simple static locations and clock times.",
@@ -18,7 +20,7 @@ const CEFR_DESCRIPTIONS: Record<CEFRLevel, string> = {
 };
 
 // FORMAT: [Question, Opt 1, Opt 2, Opt 3, Opt 4, Correct Index, Grammar Topic]
-const QUESTION_MATRIX: Record<CEFRLevel, (string | number)[][]> = {
+const QUESTION_MATRIX: Record<CEFRLevel, QuestionTuple[]> = {
   A1: [
     ["We have English class ___ Mondays.", "in", "on", "at", "by", 1, "Time: Days of the Week"],
     ["The book is ___ the table.", "in", "on", "at", "under", 1, "Place: Surfaces (On)"],
@@ -63,7 +65,7 @@ const QUESTION_MATRIX: Record<CEFRLevel, (string | number)[][]> = {
     ["You can't see the sun because it is hidden ___ the clouds.", "behind", "after", "back", "under", 0, "Place: At the back of (Behind)"],
     ["He is walking directly ___ the door right now.", "towards", "at", "in", "on", 0, "Direction: Moving in the direction of (Towards)"]
   ],
- B1: [
+  B1: [
     ["We need to submit the final project ___ the end of the week.", "by", "until", "since", "in", 0, "Time: Deadlines (By vs. Until)"],
     ["I will wait right here ___ you get back.", "until", "by", "for", "since", 0, "Time: Continuous action up to a point (Until)"],
     ["The small cabin is hidden ___ the trees in the forest.", "among", "between", "middle", "in", 0, "Place: Surrounded by multiple objects (Among)"],
@@ -85,7 +87,7 @@ const QUESTION_MATRIX: Record<CEFRLevel, (string | number)[][]> = {
     ["She stood shivering ___ the bus stop in the pouring rain.", "at", "in", "on", "by", 0, "Place: Specific transport stops (At)"],
     ["I couldn't hear the speaker because of the loud chatter ___ me.", "around", "among", "between", "about", 0, "Place: Surrounding in all directions (Around)"]
   ],
- B2: [
+  B2: [
     ["We arrived just ___ time to catch the opening act of the concert.", "in", "on", "at", "by", 0, "Time: Idiomatic (In time vs. On time)"],
     ["The express train departed exactly ___ time, at 8:15 AM.", "on", "in", "at", "by", 0, "Time: Punctuality (On time)"],
     ["___ the time we reached the theater, the play had already started.", "By", "In", "On", "At", 0, "Time: Complex clauses (By the time)"],
@@ -145,19 +147,24 @@ export default function PrepositionsExam() {
     const [streak, setStreak] = useState(0);
     
     const [history, setHistory] = useState<any[]>([]);
-    const [currentQuestionTuple, setCurrentQuestionTuple] = useState<any[] | null>(null);
+    const [currentQuestionTuple, setCurrentQuestionTuple] = useState<QuestionTuple | null>(null);
+
+    // Feedback State for immediate diagnostic retention
+    const [feedbackState, setFeedbackState] = useState<{ selectedIdx: number; isCorrect: boolean } | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     // Database Status State
     const [syncStatus, setSyncStatus] = useState<'pending' | 'success' | 'error'>('pending');
     const [finalResultsObject, setFinalResultsObject] = useState<any>(null);
 
-    const getNextQuestion = (level: CEFRLevel) => {
+    // 🔥 FIX 1: Pass currentHistory explicitly to eliminate stale-state closure bugs
+    const getNextQuestion = (level: CEFRLevel, currentHistory: any[] = history): QuestionTuple => {
         const bank = QUESTION_MATRIX[level];
-        const askedInLevel = history.filter(h => h.level === level).map(h => h.question);
+        const askedInLevel = currentHistory.filter(h => h.level === level).map(h => h.question);
         const available = bank.filter(q => !askedInLevel.includes(q[0]));
         
         if (available.length === 0) {
-            console.warn(`Question bank exhausted at level ${level}. Recycling questions.`);
+            console.warn(`Question bank exhausted at level ${level}. Serving reinforcement item.`);
         }
         
         const pool = available.length > 0 ? available : bank;
@@ -166,11 +173,11 @@ export default function PrepositionsExam() {
 
     const startExam = () => {
         if (!studentName.trim()) return;
-        setCurrentQuestionTuple(getNextQuestion('A2'));
+        setCurrentQuestionTuple(getNextQuestion('A2', []));
         setAppState('testing');
     };
 
-    // Psychometrically robust placement calculator
+    // 🔥 FIX 2: Unbroken mastery placement calculator (stops at first broken threshold)
     const calculateFinalPlacement = (historyData: any[]): CEFRLevel => {
         const accuracyByLevel: Record<CEFRLevel, { correct: number; total: number }> = {
             A1: { correct: 0, total: 0 }, A2: { correct: 0, total: 0 },
@@ -183,28 +190,39 @@ export default function PrepositionsExam() {
             if (h.correct) accuracyByLevel[h.level as CEFRLevel].correct++;
         });
 
-        // Find highest level with >= 3 attempts AND >= 60% accuracy
         let calculatedLevel: CEFRLevel = 'A1';
         for (const level of LEVELS) {
             const { correct, total } = accuracyByLevel[level];
-            if (total >= 3 && (correct / total) >= 0.60) {
-                calculatedLevel = level;
+            if (total >= 3) {
+                if ((correct / total) >= 0.60) {
+                    calculatedLevel = level;
+                } else {
+                    // Broken mastery threshold encountered! Stop scanning upward.
+                    break;
+                }
+            } else if (level === 'A1' && total < 3) {
+                calculatedLevel = 'A1';
             }
         }
         return calculatedLevel;
     };
 
-    const generateResultsObject = (finalHistory: any[]) => {
+    const generateResultsObject = (finalHistory: any[], ceilingReached: CEFRLevel) => {
         const correctCount = finalHistory.filter(h => h.correct).length;
         const calculatedLevel = calculateFinalPlacement(finalHistory);
         
-        // Fair XP: Purely accuracy based to not penalize beginners
         const finalXp = correctCount * 10;
 
-        // Diagnostic Engine: Sort topics by frequency of errors
+        // 🔥 FIX 7: Deduplicate misses to prevent question recycling from skewing diagnostic topics
+        const uniqueMisses = new Set<string>();
         const topicMissCount: Record<string, number> = {};
+        
         finalHistory.filter(h => !h.correct && h.topic).forEach(h => {
-            topicMissCount[h.topic] = (topicMissCount[h.topic] || 0) + 1;
+            const missKey = `${h.question}-${h.topic}`;
+            if (!uniqueMisses.has(missKey)) {
+                uniqueMisses.add(missKey);
+                topicMissCount[h.topic] = (topicMissCount[h.topic] || 0) + 1;
+            }
         });
 
         const uniqueAreasForImprovement = Object.entries(topicMissCount)
@@ -213,9 +231,10 @@ export default function PrepositionsExam() {
             .map(([topic]) => topic);
 
         return {
-            version: "1.4",
+            version: "2.0",
             student_name: studentName,
             final_placement: calculatedLevel,
+            ceiling_reached: ceilingReached, // 🔥 FIX 3: Reconciled tracking
             xp_earned: finalXp,
             coins_earned: Math.floor(finalXp / 5),
             total_questions: finalHistory.length,
@@ -244,10 +263,14 @@ export default function PrepositionsExam() {
     };
 
     const handleAnswer = (selectedIndex: number) => {
-        if (!currentQuestionTuple) return;
+        if (!currentQuestionTuple || isProcessing) return;
+        setIsProcessing(true);
         
         const isCorrect = selectedIndex === currentQuestionTuple[5];
         const topic = currentQuestionTuple[6] || "General Prepositions";
+        
+        // 🔥 FIX 5: Trigger visual retention feedback
+        setFeedbackState({ selectedIdx: selectedIndex, isCorrect });
         
         const newHistory = [...history, {
             question: currentQuestionTuple[0],
@@ -258,12 +281,10 @@ export default function PrepositionsExam() {
         }];
         setHistory(newHistory);
         
-        // Standard +1/-1 streak incrementing
         let newStreak = isCorrect ? streak + 1 : streak - 1;
         let newLevel = currentLevel;
         const levelIdx = LEVELS.indexOf(currentLevel);
 
-        // Adaptive Engine: Strict +/- 3 threshold to prevent level oscillation
         if (newStreak >= 3 && levelIdx < LEVELS.length - 1) {
             newLevel = LEVELS[levelIdx + 1];
             newStreak = 0;
@@ -272,18 +293,23 @@ export default function PrepositionsExam() {
             newStreak = 0;
         }
 
-        setCurrentLevel(newLevel);
-        setStreak(newStreak);
-        setQuestionsAnswered(prev => prev + 1);
+        setTimeout(() => {
+            setCurrentLevel(newLevel);
+            setStreak(newStreak);
+            setQuestionsAnswered(prev => prev + 1);
+            setFeedbackState(null);
+            setIsProcessing(false);
 
-        if (questionsAnswered + 1 >= MAX_QUESTIONS) {
-            const resultsObj = generateResultsObject(newHistory);
-            setFinalResultsObject(resultsObj);
-            saveToDatabase(resultsObj);
-            setAppState('results');
-        } else {
-            setCurrentQuestionTuple(getNextQuestion(newLevel));
-        }
+            if (questionsAnswered + 1 >= MAX_QUESTIONS) {
+                const resultsObj = generateResultsObject(newHistory, newLevel);
+                setFinalResultsObject(resultsObj);
+                saveToDatabase(resultsObj);
+                setAppState('results');
+            } else {
+                // 🔥 FIX 1: Pass newHistory directly into question selector
+                setCurrentQuestionTuple(getNextQuestion(newLevel, newHistory));
+            }
+        }, 800);
     };
 
     // --- UI RENDERING ---
@@ -351,18 +377,37 @@ export default function PrepositionsExam() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 shrink-0">
-                            {[1, 2, 3, 4].map((optIdx) => (
-                                <button 
-                                    key={`${currentQuestionTuple[0]}-${optIdx}`}
-                                    onClick={(e) => {
-                                        e.currentTarget.blur();
-                                        handleAnswer(optIdx - 1);
-                                    }}
-                                    className="w-full bg-slate-900 border-2 border-slate-800 hover:border-indigo-500 hover:bg-indigo-500/10 active:bg-indigo-500/20 text-slate-200 font-bold py-4 px-6 rounded-2xl text-left transition-all"
-                                >
-                                    {currentQuestionTuple[optIdx]}
-                                </button>
-                            ))}
+                            {[1, 2, 3, 4].map((optIdx) => {
+                                const btnIndex = optIdx - 1;
+                                let btnStyle = "bg-slate-900 border-slate-800 hover:border-indigo-500 hover:bg-indigo-500/10 text-slate-200";
+                                
+                                // 🔥 FIX 5: Render immediate diagnostic retention feedback
+                                if (feedbackState) {
+                                    if (btnIndex === feedbackState.selectedIdx) {
+                                        btnStyle = feedbackState.isCorrect 
+                                            ? "bg-emerald-600 border-emerald-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]" 
+                                            : "bg-rose-600 border-rose-400 text-white shadow-[0_0_20px_rgba(244,63,94,0.3)]";
+                                    } else if (!feedbackState.isCorrect && btnIndex === currentQuestionTuple[5]) {
+                                        btnStyle = "bg-emerald-500/20 border-emerald-500/80 text-emerald-300";
+                                    } else {
+                                        btnStyle = "bg-slate-950 border-slate-900 text-slate-600 opacity-50";
+                                    }
+                                }
+
+                                return (
+                                    <button 
+                                        key={`${currentQuestionTuple[0]}-${optIdx}`}
+                                        disabled={isProcessing}
+                                        onClick={(e) => {
+                                            e.currentTarget.blur();
+                                            handleAnswer(btnIndex);
+                                        }}
+                                        className={`w-full border-2 font-bold py-4 px-6 rounded-2xl text-left transition-all ${btnStyle}`}
+                                    >
+                                        {currentQuestionTuple[optIdx]}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -372,6 +417,7 @@ export default function PrepositionsExam() {
 
     if (appState === 'results') {
         const placedLevel = finalResultsObject?.final_placement as CEFRLevel;
+        const ceilingReached = finalResultsObject?.ceiling_reached as CEFRLevel;
 
         return (
             <div className="min-h-screen bg-slate-950 flex flex-col items-center p-6 text-slate-100 py-12 overflow-y-auto font-sans">
@@ -387,8 +433,16 @@ export default function PrepositionsExam() {
 
                     <div className="grid grid-cols-2 gap-4 mb-8">
                         <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl text-center flex flex-col justify-center">
-                            <span className="block text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Estimated CEFR Level</span>
+                            <span className="block text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Assessed CEFR Mastery</span>
                             <span className="text-4xl font-black text-indigo-400 mb-2">{placedLevel}</span>
+                            
+                            {/* 🔥 FIX 3: Transparently expose engine divergence to the reviewer */}
+                            {placedLevel !== ceilingReached && (
+                                <span className="block text-[10px] uppercase tracking-wider text-amber-400/80 mb-2 font-bold bg-amber-500/10 py-1 px-2 rounded-lg border border-amber-500/20">
+                                    Peak Ceiling Reached: {ceilingReached}
+                                </span>
+                            )}
+                            
                             <span className="text-[10px] font-medium text-slate-400 px-2 leading-relaxed">
                                 {CEFR_DESCRIPTIONS[placedLevel]}
                             </span>
@@ -410,7 +464,7 @@ export default function PrepositionsExam() {
                             </div>
                         </div>
 
-                        {/* 🔥 DIAGNOSTIC: Focus Areas */}
+                        {/* DIAGNOSTIC: Focus Areas */}
                         {finalResultsObject?.areas_for_improvement?.length > 0 && (
                             <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl col-span-2">
                                 <div className="flex items-center justify-center gap-2 mb-4">
@@ -428,7 +482,7 @@ export default function PrepositionsExam() {
                         )}
                     </div>
 
-                    {/* 🔥 DATABASE SYNC STATUS HUD */}
+                    {/* 🔥 FIX 4: Resilient Database Retry HUD */}
                     <div className={`mb-4 p-4 rounded-xl border flex items-center justify-between transition-colors ${
                         syncStatus === 'pending' ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' :
                         syncStatus === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
@@ -441,10 +495,20 @@ export default function PrepositionsExam() {
                             <span className="text-xs font-black uppercase tracking-widest">
                                 {syncStatus === 'pending' ? 'Saving your results...' :
                                  syncStatus === 'success' ? 'Results saved successfully' :
-                                 'Connection error'}
+                                 'Connection error saving results'}
                             </span>
                         </div>
+                        
                         {syncStatus === 'success' && <CheckCircle2 size={18} />}
+                        
+                        {syncStatus === 'error' && (
+                            <button 
+                                onClick={() => saveToDatabase(finalResultsObject)}
+                                className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 active:scale-95 text-white font-black uppercase tracking-widest text-[10px] rounded-lg transition-all flex items-center gap-1.5 shadow-md"
+                            >
+                                <RefreshCw size={12} /> Retry Save
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
