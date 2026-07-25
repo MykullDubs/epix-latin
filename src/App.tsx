@@ -22,6 +22,12 @@ import {
 // 🔥 IMPORT YOUR SINGULAR EXAM COMPONENT & LANDING PAGE
 import PrepositionExam from './components/PrepositionExam';
 import LandingPage from './components/LandingPage';
+import StudentClassView from './components/StudentClassView';
+import InstructorDashboard from './components/InstructorDashboard';
+import FlashcardView from './components/FlashcardView';
+import BuilderHub from './components/BuilderHub';
+import ProfileView from './components/ProfileView';
+import AuthView from './components/AuthView'; // If you also have AuthView separate
 // import AuthView from './components/AuthView'; // Uncomment if AuthView is in a separate file
 
 // --- FIREBASE CONFIGURATION ---
