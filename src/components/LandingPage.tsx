@@ -4,7 +4,7 @@ import {
     ArrowRight, Sparkles, Wand2, MonitorPlay, 
     Smartphone, Zap, CheckCircle2, GraduationCap, 
     QrCode, BrainCircuit, Play, X, Quote, ZapOff, Clock, Server, BookOpen, Users, ChevronRight, Mic, Terminal,
-    Compass // 🔥 ADDED COMPASS ICON
+    Compass 
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ function LivePlayground() {
     const [rawJson, setRawJson] = useState(DEFAULT_PAYLOAD);
     const [parsedData, setParsedData] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
-  
+ 
     // Real-time JSON Compilation
     useEffect(() => {
       try {
@@ -67,7 +67,7 @@ function LivePlayground() {
         setError(e.message);
       }
     }, [rawJson]);
-  
+ 
     // The Mock Rendering Engine (Parses MagisterOS Blocks)
     const renderBlock = (block: any, index: number) => {
       switch (block.type) {
@@ -143,7 +143,7 @@ function LivePlayground() {
           );
       }
     };
-  
+ 
     return (
       <div className="flex flex-col md:flex-row h-[600px]">
         {/* Editor Panel */}
@@ -160,7 +160,7 @@ function LivePlayground() {
             </div>
           )}
         </div>
-  
+ 
         {/* Render Output Panel */}
         <div className="w-full md:w-1/2 flex flex-col relative overflow-hidden bg-slate-900">
           <div className="flex-1 overflow-y-auto p-8 custom-scrollbar relative z-10">
@@ -194,7 +194,6 @@ function LivePlayground() {
 // ─────────────────────────────────────────────────────────────
 // COMPONENT 2: THE MAIN LANDING PAGE EXPORT
 // ─────────────────────────────────────────────────────────────
-// 🔥 ADDED `onStartPrepositions` TO PROPS
 export default function LandingPage({ onGetStarted, onLogin, onJoinGuest, onStartPlacement, onStartPrepositions }: any) {
     const [scrolled, setScrolled] = useState(false);
     const [activeTab, setActiveTab] = useState<'all' | 'survival' | 'professional' | 'grammar'>('all');
@@ -247,9 +246,9 @@ export default function LandingPage({ onGetStarted, onLogin, onJoinGuest, onStar
                     {/* 🔥 STACKED HERO BANNERS CONTAINER */}
                     <div className="mb-16 md:mb-20 space-y-4">
                         
-                        {/* BANNER 1: PLACEMENT EXAM */}
+                        {/* BANNER 1: PLACEMENT EXAM (Pointed to working exam) */}
                         <div 
-                            onClick={onStartPlacement}
+                            onClick={onStartPrepositions} // 🔥 FIX: Set this to trigger the working Prepositions Exam
                             className="bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900/40 rounded-[2rem] border border-indigo-500/30 p-1 cursor-pointer hover:border-indigo-400/60 transition-all duration-300 group overflow-hidden relative shadow-[0_0_40px_rgba(99,102,241,0.15)] hover:shadow-[0_0_60px_rgba(99,102,241,0.25)] hover:-translate-y-1"
                         >
                             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
