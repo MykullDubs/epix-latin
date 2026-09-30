@@ -32,10 +32,11 @@ import AuthView from './components/AuthView';
 
 // 🔥 IMPORT YOUR HOST PROJECTOR VIEWS
 import ClassView from './components/ClassView';
-import TriviaHost from './components/instructor/TriviaHost';
-import ConnectFourHost from './components/instructor/ConnectFourHost';
-import SlipstreamHost from './components/instructor/SlipstreamHost';
-import MarbleScrabbleHost from './components/instructor/MarbleScrabbleHost';
+// COMMENT THESE OUT UNTIL THE FILES ARE CREATED:
+// import TriviaHost from './components/instructor/TriviaHost';
+// import ConnectFourHost from './components/instructor/ConnectFourHost';
+// import SlipstreamHost from './components/instructor/SlipstreamHost';
+// import MarbleScrabbleHost from './components/instructor/MarbleScrabbleHost';
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -671,33 +672,33 @@ function App() {
                       />
                   )}
                   
-                  {liveHostConfig.mode === 'trivia' && (
-                      <TriviaHost 
-                          classId={liveHostConfig.classId} 
-                          deck={targetContent} 
-                      />
-                  )}
-                  
-                  {liveHostConfig.mode === 'connect_four' && (
-                      <ConnectFourHost 
-                          classId={liveHostConfig.classId} 
-                          deck={targetContent} 
-                      />
-                  )}
-                  
-                  {liveHostConfig.mode === 'slipstream' && (
-                      <SlipstreamHost 
-                          classId={liveHostConfig.classId} 
-                          deck={targetContent} 
-                      />
+                  {/* FALLBACK FOR UNBUILT GAMES */}
+                  {liveHostConfig.mode !== 'presentation' && (
+                      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-white h-full">
+                         <div className="bg-slate-900 border border-slate-800 p-12 rounded-[3rem] shadow-2xl max-w-lg w-full">
+                             <h2 className="text-3xl font-black uppercase mb-4 text-rose-500">Module Missing</h2>
+                             <p className="text-slate-400 font-bold uppercase tracking-widest text-xs leading-loose">
+                                 The <span className="text-white">{liveHostConfig.mode}</span> host component hasn't been implemented yet.
+                             </p>
+                         </div>
+                      </div>
                   )}
 
-                  {liveHostConfig.mode === 'marble_scrabble' && (
-                      <MarbleScrabbleHost 
-                          classId={liveHostConfig.classId} 
-                          deck={targetContent} 
-                      />
+                  {/* UNCOMMENT THESE LATER ONCE YOU BUILD THE FILES */}
+                  {/*
+                  {liveHostConfig.mode === 'trivia' && (
+                      <TriviaHost classId={liveHostConfig.classId} deck={targetContent} />
                   )}
+                  {liveHostConfig.mode === 'connect_four' && (
+                      <ConnectFourHost classId={liveHostConfig.classId} deck={targetContent} />
+                  )}
+                  {liveHostConfig.mode === 'slipstream' && (
+                      <SlipstreamHost classId={liveHostConfig.classId} deck={targetContent} />
+                  )}
+                  {liveHostConfig.mode === 'marble_scrabble' && (
+                      <MarbleScrabbleHost classId={liveHostConfig.classId} deck={targetContent} />
+                  )}
+                  */}
               </div>
           </div>
       );
