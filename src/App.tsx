@@ -371,20 +371,55 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
 }
 
 // ============================================================================
-//  HOME VIEW
+//  HOME VIEW (Fixes applied for mapping assignment String IDs to objects)
 // ============================================================================
-function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStartExam, userData, assignments, classes, user }: any) {
+function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStartExam, userData, assignments, classes, user, allDecks }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { const viewport = scrollViewportRef.current; if (viewport) { viewport.scrollTop = 0; setTimeout(() => { if (viewport) viewport.scrollTop = 0; }, 10); } }, []);
   const completedSet = new Set(userData?.completedAssignments || []);
-  const relevantAssignments = (assignments || []).filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email));
+  
+  // 🔥 FIX 2 APPLIED HERE: Properly map string IDs to lesson/deck objects
+  const relevantAssignments = (assignments || [])
+      .map((assignmentId: any) => {
+          // If it's already an object, return it
+          if (typeof assignmentId !== 'string') return assignmentId;
+          
+          // 1. Check Lessons
+          const node = lessons?.find((l: any) => l.id === assignmentId);
+          if (node) return node;
+          
+          // 2. Check Flashcard Decks
+          const deck = allDecks?.[assignmentId] || Object.values(allDecks || {}).find((d: any) => d.id === assignmentId);
+          if (deck) return { 
+              ...deck, 
+              contentType: 'deck', 
+              type: 'deck', 
+              blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }] 
+          };
+          
+          return null;
+      })
+      .filter(Boolean)
+      .filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email));
+
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
   const xp = userData?.xp || 0;
   const level = Math.floor(xp / 1000) + 1;
   const progress = ((xp % 1000) / 1000) * 100;
 
-  if (activeStudentClass) { return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} user={user} />; }
+  if (activeStudentClass) { 
+    return <StudentClassView 
+        classData={activeStudentClass} 
+        onBack={() => setActiveStudentClass(null)} 
+        onSelectLesson={onSelectLesson} 
+        onSelectDeck={onSelectDeck} 
+        userData={userData} 
+        user={user} 
+        lessons={lessons} // 🔥 FIX 1 APPLIED HERE
+        allDecks={allDecks} // 🔥 FIX 1 APPLIED HERE
+    />; 
+  }
 
   return (
   <div ref={scrollViewportRef} className="h-full overflow-y-auto overflow-x-hidden relative bg-slate-50 scroll-smooth">
@@ -688,12 +723,34 @@ function App() {
 
     if (activeTab === 'home' && activeStudentClass) {
         viewKey = `class-${activeStudentClass.id}`;
-        content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} displayName={displayName} />;
+        content = <StudentClassView 
+            classData={activeStudentClass} 
+            onBack={() => setActiveStudentClass(null)} 
+            onSelectLesson={handleContentSelection} 
+            onSelectDeck={handleContentSelection} 
+            userData={userData} 
+            user={user} 
+            displayName={displayName} 
+            lessons={lessons} // 🔥 FIX 1 APPLIED HERE
+            allDecks={allDecks} // 🔥 FIX 1 APPLIED HERE
+        />;
     } else {
         viewKey = `tab-${activeTab}`;
         switch (activeTab) {
             case 'home': 
-                content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} onStartExam={(examId: string) => setActiveExam(examId)} userData={userData} user={user} />;
+                content = <HomeView 
+                    setActiveTab={setActiveTab} 
+                    allDecks={allDecks} 
+                    lessons={lessons} 
+                    assignments={classLessons} 
+                    classes={enrolledClasses} 
+                    onSelectClass={(c: any) => setActiveStudentClass(c)} 
+                    onSelectLesson={handleContentSelection} 
+                    onSelectDeck={handleContentSelection} 
+                    onStartExam={(examId: string) => setActiveExam(examId)} 
+                    userData={userData} 
+                    user={user} 
+                />;
                 break;
             case 'discovery':
                 content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} />;
