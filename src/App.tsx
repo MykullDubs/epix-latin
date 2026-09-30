@@ -30,6 +30,13 @@ import BuilderHub from './components/instructor/BuilderHub';
 import ProfileView from './components/ProfileView';
 import AuthView from './components/AuthView';
 
+// 🔥 IMPORT YOUR HOST PROJECTOR VIEWS
+import ClassView from './components/ClassView';
+import TriviaHost from './components/instructor/TriviaHost';
+import ConnectFourHost from './components/instructor/ConnectFourHost';
+import SlipstreamHost from './components/instructor/SlipstreamHost';
+import MarbleScrabbleHost from './components/instructor/MarbleScrabbleHost';
+
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
   apiKey: "AIzaSyAjK79x_N5pSWzWluFUg25mqEc_HeraRPk",
@@ -645,7 +652,7 @@ function App() {
       const targetContent = allDecks[liveHostConfig.contentId] || lessons.find(l => l.id === liveHostConfig.contentId);
       
       return (
-          <div className="relative min-h-screen w-full bg-slate-950 flex flex-col font-sans">
+          <div className="relative min-h-screen w-full bg-slate-950 flex flex-col font-sans overflow-hidden">
               <button 
                   onClick={() => setLiveHostConfig(null)}
                   className="absolute top-4 left-4 z-50 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-800 backdrop-blur-md transition-all flex items-center gap-1.5 shadow-lg active:scale-95"
@@ -653,24 +660,44 @@ function App() {
                   <ArrowLeft size={14} strokeWidth={2.5} /> Close Session
               </button>
 
-              {/* PLACEHOLDER: Mount your actual Host Components here! */}
-              <div className="flex-1 flex items-center justify-center pt-16 pb-8 px-8 text-center text-white">
-                  <div className="bg-slate-900 border border-slate-800 p-12 rounded-[3rem] max-w-2xl w-full shadow-2xl">
-                      <Zap size={48} className="mx-auto mb-6 text-indigo-500 animate-pulse" />
-                      <h2 className="text-3xl font-black uppercase tracking-widest mb-4">Projector Active</h2>
-                      <p className="text-slate-400 mb-8 font-bold text-sm tracking-widest uppercase">
-                          Mode: <span className="text-indigo-400">{liveHostConfig.mode}</span><br/>
-                          Class ID: {liveHostConfig.classId}
-                      </p>
-                      <div className="p-6 bg-black rounded-3xl border border-slate-800 text-xs text-slate-500 font-mono text-left leading-relaxed">
-                          {`// Mount your Host components here based on liveHostConfig.mode:`}<br/><br/>
-                          {`{liveHostConfig.mode === 'presentation' && <LessonProjector classId="${liveHostConfig.classId}" lesson={targetContent} />}`}<br/><br/>
-                          {`{liveHostConfig.mode === 'trivia' && <TriviaHost classId="${liveHostConfig.classId}" deck={targetContent} />}`}<br/><br/>
-                          {`{liveHostConfig.mode === 'connect_four' && <ConnectFourHost classId="${liveHostConfig.classId}" deck={targetContent} />}`}<br/><br/>
-                          {`{liveHostConfig.mode === 'slipstream' && <SlipstreamHost classId="${liveHostConfig.classId}" deck={targetContent} />}`}<br/><br/>
-                          {`{liveHostConfig.mode === 'marble_scrabble' && <MarbleScrabbleHost classId="${liveHostConfig.classId}" deck={targetContent} />}`}
-                      </div>
-                  </div>
+              {/* LIVE PROJECTOR ROUTER */}
+              <div className="flex-1 w-full h-full relative">
+                  {liveHostConfig.mode === 'presentation' && (
+                      <ClassView 
+                          classId={liveHostConfig.classId} 
+                          lesson={targetContent} 
+                          userData={userData}
+                          onExit={() => setLiveHostConfig(null)}
+                      />
+                  )}
+                  
+                  {liveHostConfig.mode === 'trivia' && (
+                      <TriviaHost 
+                          classId={liveHostConfig.classId} 
+                          deck={targetContent} 
+                      />
+                  )}
+                  
+                  {liveHostConfig.mode === 'connect_four' && (
+                      <ConnectFourHost 
+                          classId={liveHostConfig.classId} 
+                          deck={targetContent} 
+                      />
+                  )}
+                  
+                  {liveHostConfig.mode === 'slipstream' && (
+                      <SlipstreamHost 
+                          classId={liveHostConfig.classId} 
+                          deck={targetContent} 
+                      />
+                  )}
+
+                  {liveHostConfig.mode === 'marble_scrabble' && (
+                      <MarbleScrabbleHost 
+                          classId={liveHostConfig.classId} 
+                          deck={targetContent} 
+                      />
+                  )}
               </div>
           </div>
       );
