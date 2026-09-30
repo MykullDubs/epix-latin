@@ -12,7 +12,7 @@ import ClassManagerView from './ClassManagerView';
 import InstructorInbox from './InstructorInbox';
 import { AnalyticsDashboard } from './InstructorTools';
 import CommandCenter from './CommandCenter';
-import LiveSetupModal from './LiveSetupModal'; 
+import LiveSetupModal from './LiveSetupModal'; // Note: If you renamed this file to DeploymentModal, update this import!
 import InstructorVault from './InstructorVault'; 
 import GradebookMatrix from './GradebookMatrix';
 import InstructorGradebook from './InstructorGradebook';
@@ -48,7 +48,7 @@ export default function InstructorDashboard({
   onStartVocabGame,
   onStartConnectFour,
   onStartSlipstream, 
-  onStartMarbleScrabble, // 🔥 ADDED THIS PROP
+  onStartMarbleScrabble,
   onPublishDeck, 
   onSwitchView, 
   onLogout,
@@ -425,30 +425,39 @@ export default function InstructorDashboard({
                preselectedContent={preselectedContent}
                classes={userData?.classes || []}
                decks={allDecks}
+               curriculums={curriculums}
                lessons={lessons}
                onDeploy={(config: any) => {
                    setIsLiveModalOpen(false);
                    setPreselectedContent(null);
                    
-                   if (onAssign && config.classId !== 'sandbox') {
-                       onAssign(config.classId, config.contentId);
-                   }
-                   
-                   setTimeout(() => {
-                       if (config.mode === 'connect_four') {
-                           if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
-                       } else if (config.mode === 'marble_scrabble') {
-                           if (onStartMarbleScrabble) onStartMarbleScrabble(config.contentId, config.classId);
-                       } else if (config.mode === 'trivia') {
-                           if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
-                       } else if (config.mode === 'slipstream') {
-                           if (onStartSlipstream) onStartSlipstream(config.contentId, config.classId);
-                       } else if (config.mode === 'presentation') {
-                           if (onStartPresentation) onStartPresentation(config.contentId, config.classId);
-                       } else if (config.mode === 'hud') {
-                           if (onStartHUD) onStartHUD(config.contentId, config.classId);
+                   // 🔥 1. SILENT ASSIGNMENT ROUTING
+                   if (config.mode === 'assign' && config.classId !== 'sandbox') {
+                       const isCurriculum = curriculums?.some((c: any) => c.id === config.contentId);
+                       if (isCurriculum) {
+                           if (onAssignCurriculum) onAssignCurriculum(config.classId, config.contentId);
+                       } else {
+                           if (onAssign) onAssign(config.classId, config.contentId);
                        }
-                   }, 300);
+                   } 
+                   // 🔥 2. LIVE PROTOCOL ROUTING (Does not hit student homework queues)
+                   else {
+                       setTimeout(() => {
+                           if (config.mode === 'connect_four') {
+                               if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
+                           } else if (config.mode === 'marble_scrabble') {
+                               if (onStartMarbleScrabble) onStartMarbleScrabble(config.contentId, config.classId);
+                           } else if (config.mode === 'trivia') {
+                               if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
+                           } else if (config.mode === 'slipstream') {
+                               if (onStartSlipstream) onStartSlipstream(config.contentId, config.classId);
+                           } else if (config.mode === 'presentation') {
+                               if (onStartPresentation) onStartPresentation(config.contentId, config.classId);
+                           } else if (config.mode === 'hud') {
+                               if (onStartHUD) onStartHUD(config.contentId, config.classId);
+                           }
+                       }, 300);
+                   }
                }}
            />
 
