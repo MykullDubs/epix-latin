@@ -7,7 +7,7 @@ import {
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
     Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation,
     ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen, Volume2,
-    AlertCircle, Download, LayoutGrid, Check, Maximize, Keyboard
+    AlertCircle, Download, LayoutGrid, Check, Maximize, Keyboard, Monitor
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
@@ -76,7 +76,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     
     // Annotation Palette & State
     const [isAnnotating, setIsAnnotating] = useState(false);
-    const [markerColor, setMarkerColor] = useState('#06b6d4'); // Swapped to cyan default
+    const [markerColor, setMarkerColor] = useState('#06b6d4');
     const [markerSize, setMarkerSize] = useState(6);
     const [markerStyle, setMarkerStyle] = useState<'pen' | 'highlighter' | 'text' | 'eraser'>('pen');
     const toolbarRef = useRef<HTMLDivElement>(null);
@@ -165,9 +165,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     useEffect(() => {
         if (!lesson?.id) return;
         startLiveClass(lesson.id);
-        updateLiveState({ started: false }); // explicit lobby flag
+        updateLiveState({ started: false }); 
 
-        // Restore Draggable Positions
         if (timerRef.current) timerRef.current.style.transform = localStorage.getItem('timerPos') || `translate(${window.innerWidth - 350}px, 50px)`;
         if (toolbarRef.current) toolbarRef.current.style.transform = localStorage.getItem('toolbarPos') || `translate(${window.innerWidth / 2 - 250}px, 80px)`;
         if (mainToolsRef.current) mainToolsRef.current.style.transform = localStorage.getItem('toolsPos') || `translate(${window.innerWidth - 320}px, ${window.innerHeight - 500}px)`;
@@ -182,7 +181,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
         } else if (timeLeft === 0 && timerRunning) {
             setTimerRunning(false);
-            // Play alarm sound and visual flash
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
             audio.play().catch(() => {});
             setIsBlanked(true);
@@ -221,7 +219,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             stroke.points.forEach(p => ctx.lineTo(p.x, p.y));
             ctx.stroke();
         });
-        ctx.globalCompositeOperation = 'source-over'; // reset
+        ctx.globalCompositeOperation = 'source-over'; 
         ctx.globalAlpha = 1.0;
     }, [activePageIdx, showWhiteboard, wbPage, strokesByPage, wbStrokesByPage]);
 
@@ -245,7 +243,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         const onMove = (ev: PointerEvent) => {
             let newX = initX + (ev.clientX - startX);
             let newY = initY + (ev.clientY - startY);
-            // Clamp to viewport
             newX = clamp(newX, 0, window.innerWidth - 100);
             newY = clamp(newY, 0, window.innerHeight - 100);
             el.style.transform = `translate(${newX}px, ${newY}px)`;
@@ -350,7 +347,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         link.click();
     };
 
-    // Spotlight Handler
     const handleSpotlightMove = (e: React.PointerEvent) => {
         if (!isSpotlight || !spotlightRef.current || !classViewRef.current) return;
         const rect = classViewRef.current.getBoundingClientRect();
@@ -1111,7 +1107,6 @@ const QuizBlock = memo(({ block, liveState, triggerQuiz }: { block: any, liveSta
     const totalCount = Object.keys(liveState?.students || {}).length || 1;
     const options = Array.isArray(block.content?.options) ? block.content.options : [];
     
-    // Compute Histogram
     const answerCounts: Record<string, number> = {};
     Object.values(liveState?.answers || {}).forEach((ans: any) => { answerCounts[ans.answerId] = (answerCounts[ans.answerId] || 0) + 1; });
 
@@ -1173,11 +1168,7 @@ const QuizBlock = memo(({ block, liveState, triggerQuiz }: { block: any, liveSta
     );
 });
 
-// ... the rest of the FillBlankBlock, TapSortBlock, PronunciationLab, GrammarBlock are wrapped in `memo` similarly.
-// I will output the FillBlank and TapSort to include the correct/incorrect icons as requested.
-
 const FillBlankBlock = memo(({ block, liveState }: { block: any, liveState: any }) => {
-    // Keeping logic identical but updating the UI for projector size and icons
     const rawText = String(block.text || "Missing text [here].");
     const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
@@ -1309,7 +1300,6 @@ const FillBlankBlock = memo(({ block, liveState }: { block: any, liveState: any 
 });
 
 const TapSortBlock = memo(({ block, liveState }: { block: any, liveState?: any }) => {
-    // Boilerplate for TapSort
     const normalizedItems = useMemo(() => {
         let rawItems = [];
         try { rawItems = JSON.parse(JSON.stringify(block.items || [])); } catch (e) {}
@@ -1407,4 +1397,116 @@ const TapSortBlock = memo(({ block, liveState }: { block: any, liveState?: any }
     );
 });
 
-export { ClassView };
+const LiveRoleplayBlock = memo(({ block, onLaunch }: { block: any, onLaunch: (prompt: string) => void }) => (
+    <div className="bg-slate-950 p-12 md:p-16 rounded-[4rem] shadow-2xl my-12 text-white relative overflow-hidden group w-full max-w-6xl mx-auto text-center border border-slate-800 pointer-events-auto">
+        <div className="absolute -right-20 -top-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none group-hover:bg-cyan-500/20 transition-colors duration-700" />
+        <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none group-hover:bg-indigo-500/20 transition-colors duration-700" />
+        
+        <div className="relative z-10 flex flex-col items-center">
+            <div className="w-28 h-28 bg-slate-900 border border-cyan-500/30 rounded-[2.5rem] flex items-center justify-center text-cyan-400 mb-10 shadow-[0_0_30px_rgba(6,182,212,0.15)] motion-safe:animate-pulse">
+                <Mic size={56} strokeWidth={2}/>
+            </div>
+            
+            <h3 className="text-[6vh] font-bold mb-8 leading-tight tracking-tight">
+                {String(block.title || "Live Simulation")}
+            </h3>
+            
+            <div className="flex gap-6 items-center justify-center mb-12">
+                <div className="px-8 py-4 bg-slate-800/80 border border-slate-700/50 rounded-2xl text-[2.5vh] font-bold uppercase tracking-wider text-slate-400">
+                    AI: <span className="text-cyan-400">{block.metadata?.aiPersona || 'Unknown'}</span>
+                </div>
+                <div className="px-8 py-4 bg-slate-800/80 border border-slate-700/50 rounded-2xl text-[2.5vh] font-bold uppercase tracking-wider text-slate-400">
+                    You: <span className="text-indigo-400">{block.metadata?.studentRole || 'Unknown'}</span>
+                </div>
+            </div>
+
+            <p className="text-slate-300 font-medium text-[3.5vh] leading-relaxed max-w-4xl mb-16">
+                Your Objective: <strong className="text-white">{block.metadata?.objective || 'Complete the scenario successfully.'}</strong>
+            </p>
+
+            <button 
+                onClick={() => onLaunch(block.prompt)}
+                className="px-12 py-6 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-[2.5rem] font-bold text-[3vh] uppercase tracking-wider shadow-xl hover:shadow-cyan-500/25 active:scale-95 hover:-translate-y-1 transition-all flex items-center justify-center gap-4"
+            >
+                <Mic size={36} strokeWidth={2.5}/> Start Call on Smartboard
+            </button>
+        </div>
+    </div>
+));
+
+const GrammarBlock = memo(({ block }: { block: any }) => {
+    const [revealed, setRevealed] = useState<Record<number, boolean>>({});
+
+    const toggleReveal = (idx: number) => {
+        setRevealed(prev => ({ ...prev, [idx]: !prev[idx] }));
+    };
+
+    return (
+        <div className="w-full max-w-7xl mx-auto my-12 animate-in fade-in slide-in-from-bottom-8 duration-700 pointer-events-auto">
+            <div className="bg-slate-900 rounded-[4rem] p-12 md:p-20 shadow-2xl border border-slate-800 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-indigo-500 via-cyan-500 to-emerald-500" />
+                <div className="absolute -top-32 -right-32 w-[30rem] h-[30rem] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
+
+                <header className="mb-16 relative z-10 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
+                    <div className="p-6 bg-indigo-500/10 text-indigo-400 rounded-[2rem] shrink-0 border border-indigo-500/20">
+                        <Presentation size={56} strokeWidth={2}/>
+                    </div>
+                    <div>
+                        <h2 className="text-[5.5vh] font-bold text-white tracking-tight mb-4 leading-none">
+                            {block.title || 'Grammar Focus'}
+                        </h2>
+                        <p className="text-[3vh] text-slate-300 font-medium leading-relaxed">
+                            {block.rule}
+                        </p>
+                    </div>
+                </header>
+
+                {block.formula && (
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-[3rem] p-10 mb-16 relative z-10 shadow-inner">
+                        <div className="text-[2.2vh] font-bold uppercase tracking-wider text-slate-500 mb-6 flex items-center justify-center md:justify-start gap-3">
+                            <AlertCircle size={24} className="text-amber-500" /> Structure Formula
+                        </div>
+                        <p className="text-[5vh] font-mono font-bold text-cyan-400 tracking-tight text-center md:text-left leading-snug">
+                            {block.formula}
+                        </p>
+                    </div>
+                )}
+
+                <div className="space-y-6 relative z-10">
+                    <div className="text-[2.2vh] font-bold uppercase tracking-wider text-slate-500 mb-8 flex items-center justify-center md:justify-start gap-3">
+                        <AlertCircle size={24} /> Drill Examples
+                    </div>
+                    
+                    {block.examples?.map((ex: any, idx: number) => {
+                        const parts = ex.en.split(new RegExp(`(${ex.target})`, 'gi'));
+                        const isRevealed = revealed[idx];
+                        
+                        return (
+                            <div key={idx} className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 p-8 bg-slate-800/40 hover:bg-slate-800/60 rounded-[2.5rem] border border-slate-700/50 transition-colors group">
+                                <p className="text-[4vh] font-medium text-white flex-1 leading-snug cursor-pointer" onClick={() => toggleReveal(idx)}>
+                                    {parts.map((part: string, i: number) => 
+                                        part.toLowerCase() === (ex.target || '').toLowerCase() ? (
+                                            <span 
+                                                key={i} 
+                                                className={`inline-block mx-2 font-bold transition-all duration-300 px-4 py-1 rounded-2xl ${isRevealed ? 'text-amber-400 bg-amber-500/10 border-2 border-amber-500/20' : 'text-transparent bg-slate-700/80 hover:bg-slate-700 border-2 border-slate-600/50 min-w-[120px]'}`}
+                                            >
+                                                {isRevealed ? part : ''}
+                                            </span>
+                                        ) : (
+                                            <span key={i}>{part}</span>
+                                        )
+                                    )}
+                                </p>
+                                {ex.note && (
+                                    <p className="text-[2.5vh] font-medium text-slate-400 xl:max-w-lg text-left xl:text-right border-l-4 xl:border-l-0 border-slate-700 pl-6 xl:pl-0 pt-4 xl:pt-0">
+                                        {ex.note}
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+});
