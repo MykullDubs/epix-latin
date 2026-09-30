@@ -532,6 +532,10 @@ function App() {
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [activeExam, setActiveExam] = useState<string | null>(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
+  
+  // 🔥 NEW STATE FOR LIVE PROJECTOR/HOST VIEW
+  const [liveHostConfig, setLiveHostConfig] = useState<{ mode: string, contentId: string, classId: string } | null>(null);
+
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [classLessons, setClassLessons] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
@@ -635,7 +639,44 @@ function App() {
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
 
-  // 🔥 1. INTERCEPT FULLSCREEN EXAMS AND LESSONS BEFORE ROLE CHECKS
+  // 🔥 1. INTERCEPT LIVE HOST/PROJECTOR VIEWS
+  if (liveHostConfig) {
+      // Find the specific lesson/deck object being deployed
+      const targetContent = allDecks[liveHostConfig.contentId] || lessons.find(l => l.id === liveHostConfig.contentId);
+      
+      return (
+          <div className="relative min-h-screen w-full bg-slate-950 flex flex-col font-sans">
+              <button 
+                  onClick={() => setLiveHostConfig(null)}
+                  className="absolute top-4 left-4 z-50 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-800 backdrop-blur-md transition-all flex items-center gap-1.5 shadow-lg active:scale-95"
+              >
+                  <ArrowLeft size={14} strokeWidth={2.5} /> Close Session
+              </button>
+
+              {/* PLACEHOLDER: Mount your actual Host Components here! */}
+              <div className="flex-1 flex items-center justify-center pt-16 pb-8 px-8 text-center text-white">
+                  <div className="bg-slate-900 border border-slate-800 p-12 rounded-[3rem] max-w-2xl w-full shadow-2xl">
+                      <Zap size={48} className="mx-auto mb-6 text-indigo-500 animate-pulse" />
+                      <h2 className="text-3xl font-black uppercase tracking-widest mb-4">Projector Active</h2>
+                      <p className="text-slate-400 mb-8 font-bold text-sm tracking-widest uppercase">
+                          Mode: <span className="text-indigo-400">{liveHostConfig.mode}</span><br/>
+                          Class ID: {liveHostConfig.classId}
+                      </p>
+                      <div className="p-6 bg-black rounded-3xl border border-slate-800 text-xs text-slate-500 font-mono text-left leading-relaxed">
+                          {`// Mount your Host components here based on liveHostConfig.mode:`}<br/><br/>
+                          {`{liveHostConfig.mode === 'presentation' && <LessonProjector classId="${liveHostConfig.classId}" lesson={targetContent} />}`}<br/><br/>
+                          {`{liveHostConfig.mode === 'trivia' && <TriviaHost classId="${liveHostConfig.classId}" deck={targetContent} />}`}<br/><br/>
+                          {`{liveHostConfig.mode === 'connect_four' && <ConnectFourHost classId="${liveHostConfig.classId}" deck={targetContent} />}`}<br/><br/>
+                          {`{liveHostConfig.mode === 'slipstream' && <SlipstreamHost classId="${liveHostConfig.classId}" deck={targetContent} />}`}<br/><br/>
+                          {`{liveHostConfig.mode === 'marble_scrabble' && <MarbleScrabbleHost classId="${liveHostConfig.classId}" deck={targetContent} />}`}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      );
+  }
+
+  // 🔥 2. INTERCEPT FULLSCREEN EXAMS AND LESSONS BEFORE ROLE CHECKS
   if (activeExam === 'preposition') {
       return (
           <div className="relative min-h-screen w-full bg-slate-950">
@@ -658,7 +699,7 @@ function App() {
       );
   }
 
-  // 🔥 2. WIRED LANDING PAGE FOR UNAUTHENTICATED VISITORS
+  // 🔥 3. WIRED LANDING PAGE FOR UNAUTHENTICATED VISITORS
   if (!user) {
       if (showAuthModal) {
           return (
@@ -685,7 +726,7 @@ function App() {
 
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  // 🔥 3. PASS LAUNCH CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER (No duplicates!)
+  // 🔥 4. PASS LAUNCH CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER (No duplicates!)
   const commonHandlers = { 
       onSaveCard: handleCreateCard, 
       onUpdateCard: handleUpdateCard, 
@@ -714,7 +755,20 @@ function App() {
   const isInstructor = userData.role === 'instructor';
 
   if (isInstructor) {
-      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} {...commonHandlers} onLogout={() => signOut(auth)} />;
+      return <InstructorDashboard 
+          user={user} 
+          userData={{...userData, classes: enrolledClasses}} 
+          allDecks={allDecks} 
+          lessons={libraryLessons} 
+          {...commonHandlers} 
+          // 🔥 NEW: PASS PROJECTOR HANDLERS TO DASHBOARD
+          onStartPresentation={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'presentation', contentId, classId })}
+          onStartVocabGame={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'trivia', contentId, classId })}
+          onStartConnectFour={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'connect_four', contentId, classId })}
+          onStartSlipstream={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'slipstream', contentId, classId })}
+          onStartMarbleScrabble={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'marble_scrabble', contentId, classId })}
+          onLogout={() => signOut(auth)} 
+      />;
   }
 
   const renderStudentView = () => {
@@ -731,8 +785,8 @@ function App() {
             userData={userData} 
             user={user} 
             displayName={displayName} 
-            lessons={lessons} // 🔥 FIX 1 APPLIED HERE
-            allDecks={allDecks} // 🔥 FIX 1 APPLIED HERE
+            lessons={lessons} // 🔥 FIX 1
+            allDecks={allDecks} // 🔥 FIX 1
         />;
     } else {
         viewKey = `tab-${activeTab}`;
