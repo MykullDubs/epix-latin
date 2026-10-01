@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Layers, BookOpen, FileText, Gamepad2, X, Edit3, Eye, Zap, Map, 
-  Wrench, Search, Loader2, Volume2, AlertCircle, ArrowLeft
+  Wrench, Search, Loader2, Volume2, AlertCircle, ArrowLeft, PenTool
 } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 import CardBuilderView from './CardBuilderView';
