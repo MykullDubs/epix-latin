@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
@@ -7,7 +8,7 @@ import {
 } from "firebase/auth";
 import { 
   getFirestore, doc, setDoc, onSnapshot, collection, addDoc, updateDoc, 
-  increment, writeBatch, deleteDoc, arrayUnion, query, where, collectionGroup, 
+  increment, writeBatch, deleteDoc, arrayUnion, arrayRemove, getDoc, query, where, collectionGroup, 
   orderBy, limit 
 } from "firebase/firestore";
 import { 
@@ -645,6 +646,79 @@ function App() {
     } 
   }, [user, displayName]);
 
+  const handleCreateClass = useCallback(async (name: string) => {
+      if (!user) return;
+      try {
+          await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
+              name,
+              code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+              instructorId: user.uid,
+              students: [],
+              studentEmails: [],
+              assignments: [],
+              createdAt: Date.now(),
+              pulse: 100
+          });
+      } catch (e) { console.error("Error creating class:", e); }
+  }, [user]);
+
+  const handleDeleteClass = useCallback(async (classId: string) => {
+      if (!user) return;
+      try {
+          await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId));
+      } catch (e) { console.error("Error deleting class:", e); }
+  }, [user]);
+
+  const handleRenameClass = useCallback(async (classId: string, newName: string) => {
+      if (!user) return;
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName });
+      } catch (e) { console.error("Error renaming class:", e); }
+  }, [user]);
+
+  const handleAddStudent = useCallback(async (classId: string, email: string) => {
+      if (!user) return;
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+              studentEmails: arrayUnion(email),
+              students: arrayUnion({ email, name: email.split('@')[0], joinedAt: Date.now() })
+          });
+      } catch (e) { console.error("Error adding student:", e); }
+  }, [user]);
+
+  const handleRemoveStudent = useCallback(async (classId: string, email: string) => {
+      if (!user) return;
+      try {
+          const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+          const classDoc = await getDoc(classRef);
+          if (classDoc.exists()) {
+              const data = classDoc.data();
+              await updateDoc(classRef, {
+                  students: (data.students || []).filter((s: any) => s.email !== email),
+                  studentEmails: (data.studentEmails || []).filter((e: string) => e !== email)
+              });
+          }
+      } catch (e) { console.error("Error removing student:", e); }
+  }, [user]);
+
+  const handleAssign = useCallback(async (classId: string, lessonId: string) => {
+      if (!user) return;
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+              assignments: arrayUnion(lessonId)
+          });
+      } catch (e) { console.error("Error assigning lesson:", e); }
+  }, [user]);
+
+  const handleRevoke = useCallback(async (classId: string, lessonId: string) => {
+      if (!user) return;
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+              assignments: arrayRemove(lessonId)
+          });
+      } catch (e) { console.error("Error revoking lesson:", e); }
+  }, [user]);
+
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
 
   // 🔥 1. INTERCEPT LIVE HOST/PROJECTOR VIEWS
@@ -789,7 +863,17 @@ function App() {
           allDecks={allDecks} 
           lessons={libraryLessons} 
           {...commonHandlers} 
-          // 🔥 NEW: PASS PROJECTOR HANDLERS TO DASHBOARD
+
+          // 🔥 NEW: CLASS MANAGER HANDLERS
+          onCreateClass={handleCreateClass}
+          onDeleteClass={handleDeleteClass}
+          onRenameClass={handleRenameClass}
+          onAddStudent={handleAddStudent}
+          onRemoveStudent={handleRemoveStudent}
+          onAssign={handleAssign}
+          onRevoke={handleRevoke}
+          
+          // PROJECTOR HANDLERS
           onStartPresentation={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'presentation', contentId, classId })}
           onStartVocabGame={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'trivia', contentId, classId })}
           onStartConnectFour={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'connect_four', contentId, classId })}
