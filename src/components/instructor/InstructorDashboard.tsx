@@ -12,7 +12,7 @@ import ClassManagerView from './ClassManagerView';
 import InstructorInbox from './InstructorInbox';
 import { AnalyticsDashboard } from './InstructorTools';
 import CommandCenter from './CommandCenter';
-import LiveSetupModal from './LiveSetupModal'; // Note: If you renamed this file to DeploymentModal, update this import!
+import LiveSetupModal from './LiveSetupModal';
 import InstructorVault from './InstructorVault'; 
 import GradebookMatrix from './GradebookMatrix';
 import InstructorGradebook from './InstructorGradebook';
@@ -35,8 +35,8 @@ export default function InstructorDashboard({
   onDeleteCard,
   onDeleteArtifact,
   onMoveToFolder,
-  onAssign,              
-  onRevoke,              
+  onAssign,               
+  onRevoke,               
   onCreateClass,  
   onDeleteClass,  
   onRenameClass,
@@ -57,24 +57,36 @@ export default function InstructorDashboard({
   clearProIntent,    
   AdminDashboardView 
 }: any) {
-  // 🔥 THE ROUTING ENGINE
+  // Navigation stack
   const [tabHistory, setTabHistory] = useState<string[]>(['dashboard']);
   const activeTab = tabHistory[tabHistory.length - 1] || 'dashboard';
 
   const [isRailExpanded, setIsRailExpanded] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState<string>(''); 
-  const [dashCohortId, setDashCohortId] = useState<string>(userData?.classes?.[0]?.id || '');
   
+  // Cohort selections
+  const [dashCohortId, setDashCohortId] = useState<string>(userData?.classes?.[0]?.id || '');
   const [gradebookClassId, setGradebookClassId] = useState<string>(userData?.classes?.[0]?.id || '');
   const [gradeView, setGradeView] = useState<'matrix' | 'speedmoderator'>('matrix');
 
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
   const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
 
-  // 🔥 NEW: State to hold the specific lesson ID for the Studio
   const [studioTargetId, setStudioTargetId] = useState<string | null>(null);
 
-  // 🔥 CATCH INTENTS FROM BASIC HUB
+  // Auto-sync active cohorts once Firebase finishes loading
+  useEffect(() => {
+    const classes = userData?.classes || [];
+    if (classes.length > 0) {
+      if (!gradebookClassId || !classes.some((c: any) => c.id === gradebookClassId)) {
+        setGradebookClassId(classes[0].id);
+      }
+      if (!dashCohortId || !classes.some((c: any) => c.id === dashCohortId)) {
+        setDashCohortId(classes[0].id);
+      }
+    }
+  }, [userData?.classes, gradebookClassId, dashCohortId]);
+
+  // Catch intents from Basic View
   useEffect(() => {
       if (proIntent) {
           setTabHistory([proIntent.tab]);
@@ -82,15 +94,12 @@ export default function InstructorDashboard({
           if (proIntent.action === 'launch_content' && proIntent.targetId) {
               setPreselectedContent({ id: proIntent.targetId, type: 'lesson' });
               setIsLiveModalOpen(true);
-          } 
-          else if (proIntent.action === 'launch_class' && proIntent.targetId) {
+          } else if (proIntent.action === 'launch_class' && proIntent.targetId) {
               setDashCohortId(proIntent.targetId);
               setIsLiveModalOpen(true); 
-          }
-          else if (proIntent.action === 'edit' && proIntent.targetId) {
+          } else if (proIntent.action === 'edit' && proIntent.targetId) {
               setStudioTargetId(proIntent.targetId); 
-          }
-          else if (proIntent.action === 'generate') {
+          } else if (proIntent.action === 'generate') {
               setStudioTargetId('generate'); 
           }
           
@@ -98,7 +107,7 @@ export default function InstructorDashboard({
       }
   }, [proIntent, clearProIntent]);
 
-  // --- NAVIGATION HANDLERS ---
+  // Navigation Handlers
   const handleSidebarNav = (tab: string) => {
       setTabHistory([tab]);
       if (window.innerWidth < 768) {
@@ -116,6 +125,11 @@ export default function InstructorDashboard({
   const handleGoBack = () => {
       setTabHistory(prev => prev.length > 1 ? prev.slice(0, -1) : prev);
   };
+
+  // Safely resolve the currently selected class for the gradebook
+  const selectedGradeClass = userData?.classes?.find((c: any) => c.id === gradebookClassId) 
+    || userData?.classes?.[0] 
+    || null;
 
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
     const isActive = activeTab === id;
@@ -163,7 +177,7 @@ export default function InstructorDashboard({
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans select-none transition-colors duration-300">
       
-    <aside 
+      <aside 
         className={`bg-slate-950 dark:bg-black flex flex-col overflow-x-hidden transition-all duration-500 ease-in-out z-50 border-r border-slate-900 dark:border-slate-800/50 shadow-[20px_0_40px_rgba(0,0,0,0.1)] dark:shadow-[20px_0_40px_rgba(0,0,0,0.4)] ${
           isRailExpanded ? 'w-72' : 'w-20'
         }`}
@@ -255,7 +269,7 @@ export default function InstructorDashboard({
       {/* --- MAIN STAGE --- */}
       <main className="flex-1 flex flex-col overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         
-        {/* THE GLOBAL RETURN BUTTON */}
+        {/* GLOBAL RETURN BUTTON */}
         {tabHistory.length > 1 && (
             <div className="shrink-0 px-4 md:px-8 pt-4 pb-2 z-10 flex items-center animate-in slide-in-from-top-4 duration-300">
                 <button
@@ -323,18 +337,18 @@ export default function InstructorDashboard({
            {activeTab === 'vault' && (
              <div className="h-full animate-in zoom-in-95 duration-500">
                <InstructorVault 
-                   decks={allDecks} 
-                   lessons={lessons} 
-                   onDeleteArtifact={onDeleteArtifact} 
-                   onMoveToFolder={onMoveToFolder} 
-                   onLaunchLive={(id: string, type: string) => {
+                    decks={allDecks} 
+                    lessons={lessons} 
+                    onDeleteArtifact={onDeleteArtifact} 
+                    onMoveToFolder={onMoveToFolder} 
+                    onLaunchLive={(id: string, type: string) => {
                        setPreselectedContent({ id, type });
                        setIsLiveModalOpen(true);
-                   }}
-                   onEditArtifact={(id: string, type: string) => {
+                    }}
+                    onEditArtifact={(id: string, type: string) => {
                        setStudioTargetId(id); 
                        handleDrillDown('studio'); 
-                   }}
+                    }}
                />
              </div>
            )}
@@ -349,34 +363,38 @@ export default function InstructorDashboard({
                     <div className="flex items-center gap-4 w-full md:w-auto">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Target Cohort</span>
                         <select 
-                            value={gradebookClassId}
+                            value={selectedGradeClass?.id || ''}
                             onChange={(e) => setGradebookClassId(e.target.value)}
                             className="w-full md:w-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all shadow-sm cursor-pointer"
                         >
-                            {userData?.classes?.map((c: any) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
+                            {userData?.classes?.length ? (
+                              userData.classes.map((c: any) => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                              ))
+                            ) : (
+                              <option value="">No cohorts available</option>
+                            )}
                         </select>
                     </div>
                 </div>
                 
                 <div className="flex-1 overflow-hidden p-6 md:p-8 bg-slate-50 dark:bg-slate-950">
-                    {gradebookClassId ? (
+                    {selectedGradeClass ? (
                         gradeView === 'matrix' ? (
                             <GradebookMatrix 
-                                classData={userData?.classes?.find((c: any) => c.id === gradebookClassId)} 
+                                classData={selectedGradeClass} 
                                 lessons={lessons} 
                                 activityLogs={activityLogs} 
                             />
                         ) : (
                             <InstructorGradebook 
-                                classData={userData?.classes?.find((c: any) => c.id === gradebookClassId)} 
+                                classData={selectedGradeClass} 
                             />
                         )
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-slate-400 font-bold uppercase tracking-widest opacity-50">
                             <BookOpen size={48} strokeWidth={1.5} className="mb-4 text-slate-300" />
-                            Select a cohort to initialize grading engine
+                            Select or create a cohort to initialize grading engine
                         </div>
                     )}
                 </div>
@@ -431,7 +449,6 @@ export default function InstructorDashboard({
                    setIsLiveModalOpen(false);
                    setPreselectedContent(null);
                    
-                   // 🔥 1. SILENT ASSIGNMENT ROUTING
                    if (config.mode === 'assign' && config.classId !== 'sandbox') {
                        const isCurriculum = curriculums?.some((c: any) => c.id === config.contentId);
                        if (isCurriculum) {
@@ -439,22 +456,20 @@ export default function InstructorDashboard({
                        } else {
                            if (onAssign) onAssign(config.classId, config.contentId);
                        }
-                   } 
-                   // 🔥 2. LIVE PROTOCOL ROUTING (Does not hit student homework queues)
-                   else {
+                   } else {
                        setTimeout(() => {
-                           if (config.mode === 'connect_four') {
-                               if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
-                           } else if (config.mode === 'marble_scrabble') {
-                               if (onStartMarbleScrabble) onStartMarbleScrabble(config.contentId, config.classId);
-                           } else if (config.mode === 'trivia') {
-                               if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
-                           } else if (config.mode === 'slipstream') {
-                               if (onStartSlipstream) onStartSlipstream(config.contentId, config.classId);
-                           } else if (config.mode === 'presentation') {
-                               if (onStartPresentation) onStartPresentation(config.contentId, config.classId);
-                           } else if (config.mode === 'hud') {
-                               if (onStartHUD) onStartHUD(config.contentId, config.classId);
+                           if (config.mode === 'connect_four' && onStartConnectFour) {
+                               onStartConnectFour(config.contentId, config.classId);
+                           } else if (config.mode === 'marble_scrabble' && onStartMarbleScrabble) {
+                               onStartMarbleScrabble(config.contentId, config.classId);
+                           } else if (config.mode === 'trivia' && onStartVocabGame) {
+                               onStartVocabGame(config.contentId, config.classId);
+                           } else if (config.mode === 'slipstream' && onStartSlipstream) {
+                               onStartSlipstream(config.contentId, config.classId);
+                           } else if (config.mode === 'presentation' && onStartPresentation) {
+                               onStartPresentation(config.contentId, config.classId);
+                           } else if (config.mode === 'hud' && onStartHUD) {
+                               onStartHUD(config.contentId, config.classId);
                            }
                        }, 300);
                    }
