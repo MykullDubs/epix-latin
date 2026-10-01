@@ -91,7 +91,7 @@ function Toast({ message, onClose }: any) {
 }
 
 // ============================================================================
-//  LESSON VIEW SUB-COMPONENTS (Upgraded for universal payload support)
+//  LESSON VIEW SUB-COMPONENTS
 // ============================================================================
 const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
     const [isFlipped, setIsFlipped] = useState(false);
@@ -169,7 +169,6 @@ const ChatDialogueBlock = ({ lines }: any) => (
     </div>
 );
 
-// 🔥 UNIVERSAL GRAMMAR BLOCK RENDERER
 const GrammarBlock = ({ block }: any) => (
     <div className="my-8 bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-8 rounded-[2.5rem] shadow-xl border border-indigo-500/30">
         <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest mb-4">
@@ -195,23 +194,19 @@ const GrammarBlock = ({ block }: any) => (
     </div>
 );
 
-// --- MAIN LESSON VIEW (Upgraded with Universal Payload Normalizer & Page Flattening) ---
+// --- MAIN LESSON VIEW ---
 function LessonView({ lesson, onFinish }: any) {
   useLearningTimer(auth.currentUser, lesson?.id || 'demo', 'lesson', lesson?.title || 'Lesson');
   const resetScroll = () => { window.scrollTo(0, 0); const container = document.getElementById('lesson-scroll-container'); if (container) container.scrollTop = 0; };
   useLayoutEffect(() => { resetScroll(); }, []);
   const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
   
-  // 🔥 UNIVERSAL PAYLOAD NORMALIZER: Unpacks strings, database wrappers, pages, and flat blocks
   const { normalizedLesson, blocks } = useMemo(() => {
       let obj: any = lesson;
-      
-      // 1. If lesson is a raw JSON string, parse it
       if (typeof obj === 'string') {
           try { obj = JSON.parse(obj); } catch (e) { console.error("Could not parse raw lesson string:", e); }
       }
 
-      // 2. If lesson has a stringified payload/content/data/json/body/raw field, unpack and merge it
       const payloadFields = ['payload', 'content', 'data', 'json', 'body', 'raw', 'rawJson', 'code', 'lesson'];
       for (const field of payloadFields) {
           if (obj && obj[field]) {
@@ -226,7 +221,6 @@ function LessonView({ lesson, onFinish }: any) {
           }
       }
 
-      // 3. If blocks or pages are stringified arrays, parse them
       if (obj && typeof obj.blocks === 'string') {
           try { obj.blocks = JSON.parse(obj.blocks); } catch (e) {}
       }
@@ -234,7 +228,6 @@ function LessonView({ lesson, onFinish }: any) {
           try { obj.pages = JSON.parse(obj.pages); } catch (e) {}
       }
 
-      // 4. Extract blocks array
       let extractedBlocks: any[] = [];
       if (obj && obj.blocks && Array.isArray(obj.blocks)) {
           extractedBlocks = obj.blocks;
@@ -243,7 +236,6 @@ function LessonView({ lesson, onFinish }: any) {
       } else if (obj && Array.isArray(obj)) {
           extractedBlocks = obj;
       } else if (obj && (obj.type || obj.title || obj.content || obj.questions || obj.prompt || obj.lines || obj.rule)) {
-          // If a single unwrapped block was passed, wrap it in an array!
           extractedBlocks = [obj];
       }
 
@@ -380,7 +372,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
 }
 
 // ============================================================================
-//  HOME VIEW (Fixes applied for mapping assignment String IDs to objects)
+//  HOME VIEW
 // ============================================================================
 function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStartExam, userData, assignments, classes, user, allDecks }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
@@ -388,17 +380,11 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
   useLayoutEffect(() => { const viewport = scrollViewportRef.current; if (viewport) { viewport.scrollTop = 0; setTimeout(() => { if (viewport) viewport.scrollTop = 0; }, 10); } }, []);
   const completedSet = new Set(userData?.completedAssignments || []);
   
-  // 🔥 FIX 2 APPLIED HERE: Properly map string IDs to lesson/deck objects
   const relevantAssignments = (assignments || [])
       .map((assignmentId: any) => {
-          // If it's already an object, return it
           if (typeof assignmentId !== 'string') return assignmentId;
-          
-          // 1. Check Lessons
           const node = lessons?.find((l: any) => l.id === assignmentId);
           if (node) return node;
-          
-          // 2. Check Flashcard Decks
           const deck = allDecks?.[assignmentId] || Object.values(allDecks || {}).find((d: any) => d.id === assignmentId);
           if (deck) return { 
               ...deck, 
@@ -406,7 +392,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
               type: 'deck', 
               blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }] 
           };
-          
           return null;
       })
       .filter(Boolean)
@@ -425,8 +410,8 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
         onSelectDeck={onSelectDeck} 
         userData={userData} 
         user={user} 
-        lessons={lessons} // 🔥 FIX 1 APPLIED HERE
-        allDecks={allDecks} // 🔥 FIX 1 APPLIED HERE
+        lessons={lessons} 
+        allDecks={allDecks} 
     />; 
   }
 
@@ -538,11 +523,14 @@ function App() {
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   
+  // 🔥 NEW: MISSING GRADEBOOK & STUDIO ARRAYS THAT CAUSED CRASHES
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [curriculums, setCurriculums] = useState<any[]>([]);
+
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [activeExam, setActiveExam] = useState<string | null>(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
   
-  // 🔥 NEW STATE FOR LIVE PROJECTOR/HOST VIEW
   const [liveHostConfig, setLiveHostConfig] = useState<{ mode: string, contentId: string, classId: string } | null>(null);
 
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
@@ -601,6 +589,10 @@ function App() {
     const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length > 0) setSystemDecks(d); });
     const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length > 0) setSystemLessons(l); });
 
+    // 🔥 NEW: LOAD GLOBAL LOGS AND CURRICULUMS FOR INSTRUCTORS TO PREVENT CRASHES
+    const unsubCurriculums = onSnapshot(collection(db, 'artifacts', appId, 'curriculums'), (snap) => setCurriculums(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubLogs = onSnapshot(query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(500)), (snap) => setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
     let qClasses;
     if (userData?.role === 'instructor') {
          qClasses = query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'));
@@ -617,7 +609,7 @@ function App() {
         setUserData((prev: any) => ({...prev, classes: cls, classAssignments: newAssignments})); 
     }, (error) => { console.log("Class sync error:", error); setUserData((prev: any) => ({...prev, classSyncError: true})); });
     
-    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
+    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); unsubCurriculums(); unsubLogs(); };
   }, [user, userData?.role]);
 
   // --- HANDLERS ---
@@ -625,8 +617,10 @@ function App() {
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Delete card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); } }, [user]);
   const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
+  const handleCreateCurriculum = useCallback(async (c: any) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_curriculums'), c); }, [user]);
   const handleUpdatePreferences = useCallback(async (prefs: any) => { if (!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { deckPreferences: prefs }); setUserData((prev: any) => ({ ...prev, deckPreferences: prefs })); }, [user]);
   const handleDeleteDeck = useCallback(async (deckId: string) => { if(!user) return; if(!window.confirm("Delete this deck?")) return; try { const toDelete = customCards.filter(c => c.deckId === deckId); for(const c of toDelete) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', c.id)); } setSelectedDeckKey('custom'); } catch(e) { console.error(e); } }, [user, customCards]);
+  
   const handleLogSelfStudy = useCallback(async (deckId: string, xp: number, title: string, scoreDetail?: any) => { 
       if (!user) return; 
       try { 
@@ -646,6 +640,7 @@ function App() {
     } 
   }, [user, displayName]);
 
+  // --- FIREBASE MUTATIONS FOR CLASSES ---
   const handleCreateClass = useCallback(async (name: string) => {
       if (!user) return;
       try {
@@ -664,16 +659,14 @@ function App() {
 
   const handleDeleteClass = useCallback(async (classId: string) => {
       if (!user) return;
-      try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId));
-      } catch (e) { console.error("Error deleting class:", e); }
+      try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId)); } 
+      catch (e) { console.error("Error deleting class:", e); }
   }, [user]);
 
   const handleRenameClass = useCallback(async (classId: string, newName: string) => {
       if (!user) return;
-      try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName });
-      } catch (e) { console.error("Error renaming class:", e); }
+      try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName }); } 
+      catch (e) { console.error("Error renaming class:", e); }
   }, [user]);
 
   const handleAddStudent = useCallback(async (classId: string, email: string) => {
@@ -703,27 +696,20 @@ function App() {
 
   const handleAssign = useCallback(async (classId: string, lessonId: string) => {
       if (!user) return;
-      try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
-              assignments: arrayUnion(lessonId)
-          });
-      } catch (e) { console.error("Error assigning lesson:", e); }
+      try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { assignments: arrayUnion(lessonId) }); } 
+      catch (e) { console.error("Error assigning lesson:", e); }
   }, [user]);
 
   const handleRevoke = useCallback(async (classId: string, lessonId: string) => {
       if (!user) return;
-      try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
-              assignments: arrayRemove(lessonId)
-          });
-      } catch (e) { console.error("Error revoking lesson:", e); }
+      try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { assignments: arrayRemove(lessonId) }); } 
+      catch (e) { console.error("Error revoking lesson:", e); }
   }, [user]);
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
 
   // 🔥 1. INTERCEPT LIVE HOST/PROJECTOR VIEWS
   if (liveHostConfig) {
-      // Find the specific lesson/deck object being deployed
       const targetContent = allDecks[liveHostConfig.contentId] || lessons.find(l => l.id === liveHostConfig.contentId);
       
       return (
@@ -735,7 +721,6 @@ function App() {
                   <ArrowLeft size={14} strokeWidth={2.5} /> Close Session
               </button>
 
-              {/* LIVE PROJECTOR ROUTER */}
               <div className="flex-1 w-full h-full relative">
                   {liveHostConfig.mode === 'presentation' && (
                       <ClassView 
@@ -746,7 +731,6 @@ function App() {
                       />
                   )}
                   
-                  {/* FALLBACK FOR UNBUILT GAMES */}
                   {liveHostConfig.mode !== 'presentation' && (
                       <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-white h-full">
                          <div className="bg-slate-900 border border-slate-800 p-12 rounded-[3rem] shadow-2xl max-w-lg w-full">
@@ -757,22 +741,6 @@ function App() {
                          </div>
                       </div>
                   )}
-
-                  {/* UNCOMMENT THESE LATER ONCE YOU BUILD THE FILES */}
-                  {/*
-                  {liveHostConfig.mode === 'trivia' && (
-                      <TriviaHost classId={liveHostConfig.classId} deck={targetContent} />
-                  )}
-                  {liveHostConfig.mode === 'connect_four' && (
-                      <ConnectFourHost classId={liveHostConfig.classId} deck={targetContent} />
-                  )}
-                  {liveHostConfig.mode === 'slipstream' && (
-                      <SlipstreamHost classId={liveHostConfig.classId} deck={targetContent} />
-                  )}
-                  {liveHostConfig.mode === 'marble_scrabble' && (
-                      <MarbleScrabbleHost classId={liveHostConfig.classId} deck={targetContent} />
-                  )}
-                  */}
               </div>
           </div>
       );
@@ -828,12 +796,13 @@ function App() {
 
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  // 🔥 4. PASS LAUNCH CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER (No duplicates!)
+  // 🔥 4. PASS LAUNCH CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER
   const commonHandlers = { 
       onSaveCard: handleCreateCard, 
       onUpdateCard: handleUpdateCard, 
       onDeleteCard: handleDeleteCard, 
       onSaveLesson: handleCreateLesson,
+      onSaveCurriculum: handleCreateCurriculum,
       onSelectLesson: handleContentSelection,
       onLaunchLesson: handleContentSelection,
       onPreviewLesson: handleContentSelection,
@@ -862,9 +831,10 @@ function App() {
           userData={{...userData, classes: enrolledClasses}} 
           allDecks={allDecks} 
           lessons={libraryLessons} 
+          curriculums={curriculums}
+          activityLogs={activityLogs}
           {...commonHandlers} 
 
-          // 🔥 NEW: CLASS MANAGER HANDLERS
           onCreateClass={handleCreateClass}
           onDeleteClass={handleDeleteClass}
           onRenameClass={handleRenameClass}
@@ -873,12 +843,14 @@ function App() {
           onAssign={handleAssign}
           onRevoke={handleRevoke}
           
-          // PROJECTOR HANDLERS
           onStartPresentation={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'presentation', contentId, classId })}
           onStartVocabGame={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'trivia', contentId, classId })}
           onStartConnectFour={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'connect_four', contentId, classId })}
           onStartSlipstream={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'slipstream', contentId, classId })}
           onStartMarbleScrabble={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'marble_scrabble', contentId, classId })}
+          
+          onSwitchView={() => setUserData((prev: any) => ({ ...prev, role: 'student' }))}
+          onSwitchToBasicView={() => console.log("Basic view transition handled in routing")}
           onLogout={() => signOut(auth)} 
       />;
   }
@@ -897,8 +869,8 @@ function App() {
             userData={userData} 
             user={user} 
             displayName={displayName} 
-            lessons={lessons} // 🔥 FIX 1
-            allDecks={allDecks} // 🔥 FIX 1
+            lessons={lessons}
+            allDecks={allDecks}
         />;
     } else {
         viewKey = `tab-${activeTab}`;
