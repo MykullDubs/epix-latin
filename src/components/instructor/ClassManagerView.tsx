@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Users, Plus, X, BookOpen, Edit3, Trash2, Mail, 
-    Activity, Search, Monitor, Package, Puzzle, Play, Zap, Swords, AlertTriangle, School, ChevronRight
+    Activity, Search, Monitor, Package, Puzzle, Play, Zap, Swords, AlertTriangle, School, ChevronRight, UserMinus, CheckCircle2
 } from 'lucide-react';
 
 export default function ClassManagerView({ 
