@@ -10,16 +10,17 @@ export default function InstructorGradebook({ classData }: any) {
     const [viewType, setViewType] = useState<'exams' | 'all'>('exams'); 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     
-    // 🔥 PRO-LMS: SpeedModerator State
+    // PRO-LMS: SpeedModerator State
     const [reviewingLog, setReviewingLog] = useState<any | null>(null);
     const [localScoreDetails, setLocalScoreDetails] = useState<any | null>(null);
 
     useEffect(() => {
-        if(!classData.assignments || !classData.students) return;
+        if(!classData?.assignments || !classData?.students) return;
         
-        // Map out just the emails for the query if students are objects
         const studentEmails = classData.students.map((s: any) => typeof s === 'string' ? s : s.email).slice(0, 10);
         
+        if (studentEmails.length === 0) return;
+
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
             where('type', '==', 'completion'),
@@ -33,25 +34,23 @@ export default function InstructorGradebook({ classData }: any) {
         return () => unsub();
     }, [classData]);
 
-    const displayedAssignments = classData.assignments.filter((a: any) => 
+    const displayedAssignments = (classData?.assignments || []).filter((a: any) => 
         viewType === 'all' || a.contentType === 'test' || a.contentType === 'exam'
     );
 
     // ========================================================================
-    // 🔥 CSV DATA ESCAPER (The Enterprise Export Engine)
+    // CSV DATA ESCAPER (The Enterprise Export Engine)
     // ========================================================================
     const exportToCSV = () => {
-        if (!classData.students || classData.students.length === 0) {
+        if (!classData?.students || classData.students.length === 0) {
             setToastMsg("No students to export.");
             return;
         }
 
-        // 1. Build the Headers
         const headers = ['Student Name', 'Email'];
         displayedAssignments.forEach((a: any) => headers.push(a.title));
         headers.push('Cumulative GPA');
 
-        // 2. Build the Rows
         const rows = classData.students.map((studentObj: any) => {
             const studentEmail = typeof studentObj === 'string' ? studentObj : studentObj.email;
             const studentName = typeof studentObj === 'string' ? studentEmail.split('@')[0] : (studentObj.name || studentEmail.split('@')[0]);
@@ -60,7 +59,6 @@ export default function InstructorGradebook({ classData }: any) {
             let totalScore = 0;
             let scoredAssignmentsCount = 0;
 
-            // Calculate scores for each assignment
             displayedAssignments.forEach((a: any) => {
                 const log = logs.find(l => l.studentEmail === studentEmail && (l.itemId === a.id || l.itemTitle === a.title));
                 if (log) {
@@ -73,20 +71,17 @@ export default function InstructorGradebook({ classData }: any) {
                 }
             });
 
-            // Calculate Cumulative GPA
             const gpa = scoredAssignmentsCount === 0 ? 'N/A' : `${Math.round(totalScore / scoredAssignmentsCount)}%`;
             rowData.push(gpa);
 
             return rowData;
         });
 
-        // 3. Format as CSV string (Handling commas and quotes safely)
         const csvContent = [
             headers.map((h: any) => `"${String(h).replace(/"/g, '""')}"`).join(','),
-            ...rows.map((row: any[]) => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(',')) // 🔥 Added explicit types here
+            ...rows.map((row: any[]) => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         ].join('\n');
 
-        // 4. Trigger the Download
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -155,7 +150,6 @@ export default function InstructorGradebook({ classData }: any) {
         }
     };
 
-    // --- TABLE CELL RENDERER ---
     const getScoreCell = (studentEmail: string, assign: any) => {
         let log = logs.find(l => l.studentEmail === studentEmail && (l.itemId === assign.id || l.itemTitle === assign.title));
         if (!log) return <span className="text-slate-300 dark:text-slate-700">-</span>;
@@ -196,7 +190,6 @@ export default function InstructorGradebook({ classData }: any) {
                         <button onClick={() => setViewType('all')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'all' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200 dark:border-slate-700' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Show All Logged Data</button>
                     </div>
                     
-                    {/* 🔥 THE CSV EXPORT BUTTON */}
                     <button 
                         onClick={exportToCSV}
                         className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:shadow-lg shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-2"
@@ -220,7 +213,7 @@ export default function InstructorGradebook({ classData }: any) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                            {classData.students.map((studentObj: any) => {
+                            {(classData?.students || []).map((studentObj: any) => {
                                 const studentEmail = typeof studentObj === 'string' ? studentObj : studentObj.email;
                                 const studentName = typeof studentObj === 'string' ? studentEmail.split('@')[0] : (studentObj.name || studentEmail.split('@')[0]);
 
@@ -256,7 +249,7 @@ export default function InstructorGradebook({ classData }: any) {
                 </div>
             </div>
 
-            {/* 🔥 PRO-LMS SPEED MODERATOR SIDE-PANEL */}
+            {/* SPEED MODERATOR SIDE-PANEL */}
             {reviewingLog && localScoreDetails && (
                 <div className="absolute inset-0 z-50 pointer-events-none flex justify-end">
                     <div className="absolute inset-0 bg-slate-900/20 dark:bg-black/40 backdrop-blur-sm pointer-events-auto" onClick={() => { setReviewingLog(null); setLocalScoreDetails(null); }} />
@@ -273,7 +266,6 @@ export default function InstructorGradebook({ classData }: any) {
                             <button onClick={() => { setReviewingLog(null); setLocalScoreDetails(null); }} className="p-2.5 bg-white/10 hover:bg-rose-500 rounded-full transition-colors text-white active:scale-95 shadow-sm"><X size={20} strokeWidth={3} /></button>
                         </header>
 
-                        {/* HUD Overview */}
                         <div className="px-8 py-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0 transition-colors">
                             <div>
                                 <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">Final Assessed Score</span>
@@ -290,7 +282,6 @@ export default function InstructorGradebook({ classData }: any) {
                             </div>
                         </div>
 
-                        {/* Submission Details List */}
                         <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar bg-slate-50 dark:bg-slate-950 transition-colors">
                             {localScoreDetails.details?.map((q: any, i: number) => {
                                 const isEssay = q.type === 'essay';
@@ -302,7 +293,6 @@ export default function InstructorGradebook({ classData }: any) {
                                             <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm ${needsGrading ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
                                                 Q{i + 1} • {q.type}
                                             </span>
-                                            {/* Point Adjuster */}
                                             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
                                                 <input 
                                                     type="number"
@@ -330,7 +320,6 @@ export default function InstructorGradebook({ classData }: any) {
                                             </div>
                                         )}
 
-                                        {/* Feedback Box */}
                                         <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
                                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 mb-3">
                                                 <MessageSquare size={14} className="text-indigo-500" /> Instructor Feedback
