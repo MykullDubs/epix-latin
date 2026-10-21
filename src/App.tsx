@@ -694,21 +694,26 @@ function App() {
       } catch (e) { console.error("Error removing student:", e); }
   }, [user]);
 
-const handleAssign = useCallback(async (classId: string, lessonObject: any) => {
-    if (!user) return;
+// Update the parameters to accept the full item object
+const handleAssign = useCallback(async (classId: string, fullItem: any) => {
+    if (!user || !fullItem) return;
+    
     try { 
-        // Push the whole object instead of just the ID string
         await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
+            // Push the denormalized object into the array instead of a string
             assignments: arrayUnion({
-               id: lessonObject.id,
-               title: lessonObject.title,
-               contentType: lessonObject.contentType || 'lesson',
-               type: lessonObject.type || 'lesson',
-               blocks: lessonObject.blocks || []
+                id: fullItem.id,
+                title: fullItem.title || fullItem.name || 'Untitled Assignment',
+                contentType: fullItem.contentType || fullItem.type || 'lesson',
+                type: fullItem.type || 'lesson',
+                blocks: fullItem.blocks || fullItem.cards || [],
+                // Include cohort targeting if needed
+                targetStudents: fullItem.targetStudents || [] 
             }) 
         }); 
-    } 
-    catch (e) { console.error("Error assigning lesson:", e); }
+    } catch (e) { 
+        console.error("Error assigning lesson:", e); 
+    }
 }, [user]);
 
   const handleRevoke = useCallback(async (classId: string, lessonId: string) => {
