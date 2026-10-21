@@ -1,65 +1,63 @@
 // src/components/StudentNavBar.tsx
 import React from 'react';
 import { Home, Compass, Layers, User, ShoppingBag } from 'lucide-react';
-import HoloAvatar from './HoloAvatar'; // 🔥 IMPORTED
+import HoloAvatar from './HoloAvatar';
 
 // ============================================================================
-//  STUDENT NAVIGATION BAR (Frosted Pill Edition)
+//  STUDENT NAVIGATION BAR (Flat Architectural Grid Edition)
 // ============================================================================
 export default function StudentNavBar({ activeTab, setActiveTab, activeOrg, userData }: any) {
   const tabs = [
-    { id: 'home', icon: <Home size={24} />, label: 'Home' },
-    { id: 'discovery', icon: <Compass size={24} />, label: 'Explore' },
-    { id: 'flashcards', icon: <Layers size={24} />, label: 'Decks' },
-    { id: 'store', icon: <ShoppingBag size={24} />, label: 'Market' },
-    { 
-        id: 'profile', 
-        // 🔥 If they have an avatar, show it! Otherwise, fallback to generic User icon.
-        icon: userData ? (
-            <HoloAvatar student={userData} size="sm" className="w-[26px] h-[26px] border-none ring-0 shadow-none bg-transparent" />
-        ) : (
-            <User size={24} />
-        ), 
-        label: 'Profile' 
-    }
+    { id: 'home', icon: Home, label: 'Home' },
+    { id: 'discovery', icon: Compass, label: 'Explore' },
+    { id: 'flashcards', icon: Layers, label: 'Decks' },
+    { id: 'store', icon: ShoppingBag, label: 'Market' },
+    { id: 'profile', icon: User, label: 'Profile' }
   ];
 
-  // Fallback theme color (your app's default color, e.g., Indigo-600)
+  // Primary brand color used as a stark solid fill for the active tile
   const themeColor = activeOrg?.themeColor || '#4f46e5'; 
 
   return (
-    <div className="absolute bottom-0 left-0 w-full bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800/60 px-6 py-4 pb-8 z-40 rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.4)] transition-colors duration-300">
-      <div className="flex justify-between items-center w-full max-w-md mx-auto px-2">
+    <nav className="absolute bottom-0 left-0 w-full bg-white dark:bg-black border-t-2 border-zinc-900 dark:border-zinc-200 z-50 pb-[env(safe-area-inset-bottom)]">
+      <div className="flex divide-x-2 divide-zinc-900 dark:divide-zinc-200 h-[64px] sm:h-[72px]">
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-col items-center justify-center w-14 transition-all duration-300 relative ${
-                isActive ? '' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+              className={`flex-1 flex flex-col items-center justify-center transition-colors ${
+                isActive
+                  ? 'text-white'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100'
               }`}
-              style={isActive ? { color: themeColor } : {}} 
+              style={isActive ? { backgroundColor: themeColor } : {}} 
             >
-              <div className={`transition-transform duration-300 ${isActive ? '-translate-y-2 scale-110 drop-shadow-md' : 'hover:scale-110'}`}>
-                {tab.icon}
+              <div className="mb-1.5 flex items-center justify-center">
+                {tab.id === 'profile' && userData ? (
+                  <div className={`w-6 h-6 border-2 flex items-center justify-center overflow-hidden bg-zinc-200 dark:bg-zinc-800 ${
+                      isActive ? 'border-white' : 'border-current'
+                  }`}>
+                    {/* Wrapping the avatar in a strict square box to enforce the flat UI */}
+                    <HoloAvatar student={userData} size="sm" className="w-full h-full object-cover scale-110" />
+                  </div>
+                ) : (
+                  <Icon size={20} strokeWidth={isActive ? 3 : 2.5} />
+                )}
               </div>
               
-              <span className={`text-[9px] font-black uppercase tracking-widest transition-all duration-300 absolute -bottom-4 whitespace-nowrap ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+              <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-opacity ${
+                isActive ? 'opacity-100' : 'opacity-75'
+              }`}>
                 {tab.label}
               </span>
-
-              {/* Little glowing dot under the active tab */}
-              {isActive && (
-                <div 
-                  className="absolute -bottom-6 w-1.5 h-1.5 rounded-full shadow-lg transition-all duration-300 animate-in zoom-in" 
-                  style={{ backgroundColor: themeColor, boxShadow: `0 0 12px ${themeColor}` }} 
-                />
-              )}
             </button>
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }
