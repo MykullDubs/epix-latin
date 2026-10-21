@@ -21,18 +21,18 @@ import HoloAvatar from './HoloAvatar';
 import AvatarForge from './AvatarForge';
 import MarbleScrabble from './MarbleScrabble';
 
-// --- THEME HELPER (Dark Mode Upgraded) ---
+// --- THEME HELPER (Strict Flat UI) ---
 const getSubjectTheme = (subject: string) => {
     const sub = subject?.toLowerCase() || '';
-    if (sub.includes('math')) return { color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-500 dark:bg-rose-600', light: 'bg-rose-100 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20', glow: 'shadow-rose-500/30' };
-    if (sub.includes('science') || sub.includes('bio')) return { color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-500 dark:bg-emerald-600', light: 'bg-emerald-100 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20', glow: 'shadow-emerald-500/30' };
-    if (sub.includes('social') || sub.includes('history')) return { color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500 dark:bg-amber-600', light: 'bg-amber-100 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20', glow: 'shadow-amber-500/30' };
-    if (sub.includes('read') || sub.includes('english')) return { color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-500 dark:bg-cyan-600', light: 'bg-cyan-100 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20', glow: 'shadow-cyan-500/30' };
-    return { color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-500 dark:bg-indigo-600', light: 'bg-indigo-100 dark:bg-indigo-500/10', border: 'border-indigo-200 dark:border-indigo-500/20', glow: 'shadow-indigo-500/30' };
+    if (sub.includes('math')) return { color: 'text-rose-600 dark:text-rose-500', bg: 'bg-rose-600', textWhite: 'text-white', border: 'border-rose-600 dark:border-rose-500' };
+    if (sub.includes('science') || sub.includes('bio')) return { color: 'text-emerald-600 dark:text-emerald-500', bg: 'bg-emerald-600', textWhite: 'text-white', border: 'border-emerald-600 dark:border-emerald-500' };
+    if (sub.includes('social') || sub.includes('history')) return { color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500', textWhite: 'text-black', border: 'border-amber-500 dark:border-amber-400' };
+    if (sub.includes('read') || sub.includes('english')) return { color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-500', textWhite: 'text-black', border: 'border-cyan-500 dark:border-cyan-400' };
+    return { color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-600', textWhite: 'text-white', border: 'border-indigo-600 dark:border-indigo-500' };
 };
 
 // ============================================================================
-//  SUB-COMPONENT: FORUM AVATAR
+//  SUB-COMPONENT: FORUM AVATAR (Flat)
 // ============================================================================
 const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
     const initials = name?.split(' ').map((n:any) => n[0]).join('').toUpperCase().slice(0, 2) || 'S';
@@ -40,12 +40,12 @@ const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
     
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
-            <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all shadow-sm ${url ? 'bg-white dark:bg-slate-800' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'}`}>
+            <div className={`w-full h-full border-2 border-zinc-900 dark:border-zinc-200 flex items-center justify-center font-black overflow-hidden ${url ? 'bg-white dark:bg-black' : 'bg-indigo-600 text-white border-indigo-600'}`}>
                 {url ? <img src={url} alt={`${name}'s avatar`} className="w-full h-full object-cover" /> : <span aria-hidden="true">{initials}</span>}
             </div>
             {role === 'instructor' && (
-                <div className="absolute -top-1.5 -right-1.5 bg-indigo-600 rounded-full border-2 border-white dark:border-slate-900 p-0.5 shadow-md">
-                    <Shield size={size === 'xs' ? 8 : 10} className="text-white" fill="currentColor" />
+                <div className="absolute -top-1.5 -right-1.5 bg-emerald-500 border-2 border-zinc-900 dark:border-zinc-100 p-0.5">
+                    <Shield size={size === 'xs' ? 8 : 10} className="text-black" fill="currentColor" />
                 </div>
             )}
         </div>
@@ -53,7 +53,7 @@ const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
 };
 
 // ============================================================================
-//  VOICE RECORDER COMPONENT
+//  VOICE RECORDER COMPONENT (Flat)
 // ============================================================================
 const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -82,24 +82,24 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
   const stopRecording = () => { mediaRecorderRef.current?.stop(); setIsRecording(false); };
   
   return (
-    <div className="bg-slate-50 dark:bg-slate-950/50 p-2 pl-4 rounded-full border border-slate-200 dark:border-slate-800 flex items-center justify-between transition-colors duration-300">
+    <div className="bg-zinc-100 dark:bg-zinc-900 p-2 pl-4 border-2 border-zinc-900 dark:border-zinc-200 flex items-center justify-between">
       {!audioUrl ? (
         <div className="flex items-center gap-4 w-full">
-          <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.6)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
-          <span className={`text-[10px] font-black uppercase tracking-widest flex-1 ${isRecording ? 'text-rose-500' : 'text-slate-400'}`}>
+          <div className={`w-3 h-3 ${isRecording ? 'bg-rose-600 animate-pulse' : 'bg-zinc-400 dark:bg-zinc-600'}`} />
+          <span className={`text-[10px] font-black uppercase tracking-[0.2em] flex-1 ${isRecording ? 'text-rose-600' : 'text-zinc-500'}`}>
             {isRecording ? "Recording Transmission..." : "Attach Voice Memo"}
           </span>
-          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-95 ${isRecording ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}>
+          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`w-10 h-10 flex items-center justify-center border-2 border-zinc-900 dark:border-zinc-200 transition-colors ${isRecording ? 'bg-rose-600 text-white border-rose-600' : 'bg-white dark:bg-black hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}>
             {isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={16} />}
           </button>
         </div>
       ) : (
         <div className="flex items-center gap-3 w-full animate-in fade-in">
-          <div className="w-8 h-8 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 bg-emerald-500 text-black flex items-center justify-center shrink-0">
               <Mic size={14} />
           </div>
           <audio src={audioUrl} controls className="h-8 flex-1 opacity-90 grayscale" />
-          <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 w-8 h-8 flex items-center justify-center rounded-full transition-colors"><X size={16} strokeWidth={3} /></button>
+          <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-white bg-rose-600 w-8 h-8 flex items-center justify-center hover:bg-rose-500 transition-colors"><X size={16} strokeWidth={3} /></button>
         </div>
       )}
     </div>
@@ -107,7 +107,7 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
 };
 
 // ============================================================================
-//  INTERNAL FORUM COMPONENT
+//  INTERNAL FORUM COMPONENT (Flat)
 // ============================================================================
 const ClassForum = ({ classId, userData }: { classId: string, userData: any }) => {
   const [view, setView] = useState<'list' | 'thread'>('list');
@@ -187,64 +187,61 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   };
 
   const formatDate = (ts: number) => {
-      return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return new Date(ts).toLocaleString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 
   if (view === 'list') {
     return (
-      <div className="flex flex-col h-full bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] border border-white/20 dark:border-slate-800 shadow-xl p-4 md:p-6 overflow-hidden animate-in fade-in duration-500 font-sans transition-colors duration-300">
-        <header className="flex justify-between items-center mb-6 px-2">
+      <div className="flex flex-col h-full bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 p-4 md:p-6 overflow-hidden animate-in fade-in duration-300">
+        <header className="flex justify-between items-center mb-6 pb-4 border-b-2 border-zinc-900 dark:border-zinc-200">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-2xl flex items-center justify-center shadow-inner">
+                <div className="w-10 h-10 bg-indigo-600 text-white flex items-center justify-center shrink-0">
                   <MessageSquare size={20} />
                 </div>
                 <div>
-                    <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter leading-none">Comms Link</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Active Discussions</p>
+                    <h3 className="text-xl font-black text-zinc-950 dark:text-white uppercase tracking-tight leading-none">Comms Link</h3>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mt-1">Active Discussions</p>
                 </div>
             </div>
             {isInstructor && (
-                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95">
-                  <Plus size={16} /> <span className="hidden sm:inline">New Directive</span>
+                <button onClick={() => setIsCreating(true)} className="bg-zinc-950 dark:bg-white text-white dark:text-black px-5 py-3 font-black text-[10px] uppercase flex items-center gap-2 hover:bg-indigo-600 dark:hover:bg-indigo-500 dark:hover:text-white transition-colors">
+                  <Plus size={16} strokeWidth={3} /> <span className="hidden sm:inline">New Directive</span>
                 </button>
             )}
         </header>
 
         <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 pb-20">
             {isCreating && (
-                <form onSubmit={handleCreateTopic} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-[2rem] border border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-8 relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Directive Title..." className="w-full bg-transparent text-xl font-black text-slate-800 dark:text-slate-100 outline-none mb-3 placeholder:text-slate-300 dark:placeholder:text-slate-700" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Enter details..." className="w-full bg-transparent text-sm text-slate-600 dark:text-slate-400 outline-none min-h-[100px] resize-none placeholder:text-slate-300 dark:placeholder:text-slate-700" />
-                    <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
-                        <button type="button" onClick={() => setIsCreating(false)} className="px-6 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors">Cancel</button>
-                        <button type="submit" className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md transition-colors flex items-center gap-2">Broadcast <Send size={14}/></button>
+                <form onSubmit={handleCreateTopic} className="bg-zinc-100 dark:bg-zinc-900 p-6 border-2 border-indigo-600 mb-8 relative">
+                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Directive Title..." className="w-full bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 text-lg font-black text-zinc-900 dark:text-white outline-none px-4 py-3 mb-3" />
+                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Enter details..." className="w-full bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 text-sm font-bold text-zinc-800 dark:text-zinc-200 outline-none px-4 py-3 min-h-[100px] resize-none" />
+                    <div className="flex gap-3 justify-end mt-4 pt-4 border-t-2 border-zinc-200 dark:border-zinc-800">
+                        <button type="button" onClick={() => setIsCreating(false)} className="px-6 py-2 text-zinc-500 hover:text-black dark:hover:text-white font-black text-[10px] uppercase tracking-[0.2em] transition-colors">Cancel</button>
+                        <button type="submit" className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] uppercase tracking-[0.2em] transition-colors flex items-center gap-2">Broadcast <Send size={14}/></button>
                     </div>
                 </form>
             )}
 
             {topics.length === 0 && !isCreating && (
-                <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center opacity-40">
-                    <MessageSquare size={64} className="mb-4 text-slate-400" strokeWidth={1.5} />
-                    <p className="font-black uppercase tracking-[0.2em] text-slate-500 text-sm">No Comms Active</p>
-                    <p className="text-xs font-bold text-slate-400 mt-2 max-w-xs">Waiting for instructor directives to initiate communication.</p>
+                <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center opacity-50">
+                    <MessageSquare size={48} className="mb-4 text-zinc-400" strokeWidth={2} />
+                    <p className="font-black uppercase tracking-[0.2em] text-zinc-500 text-xs">No Comms Active</p>
                 </div>
             )}
 
             {topics.map(t => (
-                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[2rem] border border-white/40 dark:border-slate-800 shadow-sm hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-500/40 transition-all text-left relative overflow-hidden group">
-                    <div className="absolute left-0 top-0 w-1.5 h-full bg-slate-200 dark:bg-slate-800 group-hover:bg-indigo-500 transition-colors" />
-                    <div className="flex justify-between items-start gap-4 mb-3">
-                        <h4 className="text-lg font-black text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight">{t.title}</h4>
-                        <span className="shrink-0 bg-slate-200/50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><ChevronRight size={12} /> Enter</span>
+                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white dark:bg-black p-6 border-2 border-zinc-900 dark:border-zinc-200 hover:border-indigo-600 transition-colors text-left flex flex-col">
+                    <div className="flex justify-between items-start gap-4 mb-3 w-full">
+                        <h4 className="text-lg sm:text-xl font-black text-zinc-950 dark:text-white leading-tight">{t.title}</h4>
+                        <span className="shrink-0 bg-zinc-950 dark:bg-white text-white dark:text-black px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] flex items-center gap-1"><ChevronRight size={12} strokeWidth={3} /> Enter</span>
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-5 font-medium leading-relaxed">{t.content}</p>
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
-                        <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 mb-6 font-bold leading-relaxed">{t.content}</p>
+                    <div className="flex items-center justify-between pt-4 border-t-2 border-zinc-100 dark:border-zinc-900 w-full">
+                        <div className="flex items-center gap-3 text-xs font-black uppercase text-zinc-500 tracking-[0.1em]">
                             <ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" />
-                            <span className="truncate max-w-[120px]">{t.authorName}</span>
+                            <span className="truncate max-w-[120px] text-zinc-900 dark:text-zinc-100">{t.authorName}</span>
                         </div>
-                        <span className="text-[10px] font-bold text-slate-400">{formatDate(t.timestamp)}</span>
+                        <span className="text-[10px] font-black tabular-nums text-zinc-400 uppercase tracking-widest">{formatDate(t.timestamp)}</span>
                     </div>
                 </button>
             ))}
@@ -253,33 +250,32 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     );
   }
 
-  // --- THREAD VIEW ---
+  // --- THREAD VIEW (Terminal Style) ---
   return (
-    <div className="flex flex-col h-full bg-white/50 dark:bg-slate-950/50 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 dark:border-slate-800 shadow-xl overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans transition-colors duration-300">
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm z-30 transition-colors duration-300 shrink-0">
-            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 dark:text-slate-500 font-black text-xs uppercase hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors active:scale-95"><ArrowLeft size={16} /> Retreat</button>
-            <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-100 dark:border-indigo-500/20 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" /> Live Thread
+    <div className="flex flex-col h-full bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 overflow-hidden animate-in slide-in-from-right-8 duration-300">
+        <header className="bg-zinc-100 dark:bg-zinc-900 p-4 border-b-2 border-zinc-900 dark:border-zinc-200 flex items-center justify-between shrink-0">
+            <button onClick={() => setView('list')} className="flex items-center gap-2 text-zinc-950 dark:text-white font-black text-[10px] tracking-[0.2em] uppercase hover:text-indigo-600 transition-colors"><ArrowLeft size={14} strokeWidth={3} /> Retreat</button>
+            <span className="text-[10px] font-black text-white bg-indigo-600 uppercase tracking-[0.2em] px-3 py-1 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-white" /> Live Thread
             </span>
         </header>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black text-white px-6 py-10 md:p-12 relative overflow-hidden shrink-0 border-b-4 border-indigo-500 shadow-inner">
-                <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><Zap size={120} /></div>
-                <div className="max-w-3xl mx-auto relative z-10">
-                    <div className="flex items-center gap-3 mb-6">
+            <div className="bg-zinc-950 text-white px-4 py-8 md:p-10 border-b-4 border-indigo-600 shrink-0">
+                <div className="max-w-3xl mx-auto">
+                    <div className="flex items-center gap-4 mb-6">
                         <ForumAvatar url={activeTopic.authorAvatarUrl} name={activeTopic.authorName} role={activeTopic.role} size="md" />
                         <div>
-                            <span className="block text-sm font-black tracking-widest uppercase text-indigo-300">{activeTopic.authorName}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">{formatDate(activeTopic.timestamp)}</span>
+                            <span className="block text-xs font-black tracking-[0.2em] uppercase text-indigo-400 mb-1">{activeTopic.authorName}</span>
+                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest tabular-nums">{formatDate(activeTopic.timestamp)}</span>
                         </div>
                     </div>
-                    <h2 className="text-3xl md:text-4xl font-black mb-4 leading-tight tracking-tight drop-shadow-md">{activeTopic.title}</h2>
-                    <p className="text-slate-300 font-medium leading-relaxed text-lg mb-8 max-w-2xl">{activeTopic.content}</p>
+                    <h2 className="text-2xl md:text-4xl font-black mb-4 leading-tight tracking-tighter uppercase">{activeTopic.title}</h2>
+                    <p className="text-zinc-300 font-bold leading-relaxed text-sm sm:text-base mb-8 whitespace-pre-wrap">{activeTopic.content}</p>
                     
                     {!isCreating && (
-                        <button onClick={() => setIsCreating(true)} className="px-8 py-4 bg-white text-indigo-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:bg-slate-100 hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
-                            <Send size={16} /> Transmit Reply
+                        <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-2">
+                            <Send size={14} strokeWidth={3} /> Transmit Reply
                         </button>
                     )}
                 </div>
@@ -287,95 +283,90 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
             <div className="max-w-3xl mx-auto p-4 md:p-8 pb-32">
                 {isCreating && (
-                    <form onSubmit={handlePostResponse} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-6 md:p-8 rounded-[2rem] border-2 border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-10 animate-in slide-in-from-top-4 duration-300 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-cyan-400" />
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">New Transmission</h4>
+                    <form onSubmit={handlePostResponse} className="bg-zinc-100 dark:bg-zinc-900 p-6 border-2 border-indigo-600 mb-8 animate-in fade-in">
+                        <h4 className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-4">New Transmission</h4>
                         
-                        <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Transmission Header..." className="w-full bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-black text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-500 mb-3" />
-                        <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write data..." className="w-full bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-600 dark:text-slate-400 outline-none focus:border-indigo-500 min-h-[100px] resize-none mb-4" />
+                        <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Transmission Header..." className="w-full bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 px-4 py-3 text-sm font-black text-zinc-900 dark:text-white outline-none focus:border-indigo-600 mb-3" />
+                        <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write data..." className="w-full bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 px-4 py-3 text-sm font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-indigo-600 min-h-[100px] resize-none mb-4" />
                         
                         <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
                         
-                        <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
-                            <button type="button" onClick={() => setIsCreating(false)} className="px-6 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors">Cancel</button>
-                            <button type="submit" disabled={isUploading} className="px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 transition-colors">
-                                {isUploading ? <Loader2 size={14} className="animate-spin" /> : <><Send size={14}/> Send</>}
+                        <div className="flex gap-3 justify-end mt-6 pt-4 border-t-2 border-zinc-300 dark:border-zinc-800">
+                            <button type="button" onClick={() => setIsCreating(false)} className="px-6 py-2 text-zinc-500 hover:text-black dark:hover:text-white font-black text-[10px] uppercase tracking-[0.2em] transition-colors">Cancel</button>
+                            <button type="submit" disabled={isUploading} className="px-8 py-3 font-black text-[10px] uppercase tracking-[0.2em] flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 transition-colors">
+                                {isUploading ? <Loader2 size={14} className="animate-spin" /> : <><Send size={14} strokeWidth={3}/> Send</>}
                             </button>
                         </div>
                     </form>
                 )}
 
-                <div className="space-y-8">
+                <div className="space-y-6">
                     {responses.length === 0 && !isCreating ? (
-                        <div className="text-center py-12 opacity-40">
-                            <Zap size={48} className="mx-auto mb-4 text-slate-400" />
-                            <p className="font-black uppercase tracking-[0.2em] text-slate-500 text-xs">No Transmissions Received</p>
+                        <div className="text-center py-12 opacity-50">
+                            <Zap size={40} className="mx-auto mb-4 text-zinc-400" />
+                            <p className="font-black uppercase tracking-[0.2em] text-zinc-500 text-xs">No Transmissions Received</p>
                         </div>
                     ) : (
                         responses.map((res) => (
-                            <article key={res.id} className="relative">
-                                <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-md p-6 md:p-8 rounded-[2rem] border border-white/50 dark:border-slate-800 shadow-lg relative z-10 transition-colors duration-300">
-                                    <div className="flex items-start justify-between gap-4 mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="md" />
-                                            <div>
-                                                <span className="block text-sm font-black text-slate-800 dark:text-slate-100 leading-none mb-1">{res.authorName}</span>
-                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{formatDate(res.timestamp)}</span>
-                                            </div>
-                                        </div>
+                            <article key={res.id} className="bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 p-5 md:p-8">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="md" />
+                                    <div>
+                                        <span className="block text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest leading-none mb-1">{res.authorName}</span>
+                                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest tabular-nums">{formatDate(res.timestamp)}</span>
                                     </div>
-                                    
-                                    <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">{res.title}</h4>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium mb-6 whitespace-pre-wrap">{res.content}</p>
-                                    
-                                    {res.audioUrl && (
-                                        <div className="mb-6 p-2 pl-4 pr-2 bg-slate-50 dark:bg-slate-950 rounded-full flex items-center gap-3 border border-slate-200 dark:border-slate-800">
-                                            <div className="w-6 h-6 bg-indigo-500/20 text-indigo-500 rounded-full flex items-center justify-center shrink-0"><Volume2 size={12} /></div>
-                                            <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-80 scale-95 origin-left grayscale" />
-                                        </div>
-                                    )}
-                                    
-                                    <div className="flex items-center gap-4 pt-4 border-t border-slate-200/60 dark:border-slate-800/60">
-                                        <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all border ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-900/50 text-rose-500 dark:text-rose-400 shadow-sm' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-rose-400'}`}>
-                                            <Heart size={14} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500 dark:fill-rose-400' : ''} /> 
-                                            <span className="text-[10px] font-black uppercase tracking-widest">{res.likes?.length || 0}</span>
-                                        </button>
-                                        <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all border text-[10px] font-black uppercase tracking-widest ${replyingToId === res.id ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-indigo-400'}`}>
-                                            <MessageSquare size={14} /> Reply
-                                        </button>
+                                </div>
+                                
+                                <h4 className="text-xl font-black text-zinc-950 dark:text-white mb-2 uppercase tracking-tight">{res.title}</h4>
+                                <p className="text-sm text-zinc-700 dark:text-zinc-300 font-bold leading-relaxed mb-6 whitespace-pre-wrap">{res.content}</p>
+                                
+                                {res.audioUrl && (
+                                    <div className="mb-6 p-2 pl-4 pr-2 bg-zinc-100 dark:bg-zinc-900 border-2 border-zinc-900 dark:border-zinc-200 flex items-center gap-3">
+                                        <div className="w-6 h-6 bg-indigo-600 text-white flex items-center justify-center shrink-0"><Volume2 size={12} strokeWidth={3} /></div>
+                                        <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90 grayscale" />
                                     </div>
+                                )}
+                                
+                                <div className="flex items-center gap-4 pt-4 border-t-2 border-zinc-100 dark:border-zinc-800">
+                                    <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 border-2 transition-colors ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-600 border-rose-600 text-white' : 'bg-transparent border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-rose-600 hover:text-rose-600'}`}>
+                                        <Heart size={14} strokeWidth={3} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-white' : ''} /> 
+                                        <span className="text-[10px] font-black uppercase tracking-widest tabular-nums">{res.likes?.length || 0}</span>
+                                    </button>
+                                    <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className={`flex items-center gap-2 px-4 py-2 border-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${replyingToId === res.id ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-transparent border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-indigo-600 hover:text-indigo-600'}`}>
+                                        <MessageSquare size={14} strokeWidth={3} /> Reply
+                                    </button>
                                 </div>
 
                                 {(res.comments?.length > 0 || replyingToId === res.id) && (
-                                    <div className="ml-8 md:ml-12 mt-4 space-y-3 relative before:absolute before:-left-6 before:top-0 before:bottom-6 before:w-px before:bg-slate-200 dark:before:bg-slate-800">
+                                    <div className="mt-4 pl-4 sm:pl-6 space-y-3 border-l-4 border-zinc-200 dark:border-zinc-800">
                                         {res.comments?.map((comment: any, idx: number) => (
-                                            <div key={idx} className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm p-4 rounded-[1.5rem] border border-white/40 dark:border-slate-800/80 transition-colors relative before:absolute before:-left-6 before:top-6 before:w-6 before:h-px before:bg-slate-200 dark:before:bg-slate-800">
+                                            <div key={idx} className="bg-zinc-50 dark:bg-zinc-900 p-4 border-2 border-zinc-200 dark:border-zinc-800">
                                                 <div className="flex items-center gap-3 mb-2">
                                                     <ForumAvatar url={comment.authorAvatarUrl} name={comment.authorName} role={comment.role} size="xs" />
-                                                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{comment.authorName}</span>
-                                                    <span className="text-[8px] font-bold text-slate-400 dark:text-slate-600 uppercase ml-auto">{formatDate(comment.timestamp)}</span>
+                                                    <span className="text-[10px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-[0.2em]">{comment.authorName}</span>
+                                                    <span className="text-[9px] font-black text-zinc-400 tabular-nums ml-auto uppercase">{formatDate(comment.timestamp)}</span>
                                                 </div>
-                                                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed pl-9">{comment.text}</p>
+                                                <p className="text-xs text-zinc-800 dark:text-zinc-200 font-bold leading-relaxed pl-9">{comment.text}</p>
                                             </div>
                                         ))}
                                         
                                         {replyingToId === res.id && (
-                                            <div className="relative flex items-center animate-in slide-in-from-top-2 before:absolute before:-left-6 before:top-1/2 before:w-6 before:h-px before:bg-indigo-300 dark:before:bg-indigo-500/50">
-                                                <div className="absolute left-4 text-indigo-400 font-mono font-black text-xs">&gt;</div>
+                                            <div className="relative flex items-stretch mt-4">
+                                                <div className="bg-indigo-600 text-white px-3 flex items-center justify-center font-black text-sm">&gt;</div>
                                                 <input 
                                                     autoFocus 
                                                     value={commentText} 
                                                     onChange={e => setCommentText(e.target.value)} 
                                                     placeholder="Enter command to reply..." 
-                                                    className="w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-2 border-indigo-200 dark:border-indigo-500/50 text-slate-800 dark:text-slate-100 rounded-2xl pl-10 pr-14 py-4 text-xs font-mono font-bold outline-none focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors shadow-sm" 
+                                                    className="w-full bg-white dark:bg-black border-y-2 border-r-2 border-zinc-900 dark:border-zinc-200 text-zinc-900 dark:text-zinc-100 px-4 py-3 text-xs font-bold outline-none focus:border-indigo-600" 
                                                     onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} 
                                                 />
                                                 <button 
                                                     onClick={() => handlePostComment(res.id)} 
                                                     disabled={!commentText.trim()}
-                                                    className="absolute right-2 p-2 bg-indigo-600 text-white rounded-xl shadow-md disabled:opacity-50 active:scale-95 transition-all"
+                                                    className="px-4 bg-indigo-600 text-white disabled:opacity-50 hover:bg-indigo-500 transition-colors"
                                                 >
-                                                    <Send size={14} />
+                                                    <Send size={14} strokeWidth={3} />
                                                 </button>
                                             </div>
                                         )}
@@ -392,19 +383,18 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 };
 
 // ============================================================================
-//  THE MONOCHROMATIC (PSX / SQUID GAME) LIVE TRIVIA REMOTE
+//  THE MONOCHROMATIC (PSX / SQUID GAME) LIVE TRIVIA REMOTE (Flat)
 // ============================================================================
 const SHAPE_THEMES = [
-    { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: Triangle },
-    { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: Square },
-    { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: Circle },
-    { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: X }
+    { bg: 'bg-rose-600', active: 'bg-rose-500 text-black', icon: Triangle },
+    { bg: 'bg-emerald-600', active: 'bg-emerald-500 text-black', icon: Square },
+    { bg: 'bg-amber-500', active: 'bg-amber-400 text-black', icon: Circle },
+    { bg: 'bg-cyan-500', active: 'bg-cyan-400 text-black', icon: X }
 ];
 
 const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classId, onLogActivity, userData }: any) => {
     const [showForge, setShowForge] = useState(false);
 
-    // DUAL LOOKUP ENGINE FOR LIVE REMOTE
     const activeLesson = useMemo(() => {
         if (!liveSession?.lessonId) return null;
         let node = lessons.find((l: any) => l.id === liveSession.lessonId);
@@ -454,7 +444,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
     const pointsThisRound = liveSession?.roundPoints?.[safeEmail] || 0;
     const [xpLogged, setXpLogged] = useState(false);
 
-    // 🔥 FIXED: REMOVED "waiting" LOCKOUT SO LATE STUDENTS CAN JOIN
     useEffect(() => {
         if (!classId || !studentEmail || !liveSession) return;
         if (!liveSession.joined?.[safeEmail]) {
@@ -487,9 +476,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
 
     const submitAnswer = async (optionId: string) => {
         if (liveSession?.quizState !== 'active' || myAnswer) return;
-
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-        
         await updateDoc(sessionRef, { 
             [`answers.${safeEmail}`]: optionId,
             [`answerTimes.${safeEmail}`]: Date.now()
@@ -498,7 +485,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
 
     const handleSaveAvatar = async (finalUrl: string, config: any) => {
         if (!auth.currentUser?.uid) return;
-
         try {
             const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
             const newEquipped = { ...(userData?.equipped || {}) };
@@ -530,8 +516,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
         };
 
         return (
-            <div className="h-full bg-black rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500 border-4 border-slate-800 shadow-[inset_0_0_100px_rgba(255,255,255,0.05)] relative overflow-hidden">
-                
+            <div className="h-full bg-black flex flex-col items-center justify-center p-8 text-center border-4 border-zinc-800 animate-in fade-in">
                 {showForge && (
                     <AvatarForge
                         currentConfig={userData?.customAvatarConfig}
@@ -540,20 +525,19 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
                     />
                 )}
 
-                <div className="relative w-40 h-40 mb-8 cursor-pointer group" onClick={() => setShowForge(true)}>
-                    <div className="absolute inset-0 bg-emerald-500 rounded-full blur-3xl opacity-20 animate-pulse" />
-                    <HoloAvatar student={studentData} size="hero" className="relative z-10" />
-                    <div className="absolute inset-0 bg-black/60 rounded-[35%] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center z-20 backdrop-blur-sm">
-                        <Settings className="text-white mb-1" size={24} />
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest">Tune</span>
+                <div className="relative w-40 h-40 mb-8 cursor-pointer group border-4 border-zinc-800" onClick={() => setShowForge(true)}>
+                    <HoloAvatar student={studentData} size="hero" className="relative z-10 w-full h-full" />
+                    <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center z-20">
+                        <Settings className="text-white mb-1" size={24} strokeWidth={2.5}/>
+                        <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Tune</span>
                     </div>
                 </div>
 
-                <h2 className="text-3xl font-black text-white mb-3 tracking-widest uppercase">Connection Secured</h2>
-                <p className="text-slate-400 font-bold text-sm max-w-[250px] uppercase tracking-widest leading-loose mb-8">Awaiting protocol launch...</p>
+                <h2 className="text-3xl font-black text-white mb-2 tracking-[0.2em] uppercase">Connection Secured</h2>
+                <p className="text-emerald-400 font-black text-xs uppercase tracking-[0.2em] mb-8">Awaiting Protocol Launch</p>
                 
-                <button onClick={() => setShowForge(true)} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 border border-slate-700">
-                   <Settings size={14} /> Tune Avatar
+                <button onClick={() => setShowForge(true)} className="bg-zinc-900 hover:bg-zinc-800 text-white px-6 py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-colors flex items-center gap-2 border-2 border-zinc-700">
+                   <Settings size={14} strokeWidth={3}/> Tune Avatar
                 </button>
             </div>
         );
@@ -561,21 +545,20 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
 
     if (isFinished) {
         return (
-            <div className="h-full bg-slate-950 rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[4px] border-slate-800 shadow-[inset_0_0_100px_rgba(79,70,229,0.15)] relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-slate-950 to-black pointer-events-none" />
-                <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
-                    <Trophy size={80} className="text-yellow-400 mb-6 drop-shadow-[0_0_30px_rgba(250,204,21,0.3)] animate-bounce-slow" strokeWidth={1.5} />
-                    <h2 className="text-3xl font-black text-white mb-2 tracking-widest uppercase">Protocol Complete</h2>
-                    <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-10">Simulation Terminated</p>
-                    <div className="bg-slate-900/80 backdrop-blur-xl border-2 border-slate-800 rounded-3xl p-6 w-full mb-8 shadow-2xl">
-                        <div className="flex justify-between items-center">
-                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Total XP Earned</span>
-                            <span className="text-4xl font-black text-indigo-400">+{xpEarned.toLocaleString()}</span> 
-                        </div>
+            <div className="h-full bg-black flex flex-col items-center justify-center p-8 text-center border-[8px] border-zinc-800 animate-in zoom-in duration-300">
+                <Trophy size={80} className="text-amber-400 mb-6" strokeWidth={2.5} />
+                <h2 className="text-3xl font-black text-white mb-2 tracking-[0.2em] uppercase">Protocol Complete</h2>
+                <p className="text-rose-500 font-black text-xs uppercase tracking-[0.2em] mb-10">Simulation Terminated</p>
+                
+                <div className="bg-zinc-900 border-4 border-zinc-800 p-6 w-full max-w-sm mb-8">
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em]">Total XP Earned</span>
+                        <span className="text-4xl font-black text-emerald-400 tabular-nums">+{xpEarned}</span> 
                     </div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                        {xpLogged || xpEarned === 0 ? <><CheckCircle2 size={12} className="text-emerald-500" /> XP Synced to Profile</> : <><Loader2 size={12} className="animate-spin text-indigo-400" /> Syncing XP...</>}
-                    </div>
+                </div>
+                
+                <div className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                    {xpLogged || xpEarned === 0 ? <><CheckCircle2 size={14} className="text-emerald-500" strokeWidth={3}/> XP Synced to Profile</> : <><Loader2 size={14} className="animate-spin text-indigo-400" /> Syncing XP...</>}
                 </div>
             </div>
         );
@@ -585,28 +568,31 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
         const isCorrect = myAnswer === quizCorrectId;
 
         return (
-            <div className={`h-full rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[8px] ${isCorrect ? 'bg-slate-900 border-emerald-500/50 shadow-[inset_0_0_100px_rgba(16,185,129,0.2)]' : 'bg-black border-slate-800'}`}>
-                {isCorrect ? <CheckCircle2 size={120} className="text-emerald-400 mb-6 animate-bounce" strokeWidth={3} /> : <XCircle size={120} className="text-slate-700 mb-6" strokeWidth={2} />}
-                <h2 className="text-5xl font-black text-white mb-4 tracking-tighter drop-shadow-md">{isCorrect ? 'VALID' : 'ELIMINATED'}</h2>
+            <div className={`h-full flex flex-col items-center justify-center p-8 text-center border-[12px] animate-in zoom-in duration-300 ${isCorrect ? 'bg-black border-emerald-500' : 'bg-black border-rose-600'}`}>
+                {isCorrect ? <CheckCircle2 size={120} className="text-emerald-500 mb-6" strokeWidth={4} /> : <XCircle size={120} className="text-rose-600 mb-6" strokeWidth={4} />}
+                <h2 className="text-5xl font-black text-white mb-4 tracking-tighter uppercase">{isCorrect ? 'Valid' : 'Eliminated'}</h2>
                 
                 {isCorrect ? (
-                    <div className="flex flex-col items-center gap-2 mt-4 animate-in slide-in-from-bottom-4 duration-700">
-                        <span className="text-emerald-400 font-black text-4xl tabular-nums">+{pointsThisRound}</span>
-                        {pointsThisRound > 850 && <span className="text-yellow-400 text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-1"><Zap size={12}/> Lightning Speed!</span>}
+                    <div className="flex flex-col items-center gap-2 mt-4 animate-in slide-in-from-bottom-4">
+                        <span className="text-emerald-500 font-black text-4xl tabular-nums">+{pointsThisRound}</span>
+                        {pointsThisRound > 850 && <span className="text-amber-400 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-1.5"><Zap size={14} strokeWidth={3}/> Lightning Speed</span>}
                     </div>
                 ) : (
-                    <p className="text-slate-500 font-black text-xl uppercase tracking-widest mt-4">0 XP</p>
+                    <p className="text-zinc-600 font-black text-xl uppercase tracking-[0.2em] mt-4 tabular-nums">0 XP</p>
                 )}
             </div>
         );
     }
 
     return (
-        <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-[4px] border-slate-800 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]">
-            <div className="bg-slate-900 p-6 rounded-[2rem] shadow-sm border border-slate-800 mb-4 text-center shrink-0">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-black px-3 py-1 rounded-lg inline-block mb-3 border border-slate-700">Target {liveSession.currentBlockIndex + 1}</span>
-                <h2 className="text-xl md:text-2xl font-bold text-white leading-tight">{quizQuestion}</h2>
+        <div className="h-full bg-black p-4 md:p-6 flex flex-col border-4 border-zinc-800">
+            <div className="bg-zinc-900 p-6 border-4 border-zinc-800 mb-4 text-center shrink-0">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-black px-3 py-1.5 inline-block mb-4 border-2 border-zinc-800 tabular-nums">
+                    Target {String(liveSession.currentBlockIndex + 1).padStart(2, '0')}
+                </span>
+                <h2 className="text-xl md:text-3xl font-black text-white leading-tight uppercase tracking-tight">{quizQuestion}</h2>
             </div>
+            
             <div className="flex-1 grid grid-cols-2 gap-4 pb-2">
                 {quizOptions.map((opt: any, idx: number) => {
                     const Theme = SHAPE_THEMES[idx % 4];
@@ -615,11 +601,10 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
                     return (
                         <button
                             key={opt.id} disabled={!!myAnswer} onClick={() => submitAnswer(opt.id)} style={{ WebkitTapHighlightColor: 'transparent' }}
-                            className={`relative rounded-[2rem] flex flex-col items-center justify-center p-4 transition-all duration-150 focus:outline-none border-4 ${Theme.color} ${myAnswer && !isSelected ? 'opacity-20 grayscale translate-y-2 shadow-none border-transparent' : 'border-slate-700 ' + Theme.shadow} ${isSelected ? 'ring-4 ring-slate-400 scale-95 translate-y-2 shadow-none bg-black border-slate-500' : 'hover:-translate-y-1 active:translate-y-2 active:shadow-none'}`}
+                            className={`relative flex flex-col items-center justify-center p-4 focus:outline-none transition-colors border-4 min-h-[140px] ${myAnswer && !isSelected ? 'opacity-20 border-zinc-800 bg-black' : isSelected ? `border-white ${Theme.active}` : `border-zinc-800 hover:border-white ${Theme.bg}`}`}
                         >
-                            <Theme.icon size={64} strokeWidth={2.5} className="text-white mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
-                            <span className="text-white font-bold text-sm md:text-base leading-tight px-2 break-words text-center tracking-wide opacity-90">{opt.text}</span>
-                            {isSelected && <div className="absolute top-4 right-4 bg-white rounded-full p-1 shadow-[0_0_15px_rgba(255,255,255,0.8)]"><CheckCircle2 size={16} className="text-black" strokeWidth={3} /></div>}
+                            <Theme.icon size={48} strokeWidth={3} className={isSelected ? 'text-black mb-4' : 'text-white mb-4'} />
+                            <span className={`font-black text-sm md:text-lg leading-tight px-2 break-words text-center tracking-tight uppercase ${isSelected ? 'text-black' : 'text-white'}`}>{opt.text}</span>
                         </button>
                     );
                 })}
@@ -629,7 +614,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
 };
 
 // ============================================================================
-//  CONNECT FOUR: STUDENT REMOTE
+//  CONNECT FOUR: STUDENT REMOTE (Flat)
 // ============================================================================
 const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, userData }: any) => {
     const [showForge, setShowForge] = useState(false);
@@ -643,7 +628,6 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
     const iHaveUnlockedDrop = myAnswer === currentQ?.correctId;
     const [xpLogged, setXpLogged] = useState(false);
 
-    // 🔥 FIXED: REMOVED "waiting" LOCKOUT SO LATE STUDENTS CAN JOIN
     useEffect(() => {
         if (!classId || !studentEmail || !liveSession) return;
         if (!liveSession.joined?.[safeEmail]) {
@@ -697,80 +681,21 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
         });
     };
 
-    const handleSaveAvatar = async (finalUrl: string, config: any) => {
-        if (!auth.currentUser?.uid) return;
-
-        try {
-            const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
-            const newEquipped = { ...(userData?.equipped || {}) };
-            delete newEquipped.avatars;
-
-            await updateDoc(userRef, {
-                'profile.main.avatarUrl': finalUrl,
-                'customAvatarConfig': config,
-                'equipped': newEquipped
-            });
-
-            const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-            await updateDoc(sessionRef, {
-                [`joined.${safeEmail}.avatarUrl`]: finalUrl,
-                [`joined.${safeEmail}.equipped`]: newEquipped
-            });
-
-            setShowForge(false);
-        } catch (err) {
-            console.error("Avatar live sync failed:", err);
-        }
-    };
-
     if (liveSession?.quizState === 'waiting') {
-        const studentData = {
-            name: userData?.name || studentEmail,
-            equipped: liveSession?.joined?.[safeEmail]?.equipped || userData?.equipped || {},
-            avatarUrl: liveSession?.joined?.[safeEmail]?.avatarUrl || userData?.profile?.main?.avatarUrl
-        };
-        
-        return (
-            <div className="h-full bg-black rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center border-4 border-slate-900 shadow-[inset_0_0_100px_rgba(255,255,255,0.05)] relative overflow-hidden">
-                {showForge && (
-                    <AvatarForge
-                        currentConfig={userData?.customAvatarConfig}
-                        onSave={handleSaveAvatar}
-                        onClose={() => setShowForge(false)}
-                    />
-                )}
-
-                <div className="relative w-40 h-40 mb-8 cursor-pointer group" onClick={() => setShowForge(true)}>
-                    <div className="absolute inset-0 bg-emerald-500 rounded-full blur-3xl opacity-20 animate-pulse" />
-                    <HoloAvatar student={studentData} size="hero" className="relative z-10" />
-                    
-                    <div className="absolute inset-0 bg-black/60 rounded-[35%] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center z-20 backdrop-blur-sm">
-                        <Settings className="text-white mb-1" size={24} />
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest">Tune</span>
-                    </div>
-                </div>
-
-                <h2 className="text-3xl font-black text-white mb-3 tracking-widest uppercase">Squad Enlisted</h2>
-                <p className="text-slate-400 font-bold text-sm max-w-[250px] uppercase tracking-widest leading-loose mb-8">Awaiting instructor deployment...</p>
-
-                <button onClick={() => setShowForge(true)} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 border border-slate-700">
-                    <Settings size={14} /> Tune Avatar
-                </button>
-            </div>
-        );
+        // Render same as Trivia waiting room but with solid Flat UI
+        return <LiveTriviaRemote liveSession={liveSession} studentEmail={studentEmail} classId={classId} onLogActivity={onLogActivity} userData={userData} />;
     }
 
     if (isFinished) {
         const iWon = liveSession.winningTeam === myTeam;
-
         return (
-            <div className={`h-full rounded-[3rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[12px] ${iWon ? 'bg-slate-900 border-emerald-500' : 'bg-black border-rose-900'}`}>
-                {iWon ? <Trophy size={120} className="text-emerald-400 mb-6 animate-bounce" /> : <XCircle size={120} className="text-rose-900 mb-6" />}
-                <h2 className="text-5xl font-black text-white mb-4 tracking-tighter">{iWon ? 'VICTORY' : 'DEFEATED'}</h2>
-                <p className="text-white/60 font-black uppercase tracking-widest">{iWon ? 'Squad Superiority Established' : 'Tactical Withdrawal Required'}</p>
+            <div className={`h-full flex flex-col items-center justify-center p-8 text-center border-[12px] ${iWon ? 'bg-black border-emerald-500' : 'bg-black border-rose-600'}`}>
+                {iWon ? <Trophy size={120} className="text-emerald-500 mb-6" strokeWidth={3}/> : <XCircle size={120} className="text-rose-600 mb-6" strokeWidth={3}/>}
+                <h2 className="text-5xl font-black text-white mb-4 tracking-tighter uppercase">{iWon ? 'Victory' : 'Defeated'}</h2>
+                <p className="text-zinc-400 font-black uppercase tracking-[0.2em]">{iWon ? 'Squad Superiority Established' : 'Tactical Withdrawal Required'}</p>
                 {iWon && (
-                    <div className="mt-8 text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                        {xpLogged ? <><CheckCircle2 size={14} /> 100 XP Synced to Profile</> : <><Loader2 size={14} className="animate-spin" /> Syncing XP...</>}
+                    <div className="mt-8 text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                        {xpLogged ? <><CheckCircle2 size={16} strokeWidth={3}/> 100 XP Synced</> : <><Loader2 size={16} className="animate-spin" strokeWidth={3}/> Syncing XP...</>}
                     </div>
                 )}
             </div>
@@ -779,26 +704,26 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
 
     if (!isMyTurn) {
         return (
-            <div className="h-full bg-black rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center border-4 border-slate-900 shadow-inner">
-                <div className="relative w-32 h-32 mb-8 opacity-20"><Shield size={128} className="text-slate-500 animate-pulse" /></div>
-                <h2 className="text-2xl font-black text-slate-700 mb-2 tracking-widest uppercase">Enemy Squad Engaging...</h2>
-                <p className="text-slate-800 font-bold text-xs uppercase tracking-widest">Hold your position</p>
+            <div className="h-full bg-black flex flex-col items-center justify-center p-8 text-center border-4 border-zinc-800">
+                <Shield size={120} strokeWidth={2} className="text-zinc-800 mb-8" />
+                <h2 className="text-2xl md:text-3xl font-black text-zinc-500 mb-2 tracking-tight uppercase">Enemy Squad Engaging</h2>
+                <p className="text-rose-600 font-black text-xs uppercase tracking-[0.2em]">Hold your position</p>
             </div>
         );
     }
 
     if (iHaveUnlockedDrop) {
         return (
-            <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-4 border-slate-800 shadow-2xl">
-                <div className={`p-6 rounded-[2rem] mb-6 text-center shadow-lg border-b-8 ${myTeam === 1 ? 'bg-rose-600 border-rose-800' : 'bg-indigo-600 border-indigo-800'}`}>
-                    <Zap size={32} fill="white" className="mx-auto mb-2 text-white" />
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Access Granted</h2>
-                    <p className="text-white/80 font-bold text-[10px] uppercase tracking-[0.2em]">Select Deployment Zone</p>
+            <div className="h-full bg-black p-4 flex flex-col border-4 border-zinc-800">
+                <div className={`p-6 mb-6 text-center border-4 ${myTeam === 1 ? 'bg-rose-600 border-rose-600' : 'bg-indigo-600 border-indigo-600'}`}>
+                    <Zap size={32} strokeWidth={3} className="mx-auto mb-2 text-white" />
+                    <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">Access Granted</h2>
+                    <p className="text-black font-black text-[10px] uppercase tracking-[0.2em] mt-2">Select Deployment Zone</p>
                 </div>
                 <div className="flex-1 grid grid-cols-4 gap-3 pb-4">
                     {[0, 1, 2, 3, 4, 5, 6].map((col) => (
-                        <button key={col} onClick={() => handleDrop(col)} className={`rounded-2xl flex flex-col items-center justify-center font-black text-2xl transition-all active:scale-90 border-b-4 ${myTeam === 1 ? 'bg-rose-500 border-rose-700 text-white' : 'bg-indigo-500 border-indigo-700 text-white'}`}>
-                            <ArrowDownCircle size={24} className="mb-2" /> {col + 1}
+                        <button key={col} onClick={() => handleDrop(col)} className={`flex flex-col items-center justify-center font-black text-2xl border-4 transition-colors ${myTeam === 1 ? 'bg-black border-rose-600 text-rose-600 hover:bg-rose-600 hover:text-white' : 'bg-black border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white'}`}>
+                            <ArrowDownCircle size={28} strokeWidth={3} className="mb-2" /> {col + 1}
                         </button>
                     ))}
                 </div>
@@ -807,14 +732,14 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
     }
 
     return (
-        <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-4 border-slate-800">
-            <div className={`p-6 rounded-[2rem] mb-4 text-center border-b-4 ${myTeam === 1 ? 'bg-rose-900/50 border-rose-500' : 'bg-indigo-900/50 border-indigo-500'}`}>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Squad Intelligence Task</span>
-                <h2 className="text-xl font-bold text-white leading-tight">"{currentQ?.question}"</h2>
+        <div className="h-full bg-black p-4 md:p-6 flex flex-col border-4 border-zinc-800">
+            <div className={`p-6 border-4 mb-4 text-center ${myTeam === 1 ? 'bg-black border-rose-600' : 'bg-black border-indigo-600'}`}>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2 block">Squad Intelligence Task</span>
+                <h2 className="text-xl md:text-2xl font-black text-white leading-tight uppercase tracking-tight">"{currentQ?.question}"</h2>
             </div>
             <div className="flex-1 flex flex-col gap-3">
                 {currentQ?.options.map((opt: any) => (
-                    <button key={opt.id} onClick={() => submitAnswer(opt.id)} className={`flex-1 rounded-2xl p-4 font-black text-sm uppercase tracking-widest transition-all border-2 ${myAnswer === opt.id ? 'bg-white text-black border-white' : 'bg-slate-900 text-slate-400 border-slate-800 active:bg-slate-800'}`}>
+                    <button key={opt.id} onClick={() => submitAnswer(opt.id)} className={`flex-1 p-4 font-black text-sm uppercase tracking-[0.1em] transition-colors border-4 ${myAnswer === opt.id ? 'bg-white text-black border-white' : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-white hover:text-white'}`}>
                         {opt.text}
                     </button>
                 ))}
@@ -834,16 +759,11 @@ export default function StudentClassView({
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [liveSession, setLiveSession] = useState<any>(null);
   
-  // 🔥 FETCH DECK DATA FOR SLIPSTREAM
   const [activeDeck, setActiveDeck] = useState<any>(null);
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
       [classData?.assignedCurriculums?.[0]]: true 
   });
-  const [isScrolled, setIsScrolled] = useState(false);
   
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-      setIsScrolled(e.currentTarget.scrollTop > 40);
-  };
   const theme = getSubjectTheme(classData?.subject);
   const safeEmail = (userData?.email || auth?.currentUser?.email || 'unknown').replace(/\./g, ',');
 
@@ -856,7 +776,6 @@ export default function StudentClassView({
     });
   }, [classData, userData]);
 
-  // 🔥 STABLE LIVE SESSION LISTENER
   useEffect(() => {
     if (!classData?.id) return;
     const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classData.id);
@@ -871,7 +790,6 @@ export default function StudentClassView({
     return () => unsubSession();
   }, [classData?.id]);
 
-  // 🔥 STABLE SLIPSTREAM DECK LISTENER
   useEffect(() => {
       if (liveSession?.type === 'slipstream' && liveSession?.lessonId) {
           const deckQuery = query(collection(db, 'artifacts', appId, 'decks'), where('id', '==', liveSession.lessonId));
@@ -884,7 +802,6 @@ export default function StudentClassView({
       }
   }, [liveSession?.type, liveSession?.lessonId]);
 
-  // 🔥 AUTO-EXIT LIVE TAB IF SESSION DIES
   useEffect(() => {
       if (!liveSession && activeSubTab === 'live') {
           setActiveSubTab('lessons');
@@ -896,7 +813,6 @@ export default function StudentClassView({
   const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
   const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
 
-  // DUAL-LOOKUP ENGINE: Checks Lessons, then checks allDecks
   const populatedAssignments = rawAssignments.map((assignment: any) => {
       if (typeof assignment !== 'string') return assignment;
       let node = lessons.find((l: any) => l.id === assignment);
@@ -931,23 +847,21 @@ export default function StudentClassView({
   const isImmersiveLiveMode = activeSubTab === 'live' && liveSession;
 
   if (isImmersiveLiveMode) {
-      // 🔥 Helper function for the student to push their tile moves to Firebase
       const handleStudentGameUpdate = async (updates: any) => {
           if (!classData?.id) return;
           try {
               const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classData.id);
               await setDoc(sessionRef, updates, { merge: true });
-          } catch (err) {
-              console.error("Failed to sync student move:", err);
-          }
+          } catch (err) { console.error("Failed to sync student move:", err); }
       };
 
       return (
-          <div className="fixed inset-0 z-[9999] bg-black flex flex-col animate-in slide-in-from-bottom-8 duration-500 font-sans">
-              <button onClick={() => setActiveSubTab('lessons')} className="absolute top-6 left-6 z-50 p-2 text-slate-500 hover:text-white rounded-full bg-slate-900 border border-slate-800"><X size={20} /></button>
+          <div className="fixed inset-0 z-[9999] bg-black flex flex-col font-sans">
+              <button onClick={() => setActiveSubTab('lessons')} className="absolute top-4 left-4 z-50 p-3 bg-white text-black font-black uppercase text-[10px] tracking-[0.2em] hover:bg-zinc-200 transition-colors flex items-center gap-2 border-2 border-transparent">
+                  <X size={16} strokeWidth={3}/> Exit Arena
+              </button>
               
               <div className="flex-1 w-full h-full p-4 md:p-8 pt-20">
-                  {/* 🔥 NEW: MARBLE SCRABBLE ROUTE */}
                   {liveSession?.currentQuestion?.gameType === 'marble-scrabble' ? (
                       <MarbleScrabble 
                           block={liveSession.currentQuestion} 
@@ -989,55 +903,56 @@ export default function StudentClassView({
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
+    <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-white overflow-hidden animate-in fade-in duration-300 font-sans relative">
       
-      {/* THE SMARTER HEADER */}
-      <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-[2rem] p-5' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-14'}`}>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+      {/* FLAT ARCHITECTURAL HEADER */}
+      <header className={`shrink-0 z-10 border-b-4 border-zinc-900 dark:border-zinc-200 transition-colors duration-300 ${theme.bg}`}>
         
-        <div className="flex items-center justify-between relative z-20">
-            <button onClick={onBack} className="flex items-center gap-2 text-white/90 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95">
-                <ArrowLeft size={16} /> BACK TO HUB
+        {/* Top Control Bar */}
+        <div className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 border-b-2 border-zinc-900/20 dark:border-zinc-100/20">
+            <button onClick={onBack} className={`flex items-center gap-2 ${theme.textWhite} font-black uppercase text-[10px] tracking-[0.2em] hover:opacity-70 transition-opacity`}>
+                <ArrowLeft size={16} strokeWidth={3}/> Hub
             </button>
-
-            <span className={`text-white font-black text-xs uppercase tracking-widest truncate max-w-[150px] md:max-w-xs transition-all duration-500 ${isScrolled ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
+            <span className={`${theme.textWhite} font-black text-[10px] uppercase tracking-[0.2em] truncate max-w-[200px]`}>
                 {classData.name}
             </span>
         </div>
 
-        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95 hidden' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        {/* Hero Area */}
+        <div className="px-4 sm:px-6 md:px-10 py-8 md:py-12">
+            <div className="max-w-4xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-8">
                 
-                <div className="flex-1 max-w-2xl">
-                    <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <span className="px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10 shadow-inner">
+                <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                        <span className={`px-3 py-1.5 bg-black ${theme.color.split(' ')[0].replace('text-', 'text-')} text-[10px] font-black uppercase tracking-[0.2em] border-2 border-black`}>
                             {classData?.grade || 'General'}
                         </span>
-                        <span className="px-3 py-1.5 bg-white/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10 shadow-sm">
+                        <span className="px-3 py-1.5 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] border-2 border-white">
                             {classData?.subject || 'Subject'}
                         </span>
                     </div>
                     
-                    <h2 className="text-3xl md:text-4xl font-black text-white leading-tight mb-3 tracking-tighter drop-shadow-sm">
+                    <h2 className={`text-4xl md:text-5xl font-black ${theme.textWhite} leading-none tracking-tighter mb-4 uppercase`}>
                         {classData.name}
                     </h2>
                     
-                    <p className="text-white/90 font-medium text-sm md:text-base leading-relaxed line-clamp-3 md:line-clamp-4">
-                        {classData.description || "Your learning adventure starts here."}
+                    <p className={`${theme.textWhite} opacity-90 font-bold text-sm md:text-base leading-relaxed max-w-2xl`}>
+                        {classData.description || "Course initialization complete. Awaiting student interaction."}
                     </p>
                 </div>
 
-                <div className="bg-black/15 backdrop-blur-md border border-white/10 rounded-[1.5rem] p-5 flex gap-6 shrink-0 shadow-inner mt-2 md:mt-0">
-                    <div className="flex flex-col items-center">
-                        <span className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">Modules</span>
-                        <span className="text-white font-black text-2xl leading-none">{totalNodesCount}</span>
+                {/* Telemetry Block */}
+                <div className="bg-black border-2 border-zinc-900 p-5 flex gap-6 shrink-0 text-white">
+                    <div className="flex flex-col">
+                        <span className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Nodes</span>
+                        <span className="font-black text-2xl leading-none tabular-nums">{String(totalNodesCount).padStart(2, '0')}</span>
                     </div>
-                    <div className="w-px bg-white/10" />
-                    <div className="flex flex-col items-center">
-                        <span className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">Completion</span>
+                    <div className="w-0.5 bg-zinc-800" />
+                    <div className="flex flex-col">
+                        <span className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Progress</span>
                         <div className="flex items-baseline gap-1">
-                            <span className="text-emerald-400 font-black text-2xl leading-none">{overallProgress}</span>
-                            <span className="text-emerald-400/60 font-bold text-xs">%</span>
+                            <span className="text-emerald-400 font-black text-2xl leading-none tabular-nums">{overallProgress}</span>
+                            <span className="text-emerald-600 font-black text-xs">%</span>
                         </div>
                     </div>
                 </div>
@@ -1047,54 +962,52 @@ export default function StudentClassView({
       </header>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20 pt-6" onScroll={handleScroll}>
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-4 sm:px-6 md:px-10 pb-32 z-0 pt-6 md:pt-10">
 
         {liveSession && activeSubTab !== 'live' && (
-            <div className="px-4 mb-8 animate-in slide-in-from-top-4 fade-in duration-500">
-                <button onClick={() => setActiveSubTab('live')} className="w-full bg-slate-900 dark:bg-black rounded-[2rem] p-1 shadow-[0_0_40px_rgba(99,102,241,0.3)] relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-indigo-500/20 animate-pulse" />
-                    <div className="relative bg-slate-800/50 dark:bg-slate-950 rounded-[1.8rem] p-4 flex items-center justify-between border border-indigo-500/30 dark:border-indigo-500/50 backdrop-blur-xl">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-full flex items-center justify-center animate-bounce-slow border border-white/20 shadow-lg shadow-indigo-500/50">
-                                <Zap size={24} className="text-indigo-600 dark:text-indigo-400" fill="currentColor" />
-                            </div>
-                            <div className="text-left">
-                                <h4 className="text-white font-black text-lg tracking-widest uppercase">LIVE PROTOCOL ACTIVE!</h4>
-                                <p className="text-indigo-300 font-bold text-[10px] uppercase tracking-widest">Join the classroom engage now</p>
-                            </div>
+            <div className="max-w-4xl mx-auto mb-8">
+                <button onClick={() => setActiveSubTab('live')} className="w-full bg-indigo-600 hover:bg-indigo-500 transition-colors border-4 border-zinc-900 dark:border-zinc-200 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left">
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-white text-indigo-600 flex items-center justify-center border-4 border-zinc-900 dark:border-zinc-200 shrink-0">
+                            <Zap size={28} strokeWidth={3} />
                         </div>
-                        <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-500 rounded-full flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
-                            <ChevronRight size={20} strokeWidth={3} />
+                        <div>
+                            <h4 className="text-white font-black text-xl md:text-2xl tracking-tight uppercase leading-none mb-2">Live Protocol Active</h4>
+                            <p className="text-indigo-200 font-black text-[10px] uppercase tracking-[0.2em]">Join the classroom engage now</p>
                         </div>
+                    </div>
+                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center shrink-0 border-2 border-black">
+                        <ChevronRight size={24} strokeWidth={3} />
                     </div>
                 </button>
             </div>
         )}
 
         {activeSubTab === 'lessons' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4">
+          <div>
              {assignedCurriculums.length > 0 ? (
-                 <section className="space-y-8 mb-10 max-w-xl mx-auto">
+                 <section className="space-y-8 mb-10 max-w-4xl mx-auto">
                      {assignedCurriculums.map((curr: any) => (
                          <CurriculumPathway key={curr.id} curr={curr} lessons={lessons} allDecks={allDecks} completedItems={completedItems} isExpanded={!!expandedRoadmaps[curr.id]} onToggle={() => toggleRoadmap(curr.id)} onSelectLesson={onSelectLesson} theme={theme} />
                      ))}
                  </section>
              ) : (
-                <div className="text-center p-12 bg-white/50 dark:bg-slate-900/30 backdrop-blur-md rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800 m-4 transition-colors duration-300">
-                    <Map size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-                    <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 mb-2">Map Loading...</h3>
-                    <p className="text-slate-500 dark:text-slate-400 font-bold">Your instructor hasn't drawn the path yet.</p>
+                <div className="text-center p-12 bg-white dark:bg-black border-4 border-dashed border-zinc-300 dark:border-zinc-800 max-w-2xl mx-auto my-8">
+                    <Map size={48} className="mx-auto text-zinc-400 mb-4" strokeWidth={2}/>
+                    <h3 className="text-2xl font-black text-zinc-950 dark:text-white uppercase tracking-tight mb-2">Map Loading</h3>
+                    <p className="text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em]">Instructor has not deployed the roadmap.</p>
                 </div>
              )}
              
              {standaloneLessons.length > 0 && (
-                 <section className="space-y-4 mb-10 px-4 max-w-xl mx-auto">
-                     <div className="flex items-center gap-3 ml-2 mb-6">
-                         <div className="h-px flex-1 bg-gradient-to-r from-transparent to-slate-200 dark:to-slate-800" />
-                         <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Bonus Quests</h3>
-                         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-slate-200 dark:to-slate-800" />
+                 <section className="space-y-4 mb-10 max-w-4xl mx-auto">
+                     <div className="flex items-center gap-4 mb-6">
+                         <h3 className="text-[10px] font-black text-zinc-950 dark:text-white uppercase tracking-[0.2em] whitespace-nowrap bg-zinc-200 dark:bg-zinc-800 px-3 py-1">Bonus Quests</h3>
+                         <div className="h-0.5 flex-1 bg-zinc-200 dark:bg-zinc-800" />
                      </div>
-                     {standaloneLessons.map((item: any) => (<StandaloneAssignmentCard key={item.id} item={item} isCompleted={completedItems.includes(item.id)} onSelectLesson={onSelectLesson} theme={theme} />))}
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {standaloneLessons.map((item: any) => (<StandaloneAssignmentCard key={item.id} item={item} isCompleted={completedItems.includes(item.id)} onSelectLesson={onSelectLesson} theme={theme} />))}
+                     </div>
                  </section>
              )}
           </div>
@@ -1102,29 +1015,29 @@ export default function StudentClassView({
 
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
         {activeSubTab === 'exams' && (
-          <section className="space-y-4 px-4 max-w-xl mx-auto">
-            {examList.length === 0 ? <div className="text-center py-20 opacity-40"><FileText size={48} className="mx-auto mb-4 text-slate-800 dark:text-slate-100" /><p className="font-black text-xs uppercase tracking-widest leading-loose text-slate-800 dark:text-slate-100">No active exams assigned.</p></div> : examList.map((item: any) => <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} />)}
+          <section className="space-y-4 max-w-4xl mx-auto">
+            {examList.length === 0 ? <div className="text-center py-20 opacity-50"><FileText size={48} strokeWidth={2} className="mx-auto mb-4 text-zinc-500" /><p className="font-black text-[10px] uppercase tracking-[0.2em] text-zinc-500">No active exams assigned.</p></div> : examList.map((item: any) => <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} />)}
           </section>
         )}
-        {activeSubTab === 'forum' && <div className="h-[70vh]"><ClassForum classId={classData.id} userData={userData} /></div>}
+        {activeSubTab === 'forum' && <div className="h-[75vh] max-w-5xl mx-auto"><ClassForum classId={classData.id} userData={userData} /></div>}
         {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
       </main>
 
-      {/* THE SENSUAL BOTTOM NAV */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
-          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/40 dark:border-white/10 flex items-center justify-between gap-1 transition-colors duration-300 ring-1 ring-white/20 dark:ring-white/5">
+      {/* DOCKED FLAT BOTTOM NAV */}
+      <nav className="border-t-2 border-zinc-900 dark:border-zinc-200 bg-white dark:bg-black z-50 shrink-0">
+          <div className="max-w-4xl mx-auto flex divide-x-2 divide-zinc-900 dark:divide-zinc-200 min-h-[64px]">
             {[
-              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} /> },
-              { id: 'leaderboard', label: 'Rankings', icon: <Trophy size={18} /> },
-              { id: 'exams', label: 'Exams', icon: <FileText size={18} /> },
-              { id: 'forum', label: 'Forum', icon: <MessageSquare size={18} /> },
-              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18} /> }
+              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} strokeWidth={2.5}/> },
+              { id: 'leaderboard', label: 'Ranks', icon: <Trophy size={18} strokeWidth={2.5}/> },
+              { id: 'exams', label: 'Exams', icon: <FileText size={18} strokeWidth={2.5}/> },
+              { id: 'forum', label: 'Forum', icon: <MessageSquare size={18} strokeWidth={2.5}/> },
+              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18} strokeWidth={2.5}/> }
             ].map((tab) => {
               const isActive = activeSubTab === tab.id;
               return (
-                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-4 rounded-full transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.6)] scale-105 ring-2 ring-indigo-400/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}>
-                  {tab.icon}
-                  {isActive && <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
+                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-col items-center justify-center flex-1 py-2 px-1 transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100'}`}>
+                  <div className="mb-1">{tab.icon}</div>
+                  <span className={`text-[9px] font-black uppercase tracking-[0.15em] hidden sm:block ${isActive ? 'text-indigo-200' : ''}`}>{tab.label}</span>
                 </button>
               );
             })}
@@ -1134,7 +1047,7 @@ export default function StudentClassView({
   );
 }
 
-// 🔥 UPDATED CURRICULUM PATHWAY
+// 🔥 UPDATED CURRICULUM PATHWAY (Flat Architectural)
 const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
     const currLessons = (curr.lessonIds || []).map((id: string) => {
         let node = lessons.find((l: any) => l.id === id);
@@ -1157,39 +1070,41 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
     const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
     const activeNodeIndex = currLessons.findIndex((l: any) => !completedItems.includes(l.id));
     const normalizedActiveIndex = activeNodeIndex === -1 ? currLessons.length - 1 : activeNodeIndex;
-    const headerAccent = curr.themeColor || '#6366f1';
+    
+    // Convert hex to a known strict tailwind class if possible, or use inline strictly.
+    const headerAccent = curr.themeColor || '#4f46e5';
 
     return (
         <article className="bg-transparent relative pb-8">
-            <button className="w-full text-left bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[3rem] border border-white/40 dark:border-slate-800 shadow-xl relative overflow-hidden group transition-colors duration-300" onClick={onToggle}>
-                <div className="absolute inset-0 opacity-5 transition-opacity group-hover:opacity-10" style={{ backgroundColor: headerAccent }} />
-                <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l to-transparent pointer-events-none opacity-20" style={{ backgroundImage: `linear-gradient(to left, ${headerAccent}, transparent)` }} />
+            <button className="w-full text-left bg-white dark:bg-black border-4 border-zinc-900 dark:border-zinc-200 flex flex-col transition-colors duration-300" onClick={onToggle}>
                 
-                <div className="relative z-10 flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between p-6 md:p-8 w-full">
                     <div>
-                        <span className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase mb-3 inline-block transition-colors duration-300 shadow-inner dark:shadow-none">{curr.grade || 'Pathway'}</span>
-                        <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-slate-100 pr-4 leading-tight tracking-tight">{curr.title}</h3>
+                        <span className="px-3 py-1.5 bg-zinc-900 dark:bg-white text-white dark:text-black text-[10px] font-black uppercase mb-3 inline-block tracking-[0.2em]">{curr.grade || 'Pathway'}</span>
+                        <h3 className="text-2xl md:text-3xl font-black text-zinc-950 dark:text-white leading-tight tracking-tighter uppercase">{curr.title}</h3>
                     </div>
-                    <div className="w-12 h-12 bg-white/50 dark:bg-slate-800/50 backdrop-blur-md rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-300 border border-white/20 dark:border-white/5 shadow-sm group-hover:scale-110 transition-all duration-300">
-                        <ChevronUp size={24} className={isExpanded ? '' : 'rotate-180 transition-transform'} />
+                    <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-900 dark:text-white border-2 border-zinc-900 dark:border-zinc-200 shrink-0">
+                        <ChevronUp size={24} strokeWidth={3} className={isExpanded ? '' : 'rotate-180 transition-transform'} />
                     </div>
                 </div>
                 
-                <div className="flex items-center gap-4 relative z-10">
-                    <div className="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative shadow-inner dark:shadow-none flex-1 p-0.5 transition-colors duration-300">
-                        <div className="h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${progressPercent}%`, backgroundColor: headerAccent }} />
+                <div className="w-full bg-zinc-100 dark:bg-zinc-900 border-t-4 border-zinc-900 dark:border-zinc-200 px-6 py-4 flex items-center gap-4">
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] shrink-0">Progress</span>
+                    <div className="h-4 w-full bg-zinc-300 dark:bg-zinc-800 flex-1 border-2 border-zinc-900 dark:border-zinc-200 overflow-hidden">
+                        <div className="h-full transition-all duration-500" style={{ width: `${progressPercent}%`, backgroundColor: headerAccent }} />
                     </div>
-                    <span className="text-sm font-black text-slate-500 dark:text-slate-400 shrink-0">{progressPercent}%</span>
+                    <span className="text-sm font-black text-zinc-950 dark:text-white tabular-nums shrink-0">{progressPercent}%</span>
                 </div>
             </button>
 
-            <div className={`overflow-hidden transition-all duration-700 ${isExpanded ? 'max-h-[5000px] opacity-100 mt-4' : 'max-h-0 opacity-0 pointer-events-none'}`}>
-                <div className="pt-8 pb-12 px-1 sm:px-4 relative transition-colors duration-300">
-                    <div className="relative max-w-sm mx-auto w-full">
-                        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-1 bg-slate-200 dark:bg-slate-800/60 rounded-full z-0 transition-colors duration-300" />
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 rounded-full transition-all duration-1000 z-0 shadow-[0_0_15px_rgba(99,102,241,0.5)]" style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }} />
+            <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'opacity-100 mt-6' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+                <div className="py-8 px-2 sm:px-4 relative">
+                    <div className="relative max-w-lg mx-auto w-full">
+                        {/* Stark central track */}
+                        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-2 bg-zinc-200 dark:bg-zinc-800 z-0" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 transition-all duration-700 z-0" style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }} />
                         
-                        <div className="relative z-10 flex flex-col gap-8 sm:gap-12 py-8">
+                        <div className="relative z-10 flex flex-col gap-10 sm:gap-14 py-8">
                             {currLessons.map((item: any, index: number) => {
                                 const isCompleted = completedItems.includes(item.id);
                                 const isCurrent = index === normalizedActiveIndex;
@@ -1197,45 +1112,47 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
                                 const isLeft = index % 2 === 0;
 
                                 return (
-                                    <div key={item.id} className={`relative flex w-full items-center min-h-[90px] ${isLocked ? 'opacity-50 grayscale-[50%]' : ''}`}>
-                                        <div className={`w-1/2 flex justify-end pr-10 sm:pr-14 z-10 ${!isLeft ? 'invisible' : ''}`}>
-                                            <div className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/40 dark:border-slate-700 w-full max-w-[160px] text-right transition-all duration-300 ${isCurrent ? 'scale-105 shadow-xl' : 'hover:scale-[1.02]'} ${isLocked ? 'pointer-events-none' : 'cursor-pointer'}`} onClick={() => !isLocked && onSelectLesson(item)}>
-                                                <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                                                    {item.contentType === 'exam' || item.contentType === 'test' ? 'Checkpoint' : `Module 0${index + 1}`}
+                                    <div key={item.id} className={`relative flex w-full items-center min-h-[100px] ${isLocked ? 'opacity-50 grayscale' : ''}`}>
+                                        
+                                        {/* Left Side Content */}
+                                        <div className={`w-1/2 flex justify-end pr-8 sm:pr-12 z-10 ${!isLeft ? 'invisible' : ''}`}>
+                                            <div className={`bg-white dark:bg-black p-5 border-4 border-zinc-900 dark:border-zinc-200 w-full max-w-[200px] text-right transition-colors ${isCurrent ? 'border-indigo-600 dark:border-indigo-500' : ''} ${isLocked ? 'pointer-events-none' : 'cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900'}`} onClick={() => !isLocked && onSelectLesson(item)}>
+                                                <span className={`text-[10px] font-black uppercase mb-2 block tracking-[0.2em] ${isCurrent ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                                    {item.contentType === 'exam' || item.contentType === 'test' ? 'Checkpoint' : `Mod ${String(index + 1).padStart(2, '0')}`}
                                                 </span>
-                                                <h4 className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
+                                                <h4 className="font-black text-sm sm:text-base text-zinc-950 dark:text-white leading-tight uppercase tracking-tight">{item.title}</h4>
                                             </div>
                                         </div>
                                         
-                                        <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 ${isLeft ? '-translate-x-[30%]' : '-translate-x-[70%]'}`}>
-                                            <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${isCompleted ? 'bg-indigo-500 border-indigo-200 dark:border-indigo-900 text-white shadow-lg shadow-indigo-500/20' : isCurrent ? `bg-slate-900 text-white scale-110 shadow-[0_0_30px_rgba(99,102,241,0.6)]` : 'bg-slate-100 dark:bg-slate-900 border-white dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'}`} style={{ ...(isCurrent && item.type !== 'quiz' && item.contentType !== 'exam' && item.contentType !== 'test' ? { borderColor: headerAccent } : {}) }}>
+                                        {/* Central Node */}
+                                        <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 ${isLeft ? '-translate-x-[25%]' : '-translate-x-[75%]'}`}>
+                                            <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center border-4 transition-colors ${isCompleted ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-black' : isCurrent ? `bg-white dark:bg-black text-zinc-950 dark:text-white` : 'bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-400 cursor-not-allowed'}`} style={{ ...(isCurrent ? { borderColor: headerAccent } : {}) }}>
                                                 {isCompleted ? (
-                                                    <CheckCircle2 size={24} strokeWidth={3} />
+                                                    <CheckCircle2 size={28} strokeWidth={4} />
                                                 ) : isLocked ? (
-                                                    <Lock size={20} />
+                                                    <Lock size={24} strokeWidth={3} />
                                                 ) : item.type === 'deck' ? (
-                                                    <Layers size={22} className={isCurrent ? "animate-pulse" : ""} />
+                                                    <Layers size={28} strokeWidth={3} />
                                                 ) : item.type === 'quiz' || item.contentType === 'exam' || item.contentType === 'test' ? (
-                                                    <HelpCircle size={24} />
+                                                    <HelpCircle size={28} strokeWidth={3} />
                                                 ) : (
-                                                    <Play size={24} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />
+                                                    <Play size={28} strokeWidth={3} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />
                                                 )}
                                                 
+                                                {/* Hard flat indicator ring for active node */}
                                                 {isCurrent && (
-                                                    <>
-                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-20" style={{ backgroundColor: headerAccent }}></span>
-                                                        <div className="absolute inset-0 -m-2 border border-white/20 rounded-full animate-spin-slow" style={{ borderColor: headerAccent }} />
-                                                    </>
+                                                    <div className="absolute inset-0 -m-2 border-2" style={{ borderColor: headerAccent }} />
                                                 )}
                                             </button>
                                         </div>
                                         
-                                        <div className={`w-1/2 flex justify-start pl-10 sm:pl-14 z-10 ${isLeft ? 'invisible' : ''}`}>
-                                            <div className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/40 dark:border-slate-700 w-full max-w-[160px] text-left transition-all duration-300 ${isCurrent ? 'scale-105 shadow-xl' : 'hover:scale-[1.02]'} ${isLocked ? 'pointer-events-none' : 'cursor-pointer'}`} onClick={() => !isLocked && onSelectLesson(item)}>
-                                                <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                                                    {item.contentType === 'exam' || item.contentType === 'test' ? 'Checkpoint' : `Module 0${index + 1}`}
+                                        {/* Right Side Content */}
+                                        <div className={`w-1/2 flex justify-start pl-8 sm:pl-12 z-10 ${isLeft ? 'invisible' : ''}`}>
+                                            <div className={`bg-white dark:bg-black p-5 border-4 border-zinc-900 dark:border-zinc-200 w-full max-w-[200px] text-left transition-colors ${isCurrent ? 'border-indigo-600 dark:border-indigo-500' : ''} ${isLocked ? 'pointer-events-none' : 'cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900'}`} onClick={() => !isLocked && onSelectLesson(item)}>
+                                                <span className={`text-[10px] font-black uppercase mb-2 block tracking-[0.2em] ${isCurrent ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                                    {item.contentType === 'exam' || item.contentType === 'test' ? 'Checkpoint' : `Mod ${String(index + 1).padStart(2, '0')}`}
                                                 </span>
-                                                <h4 className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
+                                                <h4 className="font-black text-sm sm:text-base text-zinc-950 dark:text-white leading-tight uppercase tracking-tight">{item.title}</h4>
                                             </div>
                                         </div>
                                     </div>
@@ -1250,27 +1167,25 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
 };
 
 const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: any) => (
-    <button className={`w-full text-left p-5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[2.5rem] flex items-center gap-5 transition-all group overflow-hidden relative ${isCompleted ? 'border border-emerald-200 dark:border-emerald-500/20 opacity-70' : `border border-white/40 dark:border-slate-800 shadow-xl hover:shadow-2xl hover:scale-[1.02]`}`} onClick={() => onSelectLesson(item)}>
-        <div className={`absolute top-0 right-0 w-32 h-full bg-gradient-to-l to-transparent opacity-10 pointer-events-none ${isCompleted ? 'from-emerald-500' : theme.bg.replace('bg-', 'from-')}`} />
-        <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border border-white/20 shadow-lg transition-colors shrink-0 ${isCompleted ? 'bg-emerald-500 text-white' : `${theme.bg} text-white`}`}>
-            {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={24} /> : item.type === 'deck' ? <Layers size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
+    <button className={`w-full text-left p-6 bg-white dark:bg-black border-4 flex items-center gap-6 transition-colors group ${isCompleted ? 'border-zinc-300 dark:border-zinc-800 opacity-60 grayscale' : 'border-zinc-900 dark:border-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900'}`} onClick={() => onSelectLesson(item)}>
+        <div className={`w-16 h-16 flex items-center justify-center border-4 border-zinc-900 dark:border-zinc-200 shrink-0 ${isCompleted ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500' : `${theme.bg} ${theme.textWhite}`}`}>
+            {isCompleted ? <CheckCircle2 size={28} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={28} strokeWidth={2.5}/> : item.type === 'deck' ? <Layers size={28} strokeWidth={2.5}/> : <Play size={28} strokeWidth={2.5} className="ml-1" fill="currentColor" />}
         </div>
-        <div className="flex-1 pr-2 relative z-10">
-            <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCompleted ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
+        <div className="flex-1 pr-2">
+            <span className={`text-[10px] font-black uppercase mb-1.5 block tracking-[0.2em] ${isCompleted ? 'text-zinc-500' : 'text-zinc-500 dark:text-zinc-400'}`}>
                 {isCompleted ? 'Completed' : 'Special Assignment'}
             </span>
-            <h4 className="font-black text-slate-800 dark:text-slate-100 text-lg leading-tight transition-colors tracking-tight">{item.title}</h4>
+            <h4 className="font-black text-zinc-900 dark:text-white text-xl leading-tight uppercase tracking-tight">{item.title}</h4>
         </div>
     </button>
 );
 
 const ExamCard = ({ item, onSelectLesson }: any) => (
-    <button className="w-full text-left p-6 border border-rose-200 dark:border-rose-500/20 bg-rose-50/80 dark:bg-rose-900/20 backdrop-blur-xl rounded-[3rem] flex items-center gap-5 transition-all group duration-300 shadow-xl hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.02] relative overflow-hidden" onClick={() => onSelectLesson(item)}>
-      <div className="absolute top-0 left-0 w-2 h-full bg-rose-500" />
-      <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 shadow-lg border border-rose-100 dark:border-rose-500/20 shrink-0 transition-colors duration-300 relative z-10"><Trophy size={28} fill="currentColor" /></div>
-      <div className="relative z-10">
-          <span className="text-[9px] font-black uppercase text-rose-500 dark:text-rose-400 tracking-widest bg-rose-100 dark:bg-rose-500/20 px-3 py-1 rounded-full mb-2 inline-block transition-colors duration-300 border border-rose-200 dark:border-rose-500/30">High-Stakes Assessment</span>
-          <h4 className="font-black text-slate-900 dark:text-white text-2xl leading-tight transition-colors tracking-tight">{item.title}</h4>
+    <button className="w-full text-left p-6 md:p-8 border-4 border-rose-600 bg-white dark:bg-black flex items-center gap-6 transition-colors group hover:bg-rose-50 dark:hover:bg-rose-950/30" onClick={() => onSelectLesson(item)}>
+      <div className="w-16 h-16 flex items-center justify-center bg-rose-600 text-white shrink-0 border-4 border-zinc-900 dark:border-zinc-100"><Trophy size={32} strokeWidth={2.5} /></div>
+      <div>
+          <span className="text-[10px] font-black uppercase text-white bg-rose-600 tracking-[0.2em] px-3 py-1.5 mb-3 inline-block">High-Stakes Assessment</span>
+          <h4 className="font-black text-zinc-900 dark:text-white text-2xl md:text-3xl leading-tight uppercase tracking-tight">{item.title}</h4>
       </div>
     </button>
 );
