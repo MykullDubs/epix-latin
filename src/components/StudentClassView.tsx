@@ -837,12 +837,6 @@ export default function StudentClassView({
       [initialExpandedId]: true 
   });
   
-  const [isScrolled, setIsScrolled] = useState(false);
-  
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-      setIsScrolled(e.currentTarget.scrollTop > 40);
-  };
-
   const theme = getSubjectTheme(classData?.subject);
   const safeEmail = (userData?.email || auth?.currentUser?.email || 'unknown').replace(/\./g, ',');
 
@@ -961,9 +955,7 @@ export default function StudentClassView({
           try {
               const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classData.id);
               await setDoc(sessionRef, updates, { merge: true });
-          } catch (err) {
-              console.error("Failed to sync student move:", err);
-          }
+          } catch (err) { console.error("Failed to sync student move:", err); }
       };
 
       return (
@@ -1014,63 +1006,49 @@ export default function StudentClassView({
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
       
-      {/* THE SMARTER HEADER */}
-      <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-[2rem] p-5' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-14'}`}>
+      {/* THE COMPACT FROSTED HEADER */}
+      <header className={`shrink-0 z-30 relative shadow-md ${theme.bg} rounded-b-[2rem] p-4 md:p-5 border-b border-white/10`}>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         
-        <div className="flex items-center justify-between relative z-20">
-            <button onClick={onBack} className="flex items-center gap-2 text-white/90 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95">
-                <ArrowLeft size={16} /> BACK TO HUB
-            </button>
-
-            <span className={`text-white font-black text-xs uppercase tracking-widest truncate max-w-[150px] md:max-w-xs transition-all duration-500 ${isScrolled ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
-                {classData.name}
-            </span>
-        </div>
-
-        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95 hidden' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                
-                <div className="flex-1 max-w-2xl">
-                    <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <span className="px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10 shadow-inner">
+        <div className="flex items-center justify-between relative z-20 gap-3 md:gap-6">
+            <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                <button onClick={onBack} className="w-10 h-10 md:w-12 md:h-12 bg-black/20 hover:bg-black/30 text-white rounded-full flex items-center justify-center transition-all active:scale-95 shrink-0 border border-white/10 backdrop-blur-sm shadow-inner">
+                    <ArrowLeft size={18} />
+                </button>
+                <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 bg-black/20 text-white rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-widest backdrop-blur-md shadow-inner truncate max-w-[100px]">
                             {classData?.grade || 'General'}
                         </span>
-                        <span className="px-3 py-1.5 bg-white/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10 shadow-sm">
+                        <span className="px-2 py-0.5 bg-white/20 text-white rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm truncate max-w-[100px]">
                             {classData?.subject || 'Subject'}
                         </span>
                     </div>
-                    
-                    <h2 className="text-3xl md:text-4xl font-black text-white leading-tight mb-3 tracking-tighter drop-shadow-sm">
+                    <h1 className="text-white font-black text-lg md:text-2xl uppercase tracking-tighter leading-none truncate">
                         {classData.name}
-                    </h2>
-                    
-                    <p className="text-white/90 font-medium text-sm md:text-base leading-relaxed line-clamp-3 md:line-clamp-4">
-                        {classData.description || "Your learning adventure starts here."}
-                    </p>
+                    </h1>
                 </div>
+            </div>
 
-                <div className="bg-black/15 backdrop-blur-md border border-white/10 rounded-[1.5rem] p-5 flex gap-6 shrink-0 shadow-inner mt-2 md:mt-0">
-                    <div className="flex flex-col items-center">
-                        <span className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">Modules</span>
-                        <span className="text-white font-black text-2xl leading-none">{totalNodesCount}</span>
-                    </div>
-                    <div className="w-px bg-white/10" />
-                    <div className="flex flex-col items-center">
-                        <span className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">Completion</span>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-emerald-400 font-black text-2xl leading-none">{overallProgress}</span>
-                            <span className="text-emerald-400/60 font-bold text-xs">%</span>
-                        </div>
+            <div className="flex bg-black/15 backdrop-blur-md border border-white/10 rounded-[1.2rem] p-2 px-3 md:px-4 items-center gap-3 md:gap-5 shrink-0 shadow-inner">
+                <div className="flex flex-col items-center">
+                    <span className="text-white/60 text-[7px] md:text-[8px] font-black uppercase tracking-widest mb-0.5 md:mb-1">Nodes</span>
+                    <span className="text-white font-black text-sm md:text-lg leading-none tabular-nums">{String(totalNodesCount).padStart(2, '0')}</span>
+                </div>
+                <div className="w-px h-6 bg-white/10" />
+                <div className="flex flex-col items-center">
+                    <span className="text-white/60 text-[7px] md:text-[8px] font-black uppercase tracking-widest mb-0.5 md:mb-1">Done</span>
+                    <div className="flex items-baseline gap-0.5">
+                        <span className="text-emerald-400 font-black text-sm md:text-lg leading-none tabular-nums">{overallProgress}</span>
+                        <span className="text-emerald-400/60 font-bold text-[9px] md:text-[10px]">%</span>
                     </div>
                 </div>
-
             </div>
         </div>
       </header>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20 pt-6" onScroll={handleScroll}>
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20 pt-6">
 
         {liveSession && activeSubTab !== 'live' && (
             <div className="px-4 mb-8 animate-in slide-in-from-top-4 fade-in duration-500">
