@@ -39,18 +39,27 @@ export default function DeploymentModal({ isOpen, onClose, onDeploy, activeClass
         setDeployMode(protocolId);
     };
 
-    const handleDeploy = async () => {
-        if (!selectedId) return;
-        setDeployState('deploying');
-        await new Promise(r => setTimeout(r, 1500));
-        setDeployState('success');
-        setTimeout(() => {
-            onDeploy({ classId: activeClass.id, contentId: selectedId, mode: deployMode });
-            onClose();
-            setDeployState('idle');
-        }, 1000);
-    };
+const handleDeploy = async () => {
+    if (!selectedId) return;
+    
+    // 1. Find the full object from your memoized content list
+    const fullItemObject = filteredContent.find(item => item.id === selectedId);
 
+    setDeployState('deploying');
+    await new Promise(r => setTimeout(r, 1500));
+    setDeployState('success');
+    
+    setTimeout(() => {
+        onDeploy({ 
+            classId: activeClass.id, 
+            contentId: selectedId, 
+            mode: deployMode,
+            fullItem: fullItemObject // 2. Attach the full object to the payload
+        });
+        onClose();
+        setDeployState('idle');
+    }, 1000);
+};
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300 font-sans">
             <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm" onClick={() => deployState === 'idle' && onClose()} />
