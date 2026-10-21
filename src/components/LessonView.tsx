@@ -4,7 +4,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
-  MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen,
+  MessageCircle, ArrowLeft, ArrowRight, Info, BookOpen,
   Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle, Gamepad2, Layers, Mic, RotateCcw
 } from 'lucide-react';
 import PronunciationLab from './PronunciationLab'; 
@@ -19,30 +19,41 @@ export interface LessonViewProps {
 }
 
 // ============================================================================
-//  SHARED UI HELPERS
+//  TYPOGRAPHY-FIRST SECTION HEADER
 // ============================================================================
 
-const SectionBadge = ({ icon: Icon, label, color = 'indigo' }: { icon: any; label: string; color?: 'indigo' | 'amber' | 'rose' | 'cyan' | 'fuchsia' }) => {
-    const colorMap = {
-        indigo: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200/60 dark:border-indigo-500/20',
-        amber: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-500/20',
-        rose: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-        cyan: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-        fuchsia: 'bg-fuchsia-50 dark:bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-200/60 dark:border-fuchsia-500/20',
+const SectionHeader = ({
+    icon: Icon,
+    label,
+    accent = 'indigo'
+}: {
+    icon: any;
+    label: string;
+    accent?: 'indigo' | 'amber' | 'rose' | 'cyan' | 'fuchsia' | 'emerald';
+}) => {
+    const accentMap = {
+        indigo: 'bg-indigo-600 text-white',
+        amber: 'bg-amber-500 text-black',
+        rose: 'bg-rose-600 text-white',
+        cyan: 'bg-cyan-400 text-black',
+        fuchsia: 'bg-fuchsia-600 text-white',
+        emerald: 'bg-emerald-600 text-white',
     };
 
     return (
-        <div className="flex items-center gap-2.5 mb-4 sm:mb-6">
-            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center border shrink-0 ${colorMap[color]}`}>
-                <Icon size={16} strokeWidth={2.5} />
+        <div className="flex items-center gap-3 mb-5 pb-3 border-b-2 border-zinc-900 dark:border-zinc-100">
+            <div className={`w-7 h-7 flex items-center justify-center shrink-0 ${accentMap[accent]}`}>
+                <Icon size={15} strokeWidth={2.75} />
             </div>
-            <h3 className="text-[11px] font-extrabold uppercase tracking-widest opacity-80">{label}</h3>
+            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-900 dark:text-zinc-100">
+                {label}
+            </h3>
         </div>
     );
 };
 
 // ============================================================================
-//  INTERACTIVE RENDERERS 
+//  INTERACTIVE RENDERERS (FLAT / HIGH-CONTRAST)
 // ============================================================================
 
 const QuizBlockRenderer = ({ block }: any) => {
@@ -72,20 +83,17 @@ const QuizBlockRenderer = ({ block }: any) => {
     const isCorrect = selectedId === correctId;
 
     return (
-        <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm my-4 sm:my-6 relative overflow-hidden transition-colors">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500" />
-            <div className="text-indigo-600 dark:text-indigo-400">
-                <SectionBadge icon={HelpCircle} label="Knowledge Check" color="indigo" />
-            </div>
+        <div className="bg-white dark:bg-black p-4 sm:p-6 md:p-8 border-2 border-zinc-900 dark:border-zinc-200 my-4 sm:my-6">
+            <SectionHeader icon={HelpCircle} label="Knowledge Check" accent="indigo" />
             
-            <h4 className="text-base sm:text-lg md:text-xl font-bold text-slate-900 dark:text-white mb-5 sm:mb-6 leading-snug tracking-tight">
+            <h4 className="text-xl sm:text-2xl md:text-3xl font-black text-zinc-950 dark:text-white mb-6 leading-tight tracking-tight">
                 {question}
             </h4>
             
-            <div className="space-y-2.5 sm:space-y-3">
+            <div className="space-y-2.5">
                 {normalizedOptions.length === 0 ? (
-                    <p className="text-slate-400 font-medium italic p-4 text-center border border-dashed border-slate-300 dark:border-slate-700 rounded-xl">
-                        No options provided.
+                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs p-4 text-center border-2 border-dashed border-zinc-300 dark:border-zinc-800">
+                        No options provided
                     </p>
                 ) : (
                     normalizedOptions.map((opt: any, idx: number) => {
@@ -93,30 +101,37 @@ const QuizBlockRenderer = ({ block }: any) => {
                         const isOptCorrect = isSubmitted && opt.id === correctId;
                         const isOptWrong = isSubmitted && isSelected && opt.id !== correctId;
 
-                        let btnStyle = "bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-500/50";
-                        if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-sm";
-                        if (isOptCorrect) btnStyle = "bg-emerald-600 border-emerald-600 text-white shadow-sm";
-                        if (isOptWrong) btnStyle = "bg-rose-600 border-rose-600 text-white shadow-sm";
+                        let rowStyle = "bg-white dark:bg-zinc-950 border-zinc-900 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900";
+                        let indexStyle = "bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border-zinc-900 dark:border-zinc-700";
+
+                        if (isSelected && !isSubmitted) {
+                            rowStyle = "bg-indigo-600 border-indigo-600 text-white";
+                            indexStyle = "bg-indigo-800 text-white border-indigo-400";
+                        }
+                        if (isOptCorrect) {
+                            rowStyle = "bg-emerald-600 border-emerald-600 text-white";
+                            indexStyle = "bg-emerald-800 text-white border-emerald-400";
+                        }
+                        if (isOptWrong) {
+                            rowStyle = "bg-rose-600 border-rose-600 text-white";
+                            indexStyle = "bg-rose-800 text-white border-rose-400";
+                        }
 
                         return (
                             <button 
                                 key={opt.id}
                                 disabled={isSubmitted}
                                 onClick={() => setSelectedId(opt.id)}
-                                className={`w-full flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border font-semibold text-sm sm:text-base text-left transition-all active:scale-[0.99] disabled:active:scale-100 min-h-[54px] ${btnStyle}`}
+                                className={`w-full flex items-stretch border-2 font-bold text-sm sm:text-base text-left transition-colors min-h-[56px] ${rowStyle}`}
                             >
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <span className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
-                                        isSelected || isOptCorrect || isOptWrong
-                                            ? 'bg-white/20 text-white'
-                                            : 'bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                                    }`}>
-                                        {String.fromCharCode(65 + idx)}
-                                    </span>
+                                <span className={`w-12 sm:w-14 border-r-2 text-xs sm:text-sm font-black flex items-center justify-center shrink-0 tabular-nums ${indexStyle}`}>
+                                    {String.fromCharCode(65 + idx)}
+                                </span>
+                                <span className="flex-1 px-4 py-3.5 flex items-center justify-between gap-3 min-w-0">
                                     <span className="break-words leading-snug">{opt.text}</span>
-                                </div>
-                                {isOptCorrect && <CheckCircle2 size={18} strokeWidth={2.5} className="text-white shrink-0" />}
-                                {isOptWrong && <X size={18} strokeWidth={2.5} className="text-white shrink-0" />}
+                                    {isOptCorrect && <CheckCircle2 size={20} strokeWidth={2.75} className="text-white shrink-0" />}
+                                    {isOptWrong && <X size={20} strokeWidth={2.75} className="text-white shrink-0" />}
+                                </span>
                             </button>
                         );
                     })
@@ -126,25 +141,25 @@ const QuizBlockRenderer = ({ block }: any) => {
             {!isSubmitted && selectedId !== null ? (
                 <button
                     onClick={() => setIsSubmitted(true)}
-                    className="mt-5 sm:mt-6 w-full py-3.5 sm:py-4 bg-slate-900 dark:bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-slate-800 dark:hover:bg-indigo-500 active:scale-[0.99] transition-all shadow-sm min-h-[48px]"
+                    className="mt-6 w-full py-4 bg-zinc-950 dark:bg-white text-white dark:text-black font-black text-xs uppercase tracking-[0.2em] hover:bg-indigo-600 dark:hover:bg-indigo-500 dark:hover:text-white transition-colors min-h-[52px]"
                 >
-                    Check Answer
+                    Verify Answer
                 </button>
             ) : isSubmitted && (
-                <div className={`mt-5 sm:mt-6 p-3.5 sm:p-4 rounded-xl flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center animate-in zoom-in-95 duration-200 border ${
+                <div className={`mt-6 p-4 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center border-2 ${
                     isCorrect
-                        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20'
-                        : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/20'
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-rose-600 text-white border-rose-600'
                 }`}>
-                    <span className="font-bold text-sm flex items-center gap-2">
-                        {isCorrect ? <><CheckCircle2 size={18} strokeWidth={2.5}/> Correct!</> : <><X size={18} strokeWidth={2.5}/> Not quite right</>}
+                    <span className="font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2">
+                        {isCorrect ? <><CheckCircle2 size={18} strokeWidth={2.75}/> Verified Correct</> : <><X size={18} strokeWidth={2.75}/> Incorrect Selection</>}
                     </span>
                     {!isCorrect && (
                         <button
                             onClick={() => { setIsSubmitted(false); setSelectedId(null); }}
-                            className="w-full sm:w-auto px-4 py-2.5 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm active:scale-95 transition-all text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 min-h-[40px]"
+                            className="w-full sm:w-auto px-5 py-2.5 bg-black text-white text-xs font-black uppercase tracking-[0.2em] hover:bg-zinc-800 transition-colors min-h-[42px]"
                         >
-                            Try Again
+                            Reset
                         </button>
                     )}
                 </div>
@@ -165,9 +180,7 @@ const VocabListBlockRenderer = ({ block }: any) => {
 
     const handleNav = (dir: number) => {
         setIsFlipped(false);
-        setTimeout(() => {
-            setIndex((prev) => (prev + dir + items.length) % items.length);
-        }, 120); 
+        setIndex((prev) => (prev + dir + items.length) % items.length);
     };
 
     const onTouchStart = (e: React.TouchEvent) => {
@@ -184,103 +197,90 @@ const VocabListBlockRenderer = ({ block }: any) => {
     };
 
     return (
-        <div className="py-4 sm:py-6 my-2 sm:my-4 animate-in fade-in slide-in-from-bottom-4 relative">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <div className="my-4 sm:my-6 border-2 border-zinc-900 dark:border-zinc-200 bg-white dark:bg-black">
+            {/* Top Bar */}
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b-2 border-zinc-900 dark:border-zinc-200 bg-zinc-100 dark:bg-zinc-900">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20 shrink-0">
-                        <Layers size={16} strokeWidth={2.5} />
+                    <div className="w-6 h-6 bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                        <Layers size={14} strokeWidth={2.75} />
                     </div>
-                    <h3 className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">
+                    <h3 className="text-[11px] font-black text-zinc-950 dark:text-white uppercase tracking-[0.2em]">
                         {String(block.title || 'Lexicon')}
                     </h3>
                 </div>
-                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 tabular-nums">
-                    {index + 1} / {items.length}
+                <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 tabular-nums tracking-widest">
+                    {String(index + 1).padStart(2, '0')} / {String(items.length).padStart(2, '0')}
                 </span>
             </div>
 
-            <div
-                className="w-full select-none"
-                style={{ perspective: '1000px' }}
+            {/* Flat High-Contrast Tile (Instant State Toggle) */}
+            <button
+                type="button"
+                onClick={() => setIsFlipped(!isFlipped)}
                 onTouchStart={onTouchStart}
                 onTouchEnd={onTouchEnd}
+                className={`w-full h-64 sm:h-80 p-6 sm:p-10 flex flex-col justify-between text-left transition-colors select-none ${
+                    isFlipped
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white dark:bg-black text-zinc-950 dark:text-white'
+                }`}
             >
-                <div 
-                    onClick={() => setIsFlipped(!isFlipped)}
-                    className="relative w-full h-64 sm:h-80 md:h-96 cursor-pointer transition-transform duration-500" 
-                    style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
-                >
-                    {/* Front */}
-                    <div 
-                        className="absolute inset-0 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col items-center justify-center p-6 sm:p-8 text-center"
-                        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
-                    >
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest absolute top-5">
-                            Term
-                        </span>
-                        <h3 className="text-2xl sm:text-3xl md:text-4xl font-black text-indigo-600 dark:text-indigo-400 leading-tight tracking-tight break-words max-w-full px-2">
-                            {String(currentCard.term || '')}
-                        </h3>
-                        <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider absolute bottom-5 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
-                            Tap to Flip • Swipe for Next
-                        </p>
-                    </div>
-
-                    {/* Back */}
-                    <div 
-                        className="absolute inset-0 bg-indigo-600 dark:bg-indigo-700 rounded-2xl sm:rounded-3xl shadow-md border border-indigo-500 flex flex-col items-center justify-center p-6 sm:p-8 text-white text-center" 
-                        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-                    >
-                        <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest absolute top-5">
-                            Definition
-                        </span>
-                        <div className="overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full my-6 flex items-center justify-center">
-                            <p className="text-base sm:text-lg md:text-xl font-semibold leading-relaxed">
-                                {String(currentCard.definition || '')}
-                            </p>
-                        </div>
-                        <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-wider absolute bottom-5">
-                            Tap to Flip Back
-                        </p>
-                    </div>
+                <div className="flex items-center justify-between w-full">
+                    <span className={`text-[10px] font-black uppercase tracking-[0.25em] px-2 py-1 ${
+                        isFlipped
+                            ? 'bg-black text-white'
+                            : 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black'
+                    }`}>
+                        {isFlipped ? 'Definition' : 'Term'}
+                    </span>
+                    <span className={`text-[10px] font-bold uppercase tracking-[0.15em] ${
+                        isFlipped ? 'text-indigo-200' : 'text-zinc-400'
+                    }`}>
+                        Tap to Flip
+                    </span>
                 </div>
-            </div>
 
-            <div className="flex justify-between items-center mt-4 sm:mt-6 gap-4">
+                <div className="my-auto overflow-y-auto max-h-44 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full">
+                    {!isFlipped ? (
+                        <h4 className="text-3xl sm:text-5xl font-black tracking-tighter leading-none break-words">
+                            {String(currentCard.term || '')}
+                        </h4>
+                    ) : (
+                        <p className="text-lg sm:text-2xl font-bold leading-snug tracking-tight">
+                            {String(currentCard.definition || '')}
+                        </p>
+                    )}
+                </div>
+
+                <div className="w-full flex items-center gap-1">
+                    {items.map((_: any, i: number) => (
+                        <div
+                            key={i}
+                            className={`h-1.5 flex-1 transition-colors ${
+                                i === index
+                                    ? (isFlipped ? 'bg-white' : 'bg-indigo-600')
+                                    : (isFlipped ? 'bg-indigo-400/40' : 'bg-zinc-200 dark:bg-zinc-800')
+                            }`}
+                        />
+                    ))}
+                </div>
+            </button>
+
+            {/* Contiguous Bottom Controls */}
+            <div className="grid grid-cols-2 border-t-2 border-zinc-900 dark:border-zinc-200 divide-x-2 divide-zinc-900 dark:divide-zinc-200">
                 <button
                     onClick={() => handleNav(-1)}
                     aria-label="Previous card"
-                    className="p-3.5 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-300 active:scale-95 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center"
+                    className="py-3.5 px-4 bg-white dark:bg-black text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 min-h-[48px] transition-colors"
                 >
-                    <ArrowLeft size={20} strokeWidth={2.5} />
+                    <ArrowLeft size={16} strokeWidth={2.75} /> Prev
                 </button>
-                
-                {items.length <= 10 ? (
-                    <div className="flex gap-1.5 flex-wrap justify-center">
-                        {items.map((_: any, i: number) => (
-                            <button
-                                key={i}
-                                onClick={() => { setIsFlipped(false); setIndex(i); }}
-                                aria-label={`Go to card ${i + 1}`}
-                                className={`h-2 rounded-full transition-all duration-300 ${i === index ? 'w-6 bg-indigo-500' : 'w-2 bg-slate-300 dark:bg-slate-700'}`}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="flex-1 max-w-[160px] h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-indigo-500 transition-all duration-300"
-                            style={{ width: `${((index + 1) / items.length) * 100}%` }}
-                        />
-                    </div>
-                )}
-
                 <button
                     onClick={() => handleNav(1)}
                     aria-label="Next card"
-                    className="p-3.5 bg-indigo-600 text-white rounded-xl shadow-sm active:scale-95 transition-all hover:bg-indigo-500 min-w-[48px] min-h-[48px] flex items-center justify-center"
+                    className="py-3.5 px-4 bg-zinc-950 dark:bg-white text-white dark:text-black hover:bg-indigo-600 dark:hover:bg-indigo-500 dark:hover:text-white font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 min-h-[48px] transition-colors"
                 >
-                    <ArrowRight size={20} strokeWidth={2.5} />
+                    Next <ArrowRight size={16} strokeWidth={2.75} />
                 </button>
             </div>
         </div>
@@ -357,20 +357,19 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const isEntirelyCorrect = isChecked && filledBlanks.every((item: WordItem | null, i: number) => item?.word === correctAnswers[i]);
 
     return (
-        <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm my-4 sm:my-6 relative flex flex-col transition-colors">
-            <div className="text-amber-600 dark:text-amber-500">
-                <SectionBadge icon={Edit3} label="Vocabulary Drill" color="amber" />
-            </div>
+        <div className="bg-white dark:bg-black p-4 sm:p-6 md:p-8 border-2 border-zinc-900 dark:border-zinc-200 my-4 sm:my-6 flex flex-col">
+            <SectionHeader icon={Edit3} label="Syntax Drill" accent="amber" />
 
-            <div className="sticky top-2 z-20 mb-5 sm:mb-6">
-                <div className="bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col gap-2 max-h-[22vh]">
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center shrink-0">
-                        Word Bank (Tap to Place)
+            {/* Sticky Solid Word Bank */}
+            <div className="sticky top-0 z-20 mb-6">
+                <div className="bg-zinc-100 dark:bg-zinc-900 p-3.5 sm:p-4 border-2 border-zinc-900 dark:border-zinc-200 flex flex-col gap-2.5 max-h-[24vh]">
+                    <span className="text-[10px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.2em] shrink-0">
+                        Word Bank // Tap to Insert
                     </span>
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center items-start overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full">
+                    <div className="flex flex-wrap gap-2 items-start overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full">
                         {wordBank.length === 0 && !isChecked ? (
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 py-1">
-                                <CheckCircle2 size={15} strokeWidth={2.5} /> All words placed
+                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-1.5 py-1">
+                                <CheckCircle2 size={15} strokeWidth={2.75} /> All Tokens Placed
                             </span>
                         ) : (
                             wordBank.map((item) => (
@@ -378,7 +377,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                                     key={item.id}
                                     onClick={() => handleBankClick(item)}
                                     disabled={isChecked}
-                                    className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl shadow-sm hover:border-indigo-400 active:scale-95 transition-all disabled:opacity-50 text-sm min-h-[38px]"
+                                    className="px-3.5 py-2 bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 text-zinc-950 dark:text-white font-bold hover:bg-amber-400 hover:text-black dark:hover:bg-amber-400 dark:hover:text-black transition-colors disabled:opacity-40 text-sm min-h-[38px]"
                                 >
                                     {item.word}
                                 </button>
@@ -388,19 +387,20 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
-            <div className="text-base sm:text-lg md:text-xl font-medium text-slate-800 dark:text-slate-200 leading-[2.4rem] sm:leading-[2.75rem] flex flex-wrap items-center gap-y-2 mb-4 tracking-tight">
+            {/* Passage with Sharp Inline Slots */}
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 leading-[2.6rem] sm:leading-[3rem] flex flex-wrap items-center gap-y-2.5 mb-4 tracking-tight">
                 {textParts.map((part: string, i: number) => {
                     const isLast = i === textParts.length - 1;
                     const filledItem = filledBlanks[i];
                     
-                    let blankStyle = "min-w-[76px] h-9 sm:h-10 bg-slate-100 dark:bg-slate-950 border-b-2 border-slate-300 dark:border-slate-700 mx-1 inline-flex items-center justify-center px-3 cursor-pointer transition-all rounded-lg";
+                    let blankStyle = "min-w-[88px] h-9 sm:h-10 bg-zinc-100 dark:bg-zinc-900 border-b-4 border-zinc-900 dark:border-zinc-100 mx-1.5 inline-flex items-center justify-center px-3 cursor-pointer text-xs uppercase tracking-widest text-zinc-400";
                     if (filledItem) {
-                        blankStyle = "min-w-[76px] h-9 sm:h-10 bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-300 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-300 font-bold rounded-xl mx-1 inline-flex items-center justify-center px-3.5 cursor-pointer shadow-sm active:scale-95 transition-all text-sm sm:text-base";
+                        blankStyle = "min-w-[88px] h-9 sm:h-10 bg-indigo-600 border-2 border-indigo-600 text-white font-black mx-1.5 inline-flex items-center justify-center px-3.5 cursor-pointer text-sm sm:text-base";
                     }
                     
                     if (isChecked && filledItem) {
                         const isCorrect = filledItem.word === correctAnswers[i];
-                        blankStyle = `min-w-[76px] h-9 sm:h-10 font-bold rounded-xl mx-1 inline-flex items-center justify-center px-3.5 shadow-sm text-white text-sm sm:text-base ${
+                        blankStyle = `min-w-[88px] h-9 sm:h-10 font-black mx-1.5 inline-flex items-center justify-center px-3.5 text-white text-sm sm:text-base border-2 ${
                             isCorrect ? 'bg-emerald-600 border-emerald-600' : 'bg-rose-600 border-rose-600'
                         }`;
                     }
@@ -414,7 +414,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                                     disabled={isChecked}
                                     className={blankStyle}
                                 >
-                                    {filledItem ? String(filledItem.word) : "___"}
+                                    {filledItem ? String(filledItem.word) : "____"}
                                 </button>
                             )}
                         </React.Fragment>
@@ -423,21 +423,21 @@ const FillBlankBlockRenderer = ({ block }: any) => {
             </div>
 
             {isComplete && !isChecked && (
-                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2">
+                <div className="mt-4 pt-4 border-t-2 border-zinc-200 dark:border-zinc-800">
                     <button
                         onClick={checkAnswers}
-                        className="w-full py-3.5 sm:py-4 bg-emerald-600 text-white rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider hover:bg-emerald-500 shadow-sm active:scale-[0.99] transition-all min-h-[48px]"
+                        className="w-full py-4 bg-emerald-600 text-white font-black text-xs uppercase tracking-[0.2em] hover:bg-emerald-500 transition-colors min-h-[52px]"
                     >
-                        Check Answers
+                        Verify Syntax
                     </button>
                 </div>
             )}
 
             {isChecked && (
-                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-center animate-in zoom-in-95">
+                <div className="mt-4 pt-4 border-t-2 border-zinc-200 dark:border-zinc-800 flex justify-center">
                     {isEntirelyCorrect ? (
-                        <div className="w-full py-3.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 rounded-xl font-bold text-sm flex items-center justify-center gap-2">
-                            <CheckCircle2 size={18} strokeWidth={2.5}/> Perfectly Placed!
+                        <div className="w-full py-4 bg-emerald-600 text-white font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+                            <CheckCircle2 size={18} strokeWidth={2.75}/> Sequence Verified
                         </div>
                     ) : (
                         <button
@@ -446,9 +446,9 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                                 setWordBank(initialWordBank); 
                                 setIsChecked(false); 
                             }}
-                            className="w-full py-3.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20 rounded-xl font-bold text-sm hover:bg-rose-100 active:scale-[0.99] transition-all flex items-center justify-center gap-2 min-h-[48px]"
+                            className="w-full py-4 bg-rose-600 text-white font-black text-xs uppercase tracking-[0.2em] hover:bg-rose-500 transition-colors flex items-center justify-center gap-2 min-h-[52px]"
                         >
-                            <RotateCcw size={16} /> Try Again
+                            <RotateCcw size={16} strokeWidth={2.75} /> Reset Drill
                         </button>
                     )}
                 </div>
@@ -459,36 +459,47 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
 const LiveRoleplayBlockRenderer = ({ block, onLaunch }: { block: any, onLaunch: (prompt: string) => void }) => {
     return (
-        <div className="bg-slate-950 p-5 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl shadow-lg my-6 text-white relative overflow-hidden border border-slate-800">
-            <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-900 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 mb-4 sm:mb-6">
-                    <Mic size={22} strokeWidth={2.5} />
-                </div>
-                
-                <h3 className="text-xl sm:text-2xl md:text-3xl font-black mb-3 leading-tight tracking-tight">
-                    {String(block.title || "Live Simulation")}
-                </h3>
-                
-                <div className="flex flex-wrap gap-2 items-center justify-center mb-5 sm:mb-6">
-                    <div className="px-3 py-1 bg-slate-900 border border-slate-800 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        AI: <span className="text-cyan-400">{block.metadata?.aiPersona || 'Partner'}</span>
-                    </div>
-                    <div className="px-3 py-1 bg-slate-900 border border-slate-800 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        You: <span className="text-indigo-400">{block.metadata?.studentRole || 'Speaker'}</span>
-                    </div>
-                </div>
+        <div className="bg-black text-white p-5 sm:p-8 border-2 border-zinc-800 my-4 sm:my-6">
+            <SectionHeader icon={Mic} label="Live Voice Simulation" accent="cyan" />
 
-                <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed max-w-md mb-6 sm:mb-8">
-                    Objective: <strong className="text-white">{block.metadata?.objective || 'Complete the scenario successfully.'}</strong>
-                </p>
-
-                <button 
-                    onClick={() => onLaunch(block.prompt)}
-                    className="w-full sm:w-auto px-8 py-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl font-extrabold text-xs sm:text-sm uppercase tracking-wider shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 min-h-[48px]"
-                >
-                    <Mic size={18} strokeWidth={2.5} /> Enter Arena
-                </button>
+            <h3 className="text-2xl sm:text-4xl font-black mb-5 leading-none tracking-tighter uppercase">
+                {String(block.title || "Live Simulation")}
+            </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 border-2 border-zinc-800 divide-y-2 sm:divide-y-0 sm:divide-x-2 divide-zinc-800 mb-6">
+                <div className="p-3.5 bg-zinc-950">
+                    <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">
+                        Counterpart (AI)
+                    </span>
+                    <span className="text-sm sm:text-base font-extrabold text-cyan-400">
+                        {block.metadata?.aiPersona || 'Partner'}
+                    </span>
+                </div>
+                <div className="p-3.5 bg-zinc-950">
+                    <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">
+                        Assigned Role (You)
+                    </span>
+                    <span className="text-sm sm:text-base font-extrabold text-indigo-400">
+                        {block.metadata?.studentRole || 'Speaker'}
+                    </span>
+                </div>
             </div>
+
+            <div className="border-l-4 border-cyan-400 pl-4 py-1 mb-6">
+                <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-1">
+                    Mission Objective
+                </span>
+                <p className="text-base sm:text-lg font-bold text-white leading-snug">
+                    {block.metadata?.objective || 'Complete the scenario successfully.'}
+                </p>
+            </div>
+
+            <button 
+                onClick={() => onLaunch(block.prompt)}
+                className="w-full py-4 bg-cyan-400 hover:bg-cyan-300 text-black font-black text-xs sm:text-sm uppercase tracking-[0.2em] transition-colors flex items-center justify-center gap-2.5 min-h-[52px]"
+            >
+                <Mic size={18} strokeWidth={2.75} /> Launch Arena
+            </button>
         </div>
     );
 };
@@ -502,35 +513,39 @@ const ScenarioBlockRenderer = ({ block }: any) => {
     if (!Array.isArray(options)) options = [];
     
     return (
-        <div className="bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl shadow-lg my-4 sm:my-6 text-white relative overflow-hidden border border-slate-800">
-            <div className="relative z-10">
-                <div className="text-rose-400">
-                    <SectionBadge icon={MessageSquare} label="Interactive Branch" color="rose" />
-                </div>
-                <h4 className="text-lg sm:text-xl md:text-2xl font-bold mb-2.5 leading-tight tracking-tight">{title}</h4>
-                <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed mb-6 italic border-l-2 border-rose-500/50 pl-3.5">
-                    "{context}"
+        <div className="bg-zinc-950 text-white p-4 sm:p-6 md:p-8 border-2 border-zinc-800 my-4 sm:my-6">
+            <SectionHeader icon={MessageSquare} label="Decision Branch" accent="rose" />
+
+            <h4 className="text-xl sm:text-2xl md:text-3xl font-black mb-4 leading-tight tracking-tight">
+                {title}
+            </h4>
+            <p className="text-sm sm:text-base text-zinc-300 font-bold leading-relaxed mb-6 border-l-4 border-rose-600 pl-4 py-1">
+                "{context}"
+            </p>
+            <div className="space-y-2.5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2">
+                    Select Response Vector
                 </p>
-                <div className="space-y-2.5">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">How do you respond?</p>
-                    {options.map((opt: any, i: number) => {
-                        const safeOpt = String(opt);
-                        const isSelected = selectedOpt === safeOpt;
-                        return (
-                            <button 
-                                key={i}
-                                onClick={() => setSelectedOpt(safeOpt)}
-                                className={`w-full p-3.5 sm:p-4 border rounded-xl text-left font-semibold text-sm transition-all active:scale-[0.99] min-h-[48px] ${
-                                    isSelected
-                                        ? 'bg-rose-600 border-rose-500 text-white shadow-sm'
-                                        : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700 text-slate-200'
-                                }`}
-                            >
-                                {safeOpt}
-                            </button>
-                        );
-                    })}
-                </div>
+                {options.map((opt: any, i: number) => {
+                    const safeOpt = String(opt);
+                    const isSelected = selectedOpt === safeOpt;
+                    return (
+                        <button 
+                            key={i}
+                            onClick={() => setSelectedOpt(safeOpt)}
+                            className={`w-full p-4 border-2 text-left font-bold text-sm sm:text-base transition-colors min-h-[52px] flex items-center gap-3 ${
+                                isSelected
+                                    ? 'bg-rose-600 border-rose-600 text-white'
+                                    : 'bg-black hover:bg-zinc-900 border-zinc-800 text-zinc-200'
+                            }`}
+                        >
+                            <span className="text-xs font-black uppercase tabular-nums opacity-75">
+                                0{i + 1}
+                            </span>
+                            <span>{safeOpt}</span>
+                        </button>
+                    );
+                })}
             </div>
         </div>
     );
@@ -547,11 +562,11 @@ const TapSortBlockRenderer = ({ block }: any) => {
         try { rawItems = JSON.parse(itemsJson); } catch (e) {}
         if (!Array.isArray(rawItems)) rawItems = [];
         return rawItems.map((item: any, idx: number) => {
-            if (typeof item === 'string' || typeof item === 'number') return { id: `item_${idx}`, label: String(item), emoji: '🔹' };
+            if (typeof item === 'string' || typeof item === 'number') return { id: `item_${idx}`, label: String(item), emoji: '' };
             return { 
                 id: String(item?.id || `item_${idx}`), 
                 label: String(item?.label || item?.text || ''), 
-                emoji: String(item?.emoji || '🔹')
+                emoji: String(item?.emoji || '')
             };
         });
     }, [itemsJson]);
@@ -597,33 +612,35 @@ const TapSortBlockRenderer = ({ block }: any) => {
     };
 
     return (
-        <div className="bg-amber-50/70 dark:bg-amber-500/5 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-amber-200/80 dark:border-amber-900/30 my-4 sm:my-6 shadow-sm relative flex flex-col transition-colors">
-            <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6">
-                <div className="flex items-center gap-2.5">
-                    <MousePointerClick className="text-amber-600 dark:text-amber-500 shrink-0" size={20} strokeWidth={2.5} />
-                    <h3 className="text-base sm:text-xl font-bold text-amber-950 dark:text-amber-400 tracking-tight">
-                        {String(block.title || 'Sort the Items')}
+        <div className="bg-white dark:bg-black p-4 sm:p-6 md:p-8 border-2 border-zinc-900 dark:border-zinc-200 my-4 sm:my-6 flex flex-col">
+            <div className="flex items-center justify-between gap-2 mb-5 pb-3 border-b-2 border-zinc-900 dark:border-zinc-100">
+                <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 bg-amber-500 text-black flex items-center justify-center shrink-0">
+                        <MousePointerClick size={15} strokeWidth={2.75} />
+                    </div>
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-900 dark:text-zinc-100">
+                        {String(block.title || 'Classification Matrix')}
                     </h3>
                 </div>
                 {items.length < normalizedItems.length && (
                     <button
                         onClick={resetSort}
-                        className="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-100/80 dark:bg-amber-500/10 hover:bg-amber-200/60 transition-colors"
+                        className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-zinc-900 dark:bg-zinc-100 dark:text-black flex items-center gap-1.5 px-3 py-1.5"
                     >
-                        <RotateCcw size={13} /> Reset
+                        <RotateCcw size={12} strokeWidth={2.75} /> Reset
                     </button>
                 )}
             </div>
             
-            <div className="sticky top-2 z-20 mb-5 sm:mb-6">
-                <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-amber-200/60 dark:border-slate-700 shadow-sm flex flex-col gap-2 max-h-[24vh]">
-                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-widest text-center shrink-0">
-                        {selectedItem ? 'Now tap a category below' : '1. Tap an item to select'}
+            <div className="sticky top-0 z-20 mb-6">
+                <div className="bg-zinc-100 dark:bg-zinc-900 p-3.5 sm:p-4 border-2 border-zinc-900 dark:border-zinc-200 flex flex-col gap-2.5 max-h-[24vh]">
+                    <span className="text-[10px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.2em] shrink-0">
+                        {selectedItem ? 'Step 02 // Tap Target Category Below' : 'Step 01 // Select Item to Classify'}
                     </span>
-                    <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full">
+                    <div className="flex flex-wrap gap-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full">
                         {items.length === 0 && (
-                            <p className="text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider m-auto flex items-center gap-1.5 text-xs py-1">
-                                <CheckCircle2 size={16} strokeWidth={2.5}/> All sorted! (Tap any item below to undo)
+                            <p className="text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-[0.2em] flex items-center gap-1.5 text-xs py-1">
+                                <CheckCircle2 size={16} strokeWidth={2.75}/> All Items Classified (Tap Placed Item to Undo)
                             </p>
                         )}
                         {items.map((item: SortItem) => {
@@ -632,13 +649,13 @@ const TapSortBlockRenderer = ({ block }: any) => {
                                 <button 
                                     key={item.id} 
                                     onClick={() => setSelectedItem(isSelected ? null : item)} 
-                                    className={`px-3.5 py-2 rounded-xl font-semibold text-sm transition-all shadow-sm border min-h-[38px] ${
+                                    className={`px-3.5 py-2 font-bold text-sm transition-colors border-2 min-h-[38px] ${
                                         isSelected
-                                            ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30'
-                                            : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 active:scale-95'
+                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                            : 'bg-white dark:bg-black text-zinc-900 dark:text-zinc-100 border-zinc-900 dark:border-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800'
                                     }`}
                                 >
-                                    {item.emoji} {item.label}
+                                    {item.emoji ? `${item.emoji} ` : ''}{item.label}
                                 </button>
                             );
                         })}
@@ -646,7 +663,7 @@ const TapSortBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {parsedCategories.map((cat: string) => (
                     <div
                         key={cat}
@@ -654,27 +671,27 @@ const TapSortBlockRenderer = ({ block }: any) => {
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleBucketClick(cat); }}
-                        className={`p-4 sm:p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 min-h-[120px] ${
+                        className={`border-2 transition-colors flex flex-col min-h-[140px] ${
                             selectedItem
-                                ? 'border-indigo-400 border-dashed bg-indigo-50/40 dark:bg-indigo-500/10 cursor-pointer'
-                                : 'border-amber-200/80 dark:border-amber-800/40 bg-white/60 dark:bg-slate-900/50'
+                                ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/30 cursor-pointer'
+                                : 'border-zinc-900 dark:border-zinc-200 bg-white dark:bg-black'
                         }`}
                     >
-                        <h4 className="font-bold text-amber-950 dark:text-amber-400 text-base sm:text-lg text-center leading-tight">
+                        <div className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black font-black text-xs uppercase tracking-[0.2em]">
                             {cat}
-                        </h4>
-                        <div className="flex flex-wrap justify-center gap-1.5 w-full">
+                        </div>
+                        <div className="p-3.5 flex flex-wrap gap-2 flex-1 items-start content-start">
                             {placed[cat]?.map((item: SortItem) => (
                                 <button
                                     key={item.id}
                                     type="button"
                                     onClick={(e) => handleReturnItem(e, cat, item)}
                                     title="Tap to remove"
-                                    className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs sm:text-sm font-semibold shadow-sm flex items-center gap-1.5 text-slate-700 dark:text-slate-200 hover:border-rose-300 active:scale-95"
+                                    className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-2 border-zinc-900 dark:border-zinc-700 text-xs sm:text-sm font-bold flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-colors"
                                 >
-                                    <span>{item.emoji}</span>
+                                    {item.emoji && <span>{item.emoji}</span>}
                                     <span>{item.label}</span>
-                                    <X size={12} className="text-slate-400 ml-0.5" />
+                                    <X size={13} strokeWidth={2.75} className="ml-0.5" />
                                 </button>
                             ))}
                         </div>
@@ -690,29 +707,32 @@ const AudioStoryBlockRenderer = ({ block }: any) => {
     const togglePlay = () => setIsPlaying(!isPlaying);
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm border border-slate-200/80 dark:border-slate-800 my-4 sm:my-6 transition-colors">
-            <div className="relative">
+        <div className="bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 my-4 sm:my-6">
+            <div className="relative border-b-2 border-zinc-900 dark:border-zinc-200">
                 <img
                     src={String(block.imageUrl || 'https://images.unsplash.com/photo-1518152006812-edab29b069ac?q=80&w=800&auto=format&fit=crop')}
                     alt="Story visual"
-                    className="w-full h-48 sm:h-64 md:h-72 object-cover"
+                    className="w-full h-52 sm:h-64 md:h-72 object-cover block"
                 />
                 <button
                     onClick={togglePlay}
                     aria-label={isPlaying ? "Stop audio" : "Play audio"}
-                    className={`absolute -bottom-6 right-5 sm:right-8 w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 border-2 border-white dark:border-slate-900 ${
-                        isPlaying ? 'bg-rose-500 text-white scale-105' : 'bg-indigo-600 text-white active:scale-95'
+                    className={`absolute bottom-0 right-0 w-14 h-14 flex items-center justify-center transition-colors border-t-2 border-l-2 border-zinc-900 dark:border-zinc-200 ${
+                        isPlaying ? 'bg-rose-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-500'
                     }`}
                 >
-                    {isPlaying ? <Square fill="currentColor" size={18} /> : <Play fill="currentColor" size={22} className="ml-0.5" />}
+                    {isPlaying ? <Square fill="currentColor" size={20} /> : <Play fill="currentColor" size={22} className="ml-0.5" />}
                 </button>
             </div>
-            <div className="p-5 sm:p-8 pt-8 sm:pt-10">
-                <h3 className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <Volume2 size={16} strokeWidth={2.5}/> Read Along
-                </h3>
-                <p className={`text-lg sm:text-2xl md:text-3xl font-bold leading-snug tracking-tight transition-colors duration-300 ${
-                    isPlaying ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'
+            <div className="p-5 sm:p-8">
+                <div className="flex items-center gap-2 mb-3">
+                    <Volume2 size={16} strokeWidth={2.75} className="text-indigo-600 dark:text-indigo-400" />
+                    <h3 className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em]">
+                        Audio Transcript
+                    </h3>
+                </div>
+                <p className={`text-xl sm:text-2xl md:text-3xl font-black leading-tight tracking-tight transition-colors ${
+                    isPlaying ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-950 dark:text-white'
                 }`}>
                     {String(block.text || "The legend says they looked for an eagle on a cactus...")}
                 </p>
@@ -727,20 +747,10 @@ const ImageHotspotBlockRenderer = ({ block }: any) => {
     const currentSpot = activeSpot !== null ? hotspots[activeSpot] : null;
 
     return (
-        <div className="bg-slate-950 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl shadow-lg my-4 sm:my-6 border border-slate-800">
-            <div className="flex items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2.5">
-                    <Search className="text-cyan-400 shrink-0" size={18} strokeWidth={2.5} />
-                    <h3 className="text-base sm:text-xl font-bold text-white tracking-tight">
-                        {String(block.title || 'Explore the Image')}
-                    </h3>
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Tap Pins
-                </span>
-            </div>
+        <div className="bg-black p-4 sm:p-6 md:p-8 border-2 border-zinc-800 my-4 sm:my-6 text-white">
+            <SectionHeader icon={Search} label={String(block.title || 'Visual Inspection')} accent="cyan" />
 
-            <div className="relative rounded-xl sm:rounded-2xl overflow-hidden border border-slate-800 bg-slate-900">
+            <div className="relative border-2 border-zinc-800 bg-zinc-950">
                 <img
                     src={String(block.imageUrl || 'https://images.unsplash.com/photo-1565670119853-23910c2830f3?q=80&w=800&auto=format&fit=crop')}
                     className="w-full h-auto block"
@@ -753,10 +763,10 @@ const ImageHotspotBlockRenderer = ({ block }: any) => {
                             key={i}
                             onClick={() => setActiveSpot(isSelected ? null : i)}
                             aria-label={`Hotspot ${i + 1}: ${spot.title || ''}`}
-                            className={`absolute w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-white flex items-center justify-center font-bold text-xs transition-transform z-10 ${
+                            className={`absolute w-10 h-10 sm:w-11 sm:h-11 border-2 flex items-center justify-center font-black text-xs tabular-nums transition-colors z-10 ${
                                 isSelected
-                                    ? 'bg-cyan-500 text-slate-950 scale-110 ring-4 ring-cyan-400/40'
-                                    : 'bg-rose-500 text-white shadow-md hover:scale-105'
+                                    ? 'bg-cyan-400 text-black border-black'
+                                    : 'bg-rose-600 text-white border-white hover:bg-rose-500'
                             }`}
                             style={{
                                 top: `${Math.min(92, Math.max(8, Number(spot.y) || 0))}%`,
@@ -764,28 +774,26 @@ const ImageHotspotBlockRenderer = ({ block }: any) => {
                                 transform: 'translate(-50%, -50%)'
                             }}
                         >
-                            {i + 1}
+                            {String(i + 1).padStart(2, '0')}
                         </button>
                     );
                 })}
             </div>
 
-            {/* Mobile-safe docked inspector panel */}
-            <div className="mt-4 bg-slate-900 border border-slate-800 rounded-xl p-4 min-h-[84px] flex flex-col justify-center">
+            {/* Docked Flat Readout Panel */}
+            <div className="border-x-2 border-b-2 border-zinc-800 bg-zinc-950 p-4 min-h-[88px] flex flex-col justify-center">
                 {currentSpot ? (
-                    <div className="animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                            <h4 className="text-sm sm:text-base font-bold text-cyan-400">
-                                {activeSpot! + 1}. {String(currentSpot.title || 'Detail')}
-                            </h4>
-                        </div>
-                        <p className="text-xs sm:text-sm font-medium text-slate-300 leading-relaxed">
+                    <div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400 block mb-1 tabular-nums">
+                            Pin {String(activeSpot! + 1).padStart(2, '0')} // {String(currentSpot.title || 'Detail')}
+                        </span>
+                        <p className="text-xs sm:text-sm font-bold text-zinc-200 leading-relaxed">
                             {String(currentSpot.description || '')}
                         </p>
                     </div>
                 ) : (
-                    <p className="text-xs font-semibold text-slate-500 text-center uppercase tracking-wider">
-                        Tap any numbered pin on the image to inspect
+                    <p className="text-xs font-black text-zinc-500 text-center uppercase tracking-[0.2em]">
+                        Select a Numbered Marker Above
                     </p>
                 )}
             </div>
@@ -797,9 +805,8 @@ const DrawingBlockRenderer = ({ block }: any) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [color, setColor] = useState('#ef4444'); 
-    const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#0f172a'];
+    const colors = ['#ef4444', '#2563eb', '#10b981', '#f59e0b', '#7c3aed', '#09090b'];
 
-    // Properly scales CSS coordinates to internal 800x400 canvas resolution
     const getCoordinates = (e: any, canvas: HTMLCanvasElement) => {
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -834,8 +841,8 @@ const DrawingBlockRenderer = ({ block }: any) => {
         ctx.lineTo(x, y);
         ctx.strokeStyle = color;
         ctx.lineWidth = 6;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
         ctx.stroke();
     };
 
@@ -846,22 +853,26 @@ const DrawingBlockRenderer = ({ block }: any) => {
     };
 
     return (
-        <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm my-4 sm:my-6 transition-colors">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Palette className="text-fuchsia-500 shrink-0" size={20} strokeWidth={2.5}/> 
-                    <span className="truncate">{String(block.title || "Sketch Pad")}</span>
-                </h3>
+        <div className="bg-white dark:bg-black p-4 sm:p-6 md:p-8 border-2 border-zinc-900 dark:border-zinc-200 my-4 sm:my-6">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-zinc-900 dark:border-zinc-200">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 bg-fuchsia-600 text-white flex items-center justify-center shrink-0">
+                        <Palette size={15} strokeWidth={2.75}/> 
+                    </div>
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-950 dark:text-white truncate">
+                        {String(block.title || "Freehand Canvas")}
+                    </h3>
+                </div>
                 <button
                     onClick={clearCanvas}
                     aria-label="Clear canvas"
-                    className="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all text-xs font-bold flex items-center gap-1.5 active:scale-95"
+                    className="px-3.5 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black hover:bg-rose-600 dark:hover:bg-rose-600 dark:hover:text-white transition-colors text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-1.5"
                 >
-                    <Eraser size={15} strokeWidth={2.5}/> Clear
+                    <Eraser size={14} strokeWidth={2.75}/> Clear
                 </button>
             </div>
 
-            <div className="bg-slate-50 dark:bg-slate-950 rounded-xl sm:rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 touch-none mb-4 select-none">
+            <div className="bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-900 dark:border-zinc-200 touch-none mb-4 select-none">
                 <canvas 
                     ref={canvasRef} 
                     width={800} 
@@ -877,16 +888,16 @@ const DrawingBlockRenderer = ({ block }: any) => {
                 />
             </div>
 
-            <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap gap-2">
                 {colors.map((c: string) => (
                     <button
                         key={c}
                         onClick={() => setColor(c)}
                         aria-label={`Select color ${c}`}
-                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full transition-all ${
+                        className={`w-10 h-10 border-2 transition-transform ${
                             color === c
-                                ? 'scale-110 ring-2 ring-offset-2 ring-indigo-500 dark:ring-offset-slate-900'
-                                : 'opacity-75 hover:opacity-100'
+                                ? 'border-zinc-950 dark:border-white scale-110'
+                                : 'border-transparent opacity-70 hover:opacity-100'
                         }`}
                         style={{ backgroundColor: c }}
                     />
@@ -897,16 +908,14 @@ const DrawingBlockRenderer = ({ block }: any) => {
 };
 
 const ImageBlockRenderer = ({ block }: any) => (
-    <div className="py-4 sm:py-6 animate-in fade-in">
-      <div className="rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm border border-slate-200/80 dark:border-slate-800">
-        <img
-            src={String(block.url || block.imageUrl || '')}
-            alt={String(block.caption || 'Lesson visual')}
-            className="w-full h-auto object-cover max-h-80"
-        />
-      </div>
+    <div className="my-4 sm:my-6 border-2 border-zinc-900 dark:border-zinc-200 bg-white dark:bg-black">
+      <img
+          src={String(block.url || block.imageUrl || '')}
+          alt={String(block.caption || 'Lesson visual')}
+          className="w-full h-auto object-cover max-h-80 block"
+      />
       {block.caption && (
-        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center mt-2.5 px-2">
+        <p className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-[0.15em] px-4 py-3 border-t-2 border-zinc-900 dark:border-zinc-200 bg-zinc-100 dark:bg-zinc-900">
             {String(block.caption)}
         </p>
       )}
@@ -914,50 +923,48 @@ const ImageBlockRenderer = ({ block }: any) => (
 );
 
 const CalloutBlockRenderer = ({ block }: any) => (
-    <div className="my-4 sm:my-6 p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-amber-50/90 dark:bg-amber-500/10 border border-amber-200/80 dark:border-amber-500/20 relative overflow-hidden shadow-sm transition-colors">
-      <div className="relative z-10">
-        <div className="flex items-center gap-2 mb-2.5">
-          <div className="p-1.5 bg-amber-500 text-white rounded-lg">
-            <Info size={14} strokeWidth={3} />
-          </div>
-          <span className="text-[11px] font-extrabold text-amber-800 dark:text-amber-400 uppercase tracking-widest">
-            {String(block.label || block.title || 'Spotlight')}
-          </span>
+    <div className="my-4 sm:my-6 p-5 sm:p-6 bg-amber-400 text-black border-2 border-black">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-6 h-6 bg-black text-amber-400 flex items-center justify-center">
+          <Info size={14} strokeWidth={3} />
         </div>
-        <p className="text-sm sm:text-base md:text-lg text-slate-800 dark:text-slate-200 font-semibold leading-relaxed">
-          {String(block.content || block.text || '')}
-        </p>
+        <span className="text-[11px] font-black uppercase tracking-[0.2em]">
+          {String(block.label || block.title || 'Key Directive')}
+        </span>
       </div>
+      <p className="text-base sm:text-lg md:text-xl font-black leading-snug tracking-tight">
+        {String(block.content || block.text || '')}
+      </p>
     </div>
 );
 
 const DialogueBlockRenderer = ({ block }: any) => (
-    <div className="py-4 sm:py-6 space-y-3.5 sm:space-y-4">
+    <div className="py-4 sm:py-6 space-y-3">
       {(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => {
         const isRight = String(line.side) === 'right';
         return (
-        <div key={j} className={`flex items-end gap-2.5 sm:gap-3 ${isRight ? 'flex-row-reverse' : ''}`}>
-          <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm ${
-              isRight ? 'bg-indigo-600' : 'bg-slate-600 dark:bg-slate-700'
+        <div key={j} className={`flex items-stretch gap-2.5 ${isRight ? 'flex-row-reverse' : ''}`}>
+          <div className={`w-10 sm:w-11 flex items-center justify-center text-xs font-black text-white shrink-0 border-2 border-zinc-900 dark:border-zinc-200 ${
+              isRight ? 'bg-indigo-600' : 'bg-zinc-900 dark:bg-zinc-800'
           }`}>
             {typeof line.speaker === 'string' && line.speaker.length > 0 ? line.speaker[0].toUpperCase() : '?'}
           </div>
-          <div className={`max-w-[85%] sm:max-w-[80%] p-3.5 sm:p-4 rounded-2xl text-sm sm:text-base font-medium leading-relaxed shadow-sm ${
+          <div className={`max-w-[85%] sm:max-w-[80%] p-3.5 sm:p-4 text-sm sm:text-base font-bold leading-snug border-2 ${
               isRight
-                  ? 'bg-indigo-600 text-white rounded-br-xs'
-                  : 'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-xs'
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-zinc-950 border-zinc-900 dark:border-zinc-200 text-zinc-900 dark:text-zinc-100'
           }`}>
             {typeof line.speaker === 'string' && (
-                <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${
-                    isRight ? 'text-indigo-200' : 'text-slate-400'
+                <span className={`block text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${
+                    isRight ? 'text-indigo-200' : 'text-zinc-500 dark:text-zinc-400'
                 }`}>
                     {line.speaker}
                 </span>
             )}
             <p className="break-words">{String(line.text || '')}</p>
             {line.translation && (
-                <p className={`text-xs mt-2 italic pt-2 border-t ${
-                    isRight ? 'border-indigo-400/40 text-indigo-100' : 'border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                <p className={`text-xs mt-2 pt-2 border-t-2 font-semibold ${
+                    isRight ? 'border-indigo-400 text-indigo-100' : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400'
                 }`}>
                     {String(line.translation)}
                 </p>
@@ -969,46 +976,32 @@ const DialogueBlockRenderer = ({ block }: any) => (
 );
 
 const DiscussionBlockRenderer = ({ block }: any) => (
-    <div className="py-4 sm:py-6 animate-in fade-in">
-      <div className="bg-indigo-50/60 dark:bg-indigo-500/5 border border-indigo-200/60 dark:border-indigo-500/20 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-sm transition-colors">
-        <div className="flex items-center gap-2.5 mb-4 sm:mb-6">
-          <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-sm shrink-0">
-            <MessageCircle size={18} strokeWidth={2.5}/>
+    <div className="my-4 sm:my-6 bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 p-4 sm:p-6 md:p-8">
+      <SectionHeader icon={MessageCircle} label={String(block.title || "Discussion Prompts")} accent="indigo" />
+      <div className="divide-y-2 divide-zinc-900 dark:divide-zinc-800 border-2 border-zinc-900 dark:border-zinc-800">
+        {(Array.isArray(block.questions) ? block.questions : []).map((q: any, qIdx: number) => (
+          <div key={qIdx} className="bg-white dark:bg-zinc-950 flex items-stretch">
+            <span className="w-12 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black font-black text-xs flex items-center justify-center shrink-0 tabular-nums">
+              {String(qIdx + 1).padStart(2, '0')}
+            </span>
+            <p className="p-4 text-sm sm:text-base text-zinc-900 dark:text-zinc-100 font-bold leading-snug">
+              {String(q || '')}
+            </p>
           </div>
-          <h3 className="text-base sm:text-lg md:text-xl font-bold text-indigo-950 dark:text-indigo-300 tracking-tight">
-            {String(block.title || "Discussion Prompts")}
-          </h3>
-        </div>
-        <div className="space-y-2.5 sm:space-y-3">
-          {(Array.isArray(block.questions) ? block.questions : []).map((q: any, qIdx: number) => (
-            <div key={qIdx} className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200/70 dark:border-slate-800 flex gap-3 items-start">
-              <span className="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                {qIdx + 1}
-              </span>
-              <p className="text-sm sm:text-base text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
-                {String(q || '')}
-              </p>
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
     </div>
 );
 
 const GameBlockRenderer = ({ block }: any) => (
-    <div className="py-6 animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center">
-      <div className="text-center mb-4">
-        <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            {String(block.title || "Vocabulary Battle")}
-        </h3>
-        <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
-            Game Active on Projector
-        </p>
-      </div>
-      <div className="w-full h-52 sm:h-64 bg-slate-950 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col items-center justify-center text-white shadow-lg">
-        <Gamepad2 size={36} strokeWidth={1.75} className="text-indigo-400 mb-3 animate-bounce" />
-        <p className="font-bold tracking-widest uppercase text-xs text-slate-400">Look at the Smartboard</p>
-      </div>
+    <div className="my-6 border-2 border-zinc-900 dark:border-zinc-200 bg-black text-white p-6 sm:p-10 flex flex-col items-center text-center">
+      <Gamepad2 size={40} strokeWidth={2} className="text-indigo-500 mb-3" />
+      <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter">
+          {String(block.title || "Vocabulary Battle")}
+      </h3>
+      <p className="text-[10px] font-black text-black bg-amber-400 px-3 py-1 uppercase tracking-[0.2em] mt-3">
+          Active on Classroom Projector
+      </p>
     </div>
 );
 
@@ -1140,57 +1133,40 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
       case 'code':
         return (
-          <div key={blockKey} className="py-4 sm:py-6 animate-in fade-in">
-            <div className="bg-[#0D1117] rounded-2xl sm:rounded-3xl overflow-hidden shadow-md border border-slate-800">
-              <div className="bg-white/5 px-4 py-2.5 flex justify-between items-center border-b border-white/10">
-                <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-                </div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    {String(block.language || 'Code')}
-                </span>
-              </div>
-              <div className="p-4 sm:p-6 overflow-x-auto">
-                <pre className="text-emerald-400 font-mono text-xs sm:text-sm leading-relaxed">
-                    <code>{String(block.content || '')}</code>
-                </pre>
-              </div>
+          <div key={blockKey} className="my-4 sm:my-6 border-2 border-zinc-900 dark:border-zinc-200 bg-black">
+            <div className="bg-zinc-900 px-4 py-2.5 flex justify-between items-center border-b-2 border-zinc-800">
+              <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">
+                  {String(block.language || 'Source')}
+              </span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                  UTF-8
+              </span>
+            </div>
+            <div className="p-4 sm:p-6 overflow-x-auto">
+              <pre className="text-emerald-400 font-mono text-xs sm:text-sm leading-relaxed">
+                  <code>{String(block.content || '')}</code>
+              </pre>
             </div>
           </div>
         );
 
       case 'timeline':
         return (
-           <div key={blockKey} className="py-4 sm:py-6 animate-in fade-in">
-              {block.title && (
-                <div className="flex items-center gap-2.5 mb-6">
-                    <div className="p-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-500 rounded-xl border border-amber-200 dark:border-amber-500/20">
-                        <BookOpen size={18} strokeWidth={2.5}/>
-                    </div>
-                    <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-                        {String(block.title)}
-                    </h3>
-                </div>
-              )}
-              <div className="space-y-4 sm:space-y-6 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
+           <div key={blockKey} className="my-4 sm:my-6 bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-200 p-4 sm:p-6 md:p-8">
+              <SectionHeader icon={BookOpen} label={String(block.title || 'Chronology')} accent="amber" />
+              <div className="border-l-4 border-zinc-900 dark:border-zinc-100 ml-2 pl-5 space-y-6">
                  {(Array.isArray(block.events) ? block.events : []).map((event: any, evIdx: number) => (
-                    <div key={evIdx} className="relative flex items-start md:items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full border-2 border-white dark:border-slate-950 bg-indigo-600 text-white shadow-sm shrink-0 mt-1 md:mt-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                            <div className="w-2 h-2 bg-white rounded-full" />
-                        </div>
-                        <div className="w-[calc(100%-2.75rem)] md:w-[calc(50%-2.5rem)] p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-                            <span className="font-extrabold text-indigo-600 dark:text-indigo-400 text-[10px] tracking-widest uppercase mb-1 block">
-                                {String(event.date || '')}
-                            </span>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg leading-snug mb-1.5">
-                                {String(event.title || '')}
-                            </h4>
-                            <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm font-medium leading-relaxed">
-                                {String(event.description || '')}
-                            </p>
-                        </div>
+                    <div key={evIdx} className="relative">
+                        <div className="absolute -left-[29px] top-1 w-3.5 h-3.5 bg-indigo-600 border-2 border-white dark:border-black" />
+                        <span className="font-black text-indigo-600 dark:text-indigo-400 text-[10px] tracking-[0.2em] uppercase block mb-1 tabular-nums">
+                            {String(event.date || '')}
+                        </span>
+                        <h4 className="font-black text-zinc-950 dark:text-white text-lg sm:text-xl leading-tight mb-1 tracking-tight">
+                            {String(event.title || '')}
+                        </h4>
+                        <p className="text-zinc-600 dark:text-zinc-400 text-xs sm:text-sm font-bold leading-relaxed">
+                            {String(event.description || '')}
+                        </p>
                     </div>
                  ))}
               </div>
@@ -1205,13 +1181,13 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         const title = typeof block.title === 'string' ? block.title : (typeof block.content?.title === 'string' ? block.content.title : null);
         const textBody = typeof block.content === 'string' ? block.content : (typeof block.content?.text === 'string' ? block.content.text : (typeof block.text === 'string' ? block.text : ""));
         return (
-          <div key={blockKey} className="py-4 sm:py-6 animate-in fade-in">
+          <div key={blockKey} className="py-4 sm:py-6">
             {title && (
-                <span className="inline-block px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-extrabold uppercase tracking-widest mb-3 border border-indigo-200/60 dark:border-indigo-500/20">
+                <span className="inline-block px-2.5 py-1 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black text-[10px] font-black uppercase tracking-[0.2em] mb-3">
                     {String(title)}
                 </span>
             )}
-            <div className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800 dark:text-slate-200 leading-relaxed sm:leading-snug tracking-tight whitespace-pre-wrap">
+            <div className="text-xl sm:text-2xl md:text-3xl font-extrabold text-zinc-950 dark:text-zinc-100 leading-snug tracking-tight whitespace-pre-wrap">
                 {String(textBody)}
             </div>
           </div>
@@ -1220,24 +1196,15 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       
       case 'essay':
         return (
-          <div key={blockKey} className="py-3 sm:py-4 animate-in fade-in">
-            <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors">
-                {block.title && (
-                    <div className="flex items-center gap-2.5 mb-4 sm:mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
-                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 shrink-0">
-                            <BookOpen size={16} strokeWidth={2.5}/>
-                        </div>
-                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                            {String(block.title)}
-                        </h3>
-                    </div>
-                )}
-                <div className="text-slate-700 dark:text-slate-300 font-medium text-sm sm:text-base leading-relaxed space-y-4">
-                    {String(block.content || '').split('\n').map((p: string, j: number) => {
-                        if (!p.trim()) return null;
-                        return <p key={j}>{p}</p>;
-                    })}
-                </div>
+          <div key={blockKey} className="my-4 sm:my-6 bg-white dark:bg-black p-4 sm:p-6 md:p-8 border-2 border-zinc-900 dark:border-zinc-200">
+            {block.title && (
+                <SectionHeader icon={BookOpen} label={String(block.title)} accent="indigo" />
+            )}
+            <div className="text-zinc-800 dark:text-zinc-200 font-bold text-base sm:text-lg leading-relaxed space-y-4">
+                {String(block.content || '').split('\n').map((p: string, j: number) => {
+                    if (!p.trim()) return null;
+                    return <p key={j}>{p}</p>;
+                })}
             </div>
           </div>
         );
@@ -1253,8 +1220,8 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
       default:
         return (
-            <div key={blockKey} className="p-5 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500 font-bold uppercase tracking-wider my-4">
-                Unsupported Module: {blockType}
+            <div key={blockKey} className="p-5 bg-zinc-100 dark:bg-zinc-900 border-2 border-dashed border-zinc-400 dark:border-zinc-700 text-center text-xs text-zinc-500 font-black uppercase tracking-[0.2em] my-4">
+                Unsupported Module // {blockType}
             </div>
         );
     }
@@ -1262,18 +1229,20 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
   if (!pages || pages.length === 0) {
       return (
-          <div className="h-[100dvh] flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
-              <div className="text-center p-6 sm:p-8 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 max-w-md w-full">
-                  <div className="w-14 h-14 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <AlertTriangle size={28} strokeWidth={2}/>
+          <div className="h-[100dvh] flex items-center justify-center bg-white dark:bg-black p-4">
+              <div className="p-6 sm:p-8 bg-white dark:bg-black border-2 border-zinc-900 dark:border-zinc-100 max-w-md w-full">
+                  <div className="w-12 h-12 bg-rose-600 text-white flex items-center justify-center mb-4">
+                      <AlertTriangle size={24} strokeWidth={2.5}/>
                   </div>
-                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2">Module Offline</h2>
-                  <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">
-                      The data for this lesson appears to be missing or empty.
+                  <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-950 dark:text-white mb-2">
+                      Module Offline
+                  </h2>
+                  <p className="text-zinc-600 dark:text-zinc-400 font-bold text-sm">
+                      The payload for this lesson is empty or corrupted.
                   </p>
                   <button
                       onClick={onFinish}
-                      className="mt-6 w-full py-3.5 bg-slate-900 dark:bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider active:scale-95 transition-all min-h-[48px]"
+                      className="mt-6 w-full py-4 bg-zinc-950 dark:bg-white text-white dark:text-black font-black text-xs uppercase tracking-[0.2em] min-h-[48px]"
                   >
                       Return to Hub
                   </button>
@@ -1287,7 +1256,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
   const progressPercent = ((safePageIdx + 1) / pages.length) * 100;
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans relative transition-colors duration-300">
+    <div className="flex flex-col h-[100dvh] bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-white overflow-hidden font-sans relative">
       
       {/* LIVE AUDIO ARENA OVERLAY */}
       {activeRoleplayPrompt && (
@@ -1297,35 +1266,33 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
           />
       )}
 
-      {/* COMPACT MOBILE-FRIENDLY HEADER */}
-      <header className="px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 pb-3 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/70 dark:border-slate-800/80 shrink-0 z-20">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
+      {/* HIGH-CONTRAST ARCHITECTURAL HEADER */}
+      <header className="bg-white dark:bg-black border-b-2 border-zinc-900 dark:border-zinc-200 shrink-0 z-20">
+        <div className="max-w-2xl mx-auto flex items-stretch justify-between min-h-[56px]">
+          <div className="flex items-stretch min-w-0 flex-1">
               <button
                   onClick={onFinish}
                   aria-label="Exit Lesson"
-                  className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-95 transition-all shrink-0"
+                  className="w-14 bg-zinc-950 dark:bg-white text-white dark:text-black hover:bg-rose-600 dark:hover:bg-rose-600 dark:hover:text-white flex items-center justify-center transition-colors shrink-0"
               >
-                  <X size={18} strokeWidth={2.5} />
+                  <X size={20} strokeWidth={2.75} />
               </button>
-              <div className="min-w-0">
-                  <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block truncate">
-                      {activePage?.type === 'interact' ? 'Interactive Drill' : 'Lesson Module'}
+              <div className="px-4 py-2 flex flex-col justify-center min-w-0">
+                  <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.25em] block truncate">
+                      {activePage?.type === 'interact' ? 'Interactive Drill' : 'Lesson Unit'}
                   </span>
-                  <h1 className="text-sm sm:text-base md:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                  <h1 className="text-sm sm:text-base font-black text-zinc-950 dark:text-white tracking-tight uppercase truncate">
                       {String(lesson?.title || 'Active Session')}
                   </h1>
               </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {isInstructor && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg border border-emerald-200 dark:border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Live</span>
-              </div>
-            )}
-          </div>
+          {isInstructor && (
+            <div className="px-3.5 border-l-2 border-zinc-900 dark:border-zinc-200 bg-emerald-500 text-black flex items-center gap-2 shrink-0">
+                <span className="w-2 h-2 bg-black animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Live</span>
+            </div>
+          )}
         </div>
       </header>
       
@@ -1339,49 +1306,50 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         </div>
       </main>
       
-      {/* THUMB-FRIENDLY FLEX FOOTER */}
-      <footer className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 shrink-0 z-20 relative">
-        <div className="absolute top-0 left-0 h-1 bg-slate-200/70 dark:bg-slate-800 w-full overflow-hidden">
+      {/* CONTIGUOUS FLAT GRID FOOTER */}
+      <footer className="bg-white dark:bg-black border-t-2 border-zinc-900 dark:border-zinc-200 pb-[env(safe-area-inset-bottom)] shrink-0 z-20 relative">
+        {/* Sharp Progress Strip */}
+        <div className="h-1.5 bg-zinc-200 dark:bg-zinc-800 w-full overflow-hidden">
             <div
-                className="h-full bg-indigo-600 dark:bg-indigo-400 transition-all duration-300 ease-out"
+                className="h-full bg-indigo-600 dark:bg-indigo-500 transition-all duration-200"
                 style={{ width: `${progressPercent}%` }}
             />
         </div>
 
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+        <div className="max-w-2xl mx-auto grid grid-cols-3 divide-x-2 divide-zinc-900 dark:divide-zinc-200 min-h-[56px]">
           <button
             onClick={handlePrev}
             disabled={safePageIdx === 0}
             aria-label="Previous step"
-            className="px-4 py-3 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 min-h-[48px] min-w-[48px]"
+            className="px-4 py-3 bg-white dark:bg-black text-zinc-950 dark:text-white disabled:opacity-25 hover:bg-zinc-100 dark:hover:bg-zinc-900 font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-colors"
           >
-            <ArrowLeft size={18} strokeWidth={2.5} />
-            <span className="hidden sm:inline">Back</span>
+            <ArrowLeft size={16} strokeWidth={2.75} />
+            <span>Back</span>
           </button>
 
-          <div className="text-center flex flex-col items-center px-2">
-              <span className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+          <div className="flex flex-col items-center justify-center px-2 bg-zinc-100 dark:bg-zinc-900">
+              <span className="text-[9px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.25em]">
                   Step
               </span>
-              <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-200 tabular-nums">
-                  {safePageIdx + 1} <span className="text-slate-300 dark:text-slate-700 mx-0.5">/</span> {pages.length}
+              <span className="text-xs sm:text-sm font-black text-zinc-950 dark:text-white tabular-nums tracking-widest">
+                  {String(safePageIdx + 1).padStart(2, '0')} / {String(pages.length).padStart(2, '0')}
               </span>
           </div>
 
           {safePageIdx < pages.length - 1 ? (
             <button
               onClick={handleNext}
-              className="px-5 sm:px-6 py-3 bg-indigo-600 text-white rounded-xl shadow-sm active:scale-95 transition-all hover:bg-indigo-500 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 min-h-[48px]"
+              className="px-4 py-3 bg-indigo-600 text-white hover:bg-indigo-500 font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-colors"
             >
               <span>Next</span>
-              <ArrowRight size={18} strokeWidth={2.5} />
+              <ArrowRight size={16} strokeWidth={2.75} />
             </button>
           ) : (
             <button
               onClick={onFinish}
-              className="px-6 sm:px-8 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-sm active:scale-95 transition-all text-xs uppercase tracking-wider hover:bg-emerald-500 flex items-center justify-center gap-1.5 min-h-[48px]"
+              className="px-4 py-3 bg-emerald-600 text-white font-black text-xs uppercase tracking-[0.2em] hover:bg-emerald-500 flex items-center justify-center gap-2 transition-colors"
             >
-              <CheckCircle2 size={16} strokeWidth={2.5} />
+              <CheckCircle2 size={16} strokeWidth={2.75} />
               <span>Finish</span>
             </button>
           )}
