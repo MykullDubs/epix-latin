@@ -1,5 +1,5 @@
 // src/components/StudentNavBar.tsx
-import React from 'react';
+import React from 'react';   
 import { Home, Compass, Layers, User, ShoppingBag } from 'lucide-react';
 import HoloAvatar from './HoloAvatar';
 
