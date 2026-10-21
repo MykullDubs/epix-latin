@@ -760,12 +760,20 @@ export default function StudentClassView({
   const [liveSession, setLiveSession] = useState<any>(null);
   
   const [activeDeck, setActiveDeck] = useState<any>(null);
+  
+  // 🔥 EXTRACT CORRECT INITIAL ROADMAP ID FOR STATE
+  const initialCurrId = classData?.assignedCurriculums?.[0];
+  const initialExpandedId = typeof initialCurrId === 'object' ? (initialCurrId.curriculumId || initialCurrId.id) : initialCurrId;
+
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
-      [classData?.assignedCurriculums?.[0]]: true 
+      [initialExpandedId]: true 
   });
   
   const theme = getSubjectTheme(classData?.subject);
   const safeEmail = (userData?.email || auth?.currentUser?.email || 'unknown').replace(/\./g, ',');
+
+  // COHORT LOGIC: If the user belongs to a specific cohort, we extract it.
+  const studentCohortId = userData?.cohortId;
 
   useEffect(() => {
     if (!classData || !userData?.email) return;
@@ -810,28 +818,55 @@ export default function StudentClassView({
 
   const toggleRoadmap = (currId: string) => setExpandedRoadmaps(prev => ({ ...prev, [currId]: !prev[currId] }));
 
+  // 🔥 ADVANCED MAPPING LOGIC (Supports cohorts AND string/object payloads)
   const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
   const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
 
-  const populatedAssignments = rawAssignments.map((assignment: any) => {
-      if (typeof assignment !== 'string') return assignment;
-      let node = lessons.find((l: any) => l.id === assignment);
-      if (node) return node;
+  // Filter content by cohort
+  const relevantAssignments = rawAssignments.filter((assignment: any) => {
+      if (typeof assignment === 'string') return true; 
+      if (assignment.cohortId && studentCohortId) return assignment.cohortId === studentCohortId;
+      if (assignment.cohortId && !studentCohortId) return false; 
+      return true; 
+  });
+
+  const relevantCurriculums = rawCurriculums.filter((curr: any) => {
+      if (typeof curr === 'string') return true;
+      if (curr.cohortId && studentCohortId) return curr.cohortId === studentCohortId;
+      if (curr.cohortId && !studentCohortId) return false;
+      return true;
+  });
+
+  // Map to fully hydrated nodes
+  const populatedAssignments = relevantAssignments.map((assignment: any) => {
+      const targetId = typeof assignment === 'string' ? assignment : (assignment.lessonId || assignment.contentId || assignment.id);
       
-      let deck = allDecks?.[assignment] || Object.values(allDecks || {}).find((d: any) => d.id === assignment);
+      let node = lessons.find((l: any) => l.id === targetId);
+      if (node) return typeof assignment === 'object' ? { ...node, ...assignment } : node;
+      
+      let deck = allDecks?.[targetId] || Object.values(allDecks || {}).find((d: any) => d.id === targetId);
       if (deck) {
           return {
               id: deck.id,
               title: deck.title || deck.name,
               contentType: 'deck',
               type: 'deck', 
-              blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }]
+              blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }],
+              ...(typeof assignment === 'object' ? assignment : {})
           };
       }
+
+      // Fallback
+      if (typeof assignment === 'object' && (assignment.title || assignment.name)) return assignment;
       return null;
   }).filter(Boolean);
 
-  const assignedCurriculums = rawCurriculums.map((id: string) => curriculums.find((c: any) => c.id === id)).filter(Boolean);
+  const assignedCurriculums = relevantCurriculums.map((curr: any) => {
+      const targetId = typeof curr === 'string' ? curr : (curr.curriculumId || curr.contentId || curr.id);
+      const found = curriculums.find((c: any) => c.id === targetId);
+      return found ? (typeof curr === 'object' ? { ...found, ...curr } : found) : null;
+  }).filter(Boolean);
+
   const standaloneLessons = populatedAssignments.filter((a: any) => !(a.contentType === 'exam' || a.contentType === 'test') && !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id)));
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
 
