@@ -694,11 +694,22 @@ function App() {
       } catch (e) { console.error("Error removing student:", e); }
   }, [user]);
 
-  const handleAssign = useCallback(async (classId: string, lessonId: string) => {
-      if (!user) return;
-      try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { assignments: arrayUnion(lessonId) }); } 
-      catch (e) { console.error("Error assigning lesson:", e); }
-  }, [user]);
+const handleAssign = useCallback(async (classId: string, lessonObject: any) => {
+    if (!user) return;
+    try { 
+        // Push the whole object instead of just the ID string
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
+            assignments: arrayUnion({
+               id: lessonObject.id,
+               title: lessonObject.title,
+               contentType: lessonObject.contentType || 'lesson',
+               type: lessonObject.type || 'lesson',
+               blocks: lessonObject.blocks || []
+            }) 
+        }); 
+    } 
+    catch (e) { console.error("Error assigning lesson:", e); }
+}, [user]);
 
   const handleRevoke = useCallback(async (classId: string, lessonId: string) => {
       if (!user) return;
