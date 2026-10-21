@@ -12,7 +12,8 @@ import {
     ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
     Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2,
     Triangle, Circle, XCircle, X, ArrowDownCircle, Settings, Sparkles,
-    Layers, HelpCircle, PlayCircle
+    Layers, HelpCircle, PlayCircle, BookText, Highlighter, PenTool,
+    AlignLeft, Save
 } from 'lucide-react';
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
@@ -105,6 +106,149 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
     </div>
   );
 };
+
+// ============================================================================
+//  IMMERSIVE READING & ANNOTATION COMPONENT
+// ============================================================================
+const ReadingAnnotator = ({ reading, onExit, theme }: any) => {
+    const [activeBlock, setActiveBlock] = useState<number | null>(null);
+    const [annotations, setAnnotations] = useState<Record<number, string>>({});
+    const [draftNote, setDraftNote] = useState("");
+
+    // Fallback content if the reading object doesn't have an explicit content array
+    const paragraphs = useMemo(() => {
+        if (Array.isArray(reading?.content)) return reading.content;
+        if (typeof reading?.content === 'string') return reading.content.split('\n').filter((p: string) => p.trim() !== '');
+        if (reading?.blocks) return reading.blocks.map((b: any) => b.text || b.content || '').filter(Boolean);
+        return ["Content missing or format not supported."];
+    }, [reading]);
+
+    const handleSelectBlock = (idx: number) => {
+        if (activeBlock === idx) {
+            setActiveBlock(null);
+            setDraftNote("");
+        } else {
+            setActiveBlock(idx);
+            setDraftNote(annotations[idx] || "");
+        }
+    };
+
+    const handleSaveNote = () => {
+        if (activeBlock === null) return;
+        if (!draftNote.trim()) {
+            const newAnnotations = { ...annotations };
+            delete newAnnotations[activeBlock];
+            setAnnotations(newAnnotations);
+        } else {
+            setAnnotations({ ...annotations, [activeBlock]: draftNote });
+        }
+        setActiveBlock(null);
+        setDraftNote("");
+    };
+
+    return (
+        <div className="fixed inset-0 z-[9999] bg-slate-50 dark:bg-slate-950 flex flex-col animate-in slide-in-from-bottom-8 duration-500 font-sans transition-colors duration-300">
+            {/* Header */}
+            <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 p-4 md:p-6 flex items-center justify-between shrink-0 shadow-sm z-30">
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <button onClick={onExit} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors shrink-0 text-slate-500 dark:text-slate-400">
+                        <X size={20} />
+                    </button>
+                    <div className="min-w-0">
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${theme?.color || 'text-indigo-500'}`}>Reading Assignment</span>
+                        <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white truncate">{reading?.title || 'Untitled Document'}</h2>
+                    </div>
+                </div>
+                <div className="hidden sm:flex items-center gap-2 shrink-0 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-full border border-indigo-100 dark:border-indigo-500/20">
+                    <PenTool size={16} />
+                    <span className="text-xs font-bold uppercase tracking-widest">Annotate Mode</span>
+                </div>
+            </header>
+
+            {/* Reading Canvas */}
+            <div className="flex-1 flex overflow-hidden relative">
+                {/* Main Text Area */}
+                <div className={`flex-1 overflow-y-auto custom-scrollbar p-6 md:p-12 transition-all duration-500 ${activeBlock !== null ? 'md:pr-[400px]' : ''}`}>
+                    <div className="max-w-3xl mx-auto space-y-6 pb-32">
+                        {reading?.author && (
+                            <p className="text-slate-400 font-black uppercase tracking-widest text-sm mb-8 border-b border-slate-200 dark:border-slate-800 pb-4">
+                                By {reading.author}
+                            </p>
+                        )}
+                        
+                        {paragraphs.map((para: string, idx: number) => {
+                            const isAnnotated = !!annotations[idx];
+                            const isActive = activeBlock === idx;
+
+                            return (
+                                <div 
+                                    key={idx} 
+                                    onClick={() => handleSelectBlock(idx)}
+                                    className={`relative p-4 md:p-6 rounded-[2rem] transition-all duration-300 cursor-pointer group ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 shadow-inner border border-indigo-200 dark:border-indigo-800' : isAnnotated ? 'bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 hover:bg-slate-100 dark:hover:bg-slate-800/50' : 'border border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
+                                >
+                                    {isAnnotated && !isActive && (
+                                        <div className="absolute -left-2 top-6 w-1.5 h-8 bg-amber-400 rounded-r-full shadow-[0_0_10px_rgba(251,191,36,0.6)]" />
+                                    )}
+                                    {isActive && (
+                                        <div className="absolute -left-2 top-6 w-1.5 h-8 bg-indigo-500 rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.6)] animate-pulse" />
+                                    )}
+                                    <p className={`text-lg md:text-xl leading-relaxed transition-colors duration-300 ${isActive ? 'text-indigo-950 dark:text-indigo-100' : 'text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'}`}>
+                                        {para}
+                                    </p>
+                                    
+                                    {/* Quick action hint */}
+                                    <div className={`absolute top-4 right-4 text-indigo-400 opacity-0 transition-opacity ${!isActive && 'group-hover:opacity-100'}`}>
+                                        <Highlighter size={18} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Annotation Slide-out Panel */}
+                <div className={`absolute top-0 right-0 h-full w-full md:w-[380px] bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border-l border-slate-200 dark:border-slate-800 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${activeBlock !== null ? 'translate-x-0' : 'translate-x-full'}`}>
+                    <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/50">
+                        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                            <AlignLeft size={18} />
+                            <h3 className="font-black text-sm uppercase tracking-widest">Section Notes</h3>
+                        </div>
+                        <button onClick={() => setActiveBlock(null)} className="text-slate-400 hover:text-rose-500 transition-colors p-1"><X size={18} /></button>
+                    </div>
+                    
+                    <div className="flex-1 p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+                        <div className="bg-slate-100 dark:bg-slate-800 rounded-[1.5rem] p-4 border border-slate-200 dark:border-slate-700">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Selected Text</span>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 font-medium line-clamp-4 italic border-l-2 border-indigo-300 pl-3">
+                                {activeBlock !== null ? paragraphs[activeBlock] : ''}
+                            </p>
+                        </div>
+
+                        <div className="flex-1 flex flex-col relative">
+                            <textarea
+                                autoFocus
+                                value={draftNote}
+                                onChange={(e) => setDraftNote(e.target.value)}
+                                placeholder="Add your thoughts, questions, or highlights here..."
+                                className="flex-1 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-6 text-slate-800 dark:text-slate-100 resize-none outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="p-6 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800">
+                        <button 
+                            onClick={handleSaveNote}
+                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Save size={16} /> {draftNote.trim() ? 'Save Annotation' : 'Clear Note'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 // ============================================================================
 //  INTERNAL FORUM COMPONENT
@@ -823,11 +967,12 @@ export default function StudentClassView({
     classData, lessons = [], curriculums = [], allDecks = {}, onBack, 
     onSelectLesson, userData, setActiveTab, setSelectedLessonId, ExamPlayerView, onLogActivity 
 }: any) {
-  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades' | 'live'>('lessons');
+  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades' | 'live' | 'readings'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [liveSession, setLiveSession] = useState<any>(null);
   
   const [activeDeck, setActiveDeck] = useState<any>(null);
+  const [activeReading, setActiveReading] = useState<any>(null);
   
   // 🔥 EXTRACT CORRECT INITIAL ROADMAP ID FOR STATE
   const initialCurrId = classData?.assignedCurriculums?.[0];
@@ -935,8 +1080,11 @@ export default function StudentClassView({
       return found ? (typeof curr === 'object' ? { ...found, ...curr } : found) : null;
   }).filter(Boolean);
 
-  const standaloneLessons = populatedAssignments.filter((a: any) => !(a.contentType === 'exam' || a.contentType === 'test') && !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id)));
+  const standaloneLessons = populatedAssignments.filter((a: any) => !(a.contentType === 'exam' || a.contentType === 'test' || a.type === 'reading') && !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id)));
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
+  
+  // 🔥 Extract Readings
+  const readingsList = populatedAssignments.filter((a: any) => a.type === 'reading' || a.contentType === 'reading');
 
   const allClassNodeIds = Array.from(new Set([
       ...populatedAssignments.map((a:any) => a.id),
@@ -948,6 +1096,10 @@ export default function StudentClassView({
   const overallProgress = totalNodesCount > 0 ? Math.round((completedClassNodes / totalNodesCount) * 100) : 0;
 
   const isImmersiveLiveMode = activeSubTab === 'live' && liveSession;
+
+  if (activeReading) {
+      return <ReadingAnnotator reading={activeReading} onExit={() => setActiveReading(null)} theme={theme} studentEmail={safeEmail} classId={classData.id} />;
+  }
 
   if (isImmersiveLiveMode) {
       const handleStudentGameUpdate = async (updates: any) => {
@@ -1101,6 +1253,39 @@ export default function StudentClassView({
           </div>
         )}
 
+        {activeSubTab === 'readings' && (
+            <section className="space-y-4 px-4 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4">
+                {readingsList.length === 0 ? (
+                    <div className="text-center py-20 opacity-40">
+                        <BookText size={48} className="mx-auto mb-4 text-slate-800 dark:text-slate-100" />
+                        <p className="font-black text-xs uppercase tracking-widest leading-loose text-slate-800 dark:text-slate-100">No readings assigned.</p>
+                    </div>
+                ) : (
+                    readingsList.map((item: any) => (
+                        <button 
+                            key={item.id} 
+                            onClick={() => setActiveReading(item)}
+                            className={`w-full text-left p-6 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[2.5rem] flex items-start gap-5 transition-all group overflow-hidden relative border border-white/40 dark:border-slate-800 shadow-xl hover:shadow-2xl hover:scale-[1.02]`}
+                        >
+                            <div className={`absolute top-0 right-0 w-32 h-full bg-gradient-to-l to-transparent opacity-10 pointer-events-none ${theme.bg.replace('bg-', 'from-')}`} />
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border border-white/20 shadow-lg transition-colors shrink-0 ${theme.bg} text-white`}>
+                                <BookText size={24} strokeWidth={2.5} />
+                            </div>
+                            <div className="flex-1 pr-2 relative z-10 pt-1">
+                                <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase mb-1 block tracking-widest">
+                                    Assigned Reading
+                                </span>
+                                <h4 className="font-black text-slate-800 dark:text-slate-100 text-lg leading-tight tracking-tight mb-2">{item.title}</h4>
+                                <p className="text-xs font-bold text-slate-500 line-clamp-2 leading-relaxed">
+                                    {item.description || "Read and annotate this assigned document."}
+                                </p>
+                            </div>
+                        </button>
+                    ))
+                )}
+            </section>
+        )}
+
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
         {activeSubTab === 'exams' && (
           <section className="space-y-4 px-4 max-w-xl mx-auto">
@@ -1112,20 +1297,21 @@ export default function StudentClassView({
       </main>
 
       {/* THE SENSUAL BOTTOM NAV */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
-          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/40 dark:border-white/10 flex items-center justify-between gap-1 transition-colors duration-300 ring-1 ring-white/20 dark:ring-white/5">
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[650px] z-[100] px-2">
+          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-2 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/40 dark:border-white/10 flex items-center justify-between gap-1 transition-colors duration-300 ring-1 ring-white/20 dark:ring-white/5">
             {[
               { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} /> },
-              { id: 'leaderboard', label: 'Rankings', icon: <Trophy size={18} /> },
+              { id: 'readings', label: 'Readings', icon: <BookText size={18} /> },
+              { id: 'leaderboard', label: 'Ranks', icon: <Trophy size={18} /> },
               { id: 'exams', label: 'Exams', icon: <FileText size={18} /> },
               { id: 'forum', label: 'Forum', icon: <MessageSquare size={18} /> },
               { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18} /> }
             ].map((tab) => {
               const isActive = activeSubTab === tab.id;
               return (
-                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-4 rounded-full transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.6)] scale-105 ring-2 ring-indigo-400/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-col flex-1 items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.6)] ring-2 ring-indigo-400/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}>
                   {tab.icon}
-                  {isActive && <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
+                  {isActive && <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap animate-in zoom-in">{tab.label}</span>}
                 </button>
               );
             })}
