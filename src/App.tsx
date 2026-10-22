@@ -374,7 +374,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
 // ============================================================================
 //  HOME VIEW
 // ============================================================================
-function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStartExam, userData, assignments, classes, user, allDecks }: any) {
+function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStartExam, userData, assignments, classes, user, allDecks, curriculums }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { const viewport = scrollViewportRef.current; if (viewport) { viewport.scrollTop = 0; setTimeout(() => { if (viewport) viewport.scrollTop = 0; }, 10); } }, []);
@@ -412,6 +412,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
         user={user} 
         lessons={lessons} 
         allDecks={allDecks} 
+        curriculums={curriculums}
     />; 
   }
 
@@ -694,27 +695,27 @@ function App() {
       } catch (e) { console.error("Error removing student:", e); }
   }, [user]);
 
-// Update the parameters to accept the full item object
-const handleAssign = useCallback(async (classId: string, fullItem: any) => {
-    if (!user || !fullItem) return;
-    
-    try { 
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
-            // Push the denormalized object into the array instead of a string
-            assignments: arrayUnion({
-                id: fullItem.id,
-                title: fullItem.title || fullItem.name || 'Untitled Assignment',
-                contentType: fullItem.contentType || fullItem.type || 'lesson',
-                type: fullItem.type || 'lesson',
-                blocks: fullItem.blocks || fullItem.cards || [],
-                // Include cohort targeting if needed
-                targetStudents: fullItem.targetStudents || [] 
-            }) 
-        }); 
-    } catch (e) { 
-        console.error("Error assigning lesson:", e); 
-    }
-}, [user]);
+  // Update the parameters to accept the full item object
+  const handleAssign = useCallback(async (classId: string, fullItem: any) => {
+      if (!user || !fullItem) return;
+      
+      try { 
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
+              // Push the denormalized object into the array instead of a string
+              assignments: arrayUnion({
+                  id: fullItem.id,
+                  title: fullItem.title || fullItem.name || 'Untitled Assignment',
+                  contentType: fullItem.contentType || fullItem.type || 'lesson',
+                  type: fullItem.type || 'lesson',
+                  blocks: fullItem.blocks || fullItem.cards || [],
+                  // Include cohort targeting if needed
+                  targetStudents: fullItem.targetStudents || [] 
+              }) 
+          }); 
+      } catch (e) { 
+          console.error("Error assigning lesson:", e); 
+      }
+  }, [user]);
 
   const handleRevoke = useCallback(async (classId: string, lessonId: string) => {
       if (!user) return;
@@ -887,6 +888,7 @@ const handleAssign = useCallback(async (classId: string, fullItem: any) => {
             displayName={displayName} 
             lessons={lessons}
             allDecks={allDecks}
+            curriculums={curriculums}
         />;
     } else {
         viewKey = `tab-${activeTab}`;
@@ -904,6 +906,7 @@ const handleAssign = useCallback(async (classId: string, fullItem: any) => {
                     onStartExam={(examId: string) => setActiveExam(examId)} 
                     userData={userData} 
                     user={user} 
+                    curriculums={curriculums}
                 />;
                 break;
             case 'discovery':
