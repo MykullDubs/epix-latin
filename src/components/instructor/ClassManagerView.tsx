@@ -50,8 +50,8 @@ export default function ClassManagerView({
     const uniqueSubjects = new Set<string>(rawSubjects);
     const availableSubjects: string[] = ['All', ...Array.from(uniqueSubjects)];
 
-    const assignedLessons = lessons.filter((l: any) => activeClass?.assignments?.includes(l.id));
-    const unassignedLessons = lessons.filter((l: any) => !activeClass?.assignments?.includes(l.id));
+    const assignedLessons = lessons.filter((l: any) => activeClass?.assignments?.some((a: any) => a === l.id || a.id === l.id));
+    const unassignedLessons = lessons.filter((l: any) => !activeClass?.assignments?.some((a: any) => a === l.id || a.id === l.id));
     
     const filteredCurriculums = curriculums.filter((c: any) => {
         const title = String(c.title || '');
@@ -91,8 +91,14 @@ export default function ClassManagerView({
 
     const handleBulkAssign = (curriculum: any) => {
         if (!window.confirm(`Assign the Pathway "${curriculum.title}" to this cohort?`)) return;
-        if (onAssignCurriculum) onAssignCurriculum(activeClass.id, curriculum.id);
-        else curriculum.lessonIds.forEach((id: string) => onAssign(activeClass.id, id));
+        if (onAssignCurriculum) {
+            onAssignCurriculum(activeClass.id, curriculum.id);
+        } else {
+            curriculum.lessonIds.forEach((id: string) => {
+                const fullItem = lessons.find((l: any) => l.id === id) || allDecks[id];
+                if (fullItem) onAssign(activeClass.id, fullItem);
+            });
+        }
     };
 
     const defaultDeckKey = Object.keys(allDecks)[0] || 'custom';
