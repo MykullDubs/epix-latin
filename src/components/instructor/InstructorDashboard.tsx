@@ -35,8 +35,8 @@ export default function InstructorDashboard({
   onDeleteCard,
   onDeleteArtifact,
   onMoveToFolder,
-  onAssign,               
-  onRevoke,               
+  onAssign,                
+  onRevoke,                
   onCreateClass,  
   onDeleteClass,  
   onRenameClass,
@@ -487,9 +487,9 @@ export default function InstructorDashboard({
                    if (config.mode === 'assign' && config.classId !== 'sandbox') {
                        const isCurriculum = curriculums?.some((c: any) => c.id === config.contentId);
                        if (isCurriculum) {
-                           if (onAssignCurriculum) onAssignCurriculum(config.classId, config.contentId);
+                           if (onAssignCurriculum) onAssignCurriculum(config.classId, config.fullItem || config.contentId);
                        } else {
-                           if (onAssign) onAssign(config.classId, config.contentId);
+                           if (onAssign) onAssign(config.classId, config.fullItem || config.contentId);
                        }
                    } else {
                        setTimeout(() => {
