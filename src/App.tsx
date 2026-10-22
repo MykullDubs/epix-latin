@@ -695,22 +695,20 @@ function App() {
       } catch (e) { console.error("Error removing student:", e); }
   }, [user]);
 
-  // Update the parameters to accept the full item object
-  const handleAssign = useCallback(async (classId: string, fullItem: any) => {
-      if (!user || !fullItem) return;
+const handleAssign = useCallback(async (classId: string, payload: any) => {
+      if (!user || !payload) return;
       
+      // Safely extract the string ID whether it came from the dashboard (string) or modal (object)
+      const targetId = typeof payload === 'string' ? payload : (payload.id || payload.lessonId || payload.contentId);
+      
+      if (!targetId) {
+          console.warn("Invalid assignment payload:", payload);
+          return;
+      }
+
       try { 
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
-              // Push the denormalized object into the array instead of a string
-              assignments: arrayUnion({
-                  id: fullItem.id,
-                  title: fullItem.title || fullItem.name || 'Untitled Assignment',
-                  contentType: fullItem.contentType || fullItem.type || 'lesson',
-                  type: fullItem.type || 'lesson',
-                  blocks: fullItem.blocks || fullItem.cards || [],
-                  // Include cohort targeting if needed
-                  targetStudents: fullItem.targetStudents || [] 
-              }) 
+              assignments: arrayUnion(targetId) 
           }); 
       } catch (e) { 
           console.error("Error assigning lesson:", e); 
