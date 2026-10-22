@@ -1226,29 +1226,38 @@ export default function StudentClassView({
 
         {activeSubTab === 'lessons' && (
           <div className="animate-in fade-in slide-in-from-bottom-4">
-             {assignedCurriculums.length > 0 ? (
+             {/* 1. RENDER CURRICULUMS IF THEY EXIST */}
+             {assignedCurriculums.length > 0 && (
                  <section className="space-y-8 mb-10 max-w-xl mx-auto">
                      {assignedCurriculums.map((curr: any) => (
                          <CurriculumPathway key={curr.id} curr={curr} lessons={lessons} allDecks={allDecks} completedItems={completedItems} isExpanded={!!expandedRoadmaps[curr.id]} onToggle={() => toggleRoadmap(curr.id)} onSelectLesson={onSelectLesson} theme={theme} />
                      ))}
                  </section>
-             ) : (
+             )}
+             
+             {/* 2. RENDER STANDALONE LESSONS IF THEY EXIST */}
+             {standaloneLessons.length > 0 && (
+                 <section className="space-y-4 mb-10 px-4 max-w-xl mx-auto">
+                     {assignedCurriculums.length > 0 && (
+                         <div className="flex items-center gap-3 ml-2 mb-6">
+                             <div className="h-px flex-1 bg-gradient-to-r from-transparent to-slate-200 dark:to-slate-800" />
+                             <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Additional Modules</h3>
+                             <div className="h-px flex-1 bg-gradient-to-l from-transparent to-slate-200 dark:to-slate-800" />
+                         </div>
+                     )}
+                     {standaloneLessons.map((item: any) => (
+                         <StandaloneAssignmentCard key={item.id} item={item} isCompleted={completedItems.includes(item.id)} onSelectLesson={onSelectLesson} theme={theme} />
+                     ))}
+                 </section>
+             )}
+
+             {/* 3. ONLY SHOW EMPTY STATE IF BOTH ARE EMPTY */}
+             {assignedCurriculums.length === 0 && standaloneLessons.length === 0 && (
                 <div className="text-center p-12 bg-white/50 dark:bg-slate-900/30 backdrop-blur-md rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800 m-4 transition-colors duration-300">
                     <Map size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
                     <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 mb-2">Map Loading...</h3>
                     <p className="text-slate-500 dark:text-slate-400 font-bold">Your instructor hasn't drawn the path yet.</p>
                 </div>
-             )}
-             
-             {standaloneLessons.length > 0 && (
-                 <section className="space-y-4 mb-10 px-4 max-w-xl mx-auto">
-                     <div className="flex items-center gap-3 ml-2 mb-6">
-                         <div className="h-px flex-1 bg-gradient-to-r from-transparent to-slate-200 dark:to-slate-800" />
-                         <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Bonus Quests</h3>
-                         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-slate-200 dark:to-slate-800" />
-                     </div>
-                     {standaloneLessons.map((item: any) => (<StandaloneAssignmentCard key={item.id} item={item} isCompleted={completedItems.includes(item.id)} onSelectLesson={onSelectLesson} theme={theme} />))}
-                 </section>
              )}
           </div>
         )}
