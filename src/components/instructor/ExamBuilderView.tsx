@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
     Code, Settings, BarChart, Clock, Tag, X, Trash2, 
     List, Check, CheckCircle2, AlignLeft, Save, Plus,
-    FileText, Zap, Edit3
+    FileText, Zap, Edit3, GitBranch, Target, ArrowRightCircle
 } from 'lucide-react';
 
 // ============================================================================
@@ -17,7 +17,9 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
         level: 'All',
         duration: 30,
         tags: [],
-        blocks: [] // FIXED: Replaced 'questions' with 'blocks'
+        blocks: [], 
+        isProgressive: false,
+        phases: []
     });
     
     const [jsonMode, setJsonMode] = useState(false);
@@ -25,10 +27,63 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [tagInput, setTagInput] = useState('');
 
-    // Safely calculate points (Defaulting to 10 per block if not specified)
-    const totalPoints = (examData.blocks || []).reduce((sum: number, b: any) => sum + (Number(b.points) || 10), 0);
+    // Safely calculate points across either flat blocks or progressive phases
+    const totalPoints = examData.isProgressive 
+        ? (examData.phases || []).reduce((sum: number, p: any) => sum + (p.blocks || []).reduce((bSum: number, b: any) => bSum + (Number(b.points) || 10), 0), 0)
+        : (examData.blocks || []).reduce((sum: number, b: any) => sum + (Number(b.points) || 10), 0);
 
-    const addBlock = (type: 'quiz' | 'fill-blank' | 'essay') => {
+    const toggleProgressiveMode = () => {
+        if (!examData.isProgressive) {
+            // Turning ON: Migrate existing blocks into Phase 1
+            setExamData({
+                ...examData,
+                isProgressive: true,
+                phases: examData.phases?.length ? examData.phases : [{
+                    id: `phase_${Date.now()}`,
+                    title: 'Phase 1: Foundation',
+                    passingThreshold: 80,
+                    blocks: examData.blocks || []
+                }],
+                blocks: []
+            });
+        } else {
+            // Turning OFF: Flatten all phases back into the root blocks array
+            const flattenedBlocks = (examData.phases || []).flatMap((p: any) => p.blocks || []);
+            setExamData({
+                ...examData,
+                isProgressive: false,
+                blocks: flattenedBlocks
+            });
+        }
+    };
+
+    // --- PHASE MANAGEMENT ---
+    const addPhase = () => {
+        setExamData({
+            ...examData,
+            phases: [...(examData.phases || []), {
+                id: `phase_${Date.now()}`,
+                title: `Phase ${(examData.phases?.length || 0) + 1}`,
+                passingThreshold: 80,
+                blocks: []
+            }]
+        });
+    };
+
+    const updatePhase = (pIdx: number, field: string, val: any) => {
+        const newPhases = [...examData.phases];
+        newPhases[pIdx] = { ...newPhases[pIdx], [field]: val };
+        setExamData({ ...examData, phases: newPhases });
+    };
+
+    const removePhase = (pIdx: number) => {
+        const newPhases = [...examData.phases];
+        newPhases.splice(pIdx, 1);
+        setExamData({ ...examData, phases: newPhases });
+    };
+
+    // --- BLOCK MANAGEMENT ---
+    const addBlock = (type: 'quiz' | 'fill-blank' | 'essay', phaseIdx: number | null = null) => {
         let newBlock: any = { id: `block_${Date.now()}`, type, points: 10 };
         
         if (type === 'quiz') {
@@ -47,19 +102,49 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
             newBlock.content = '';
         }
 
-        setExamData({ ...examData, blocks: [...(examData.blocks || []), newBlock] });
+        if (phaseIdx !== null) {
+            const newPhases = [...examData.phases];
+            newPhases[phaseIdx].blocks = [...(newPhases[phaseIdx].blocks || []), newBlock];
+            setExamData({ ...examData, phases: newPhases });
+        } else {
+            setExamData({ ...examData, blocks: [...(examData.blocks || []), newBlock] });
+        }
     };
 
-    const updateBlockRoot = (idx: number, field: string, val: any) => {
-        const newBlocks = [...examData.blocks];
-        newBlocks[idx] = { ...newBlocks[idx], [field]: val };
-        setExamData({ ...examData, blocks: newBlocks });
+    const removeBlock = (bIdx: number, phaseIdx: number | null = null) => {
+        if (phaseIdx !== null) {
+            const newPhases = [...examData.phases];
+            newPhases[phaseIdx].blocks.splice(bIdx, 1);
+            setExamData({ ...examData, phases: newPhases });
+        } else {
+            const newBlocks = [...examData.blocks];
+            newBlocks.splice(bIdx, 1);
+            setExamData({ ...examData, blocks: newBlocks });
+        }
     };
 
-    const updateBlockContent = (idx: number, field: string, val: any) => {
-        const newBlocks = [...examData.blocks];
-        newBlocks[idx].content = { ...newBlocks[idx].content, [field]: val };
-        setExamData({ ...examData, blocks: newBlocks });
+    const updateBlockRoot = (bIdx: number, field: string, val: any, phaseIdx: number | null = null) => {
+        if (phaseIdx !== null) {
+            const newPhases = [...examData.phases];
+            newPhases[phaseIdx].blocks[bIdx] = { ...newPhases[phaseIdx].blocks[bIdx], [field]: val };
+            setExamData({ ...examData, phases: newPhases });
+        } else {
+            const newBlocks = [...examData.blocks];
+            newBlocks[bIdx] = { ...newBlocks[bIdx], [field]: val };
+            setExamData({ ...examData, blocks: newBlocks });
+        }
+    };
+
+    const updateBlockContent = (bIdx: number, field: string, val: any, phaseIdx: number | null = null) => {
+        if (phaseIdx !== null) {
+            const newPhases = [...examData.phases];
+            newPhases[phaseIdx].blocks[bIdx].content = { ...newPhases[phaseIdx].blocks[bIdx].content, [field]: val };
+            setExamData({ ...examData, phases: newPhases });
+        } else {
+            const newBlocks = [...examData.blocks];
+            newBlocks[bIdx].content = { ...newBlocks[bIdx].content, [field]: val };
+            setExamData({ ...examData, blocks: newBlocks });
+        }
     };
 
     const handleImport = () => {
@@ -67,14 +152,14 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
             setJsonError(null);
             let parsed = JSON.parse(jsonInput);
             
-            // FIX: If the user pasted the array of 4 exams, grab the first one automatically
+            // Fix: If the user pasted an array of exams, grab the first one automatically
             if (Array.isArray(parsed)) {
                 parsed = parsed[0];
             }
 
             const hydratedData = { ...examData, ...parsed, contentType: 'exam' };
-            // Ensure blocks array exists
             if (!hydratedData.blocks) hydratedData.blocks = [];
+            if (!hydratedData.phases) hydratedData.phases = [];
             
             setExamData(hydratedData);
             setJsonMode(false);
@@ -97,17 +182,140 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
         setExamData({ ...examData, tags: examData.tags.filter((t:string) => t !== tagToRemove) });
     };
 
+    // --- REUSABLE BLOCK RENDERER ---
+    const renderBlockCard = (b: any, bIdx: number, pIdx: number | null = null) => (
+        <div key={b.id || bIdx} className="bg-white p-8 md:p-10 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative group hover:border-indigo-200 transition-all animate-in slide-in-from-bottom-4">
+            
+            {/* Block Header */}
+            <div className="flex justify-between items-center mb-8 pb-6 border-b border-slate-50">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-900 text-white rounded-[1rem] flex items-center justify-center font-black text-xl shadow-md">{bIdx + 1}</div>
+                    <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">Block Type</span>
+                        <span className="text-sm font-bold text-indigo-600 capitalize">{b.type.replace('-', ' ')}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-amber-50 px-3 py-2 rounded-xl border border-amber-100 focus-within:border-amber-300 focus-within:bg-white transition-all">
+                        <input className="w-12 bg-transparent text-right font-black text-amber-600 outline-none text-lg" type="number" min="1" value={b.points || 10} onChange={e => updateBlockRoot(bIdx, 'points', parseInt(e.target.value) || 0, pIdx)} />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 mt-1">pts</span>
+                    </div>
+                    <button onClick={() => removeBlock(bIdx, pIdx)} className="p-3 bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all active:scale-90">
+                        <Trash2 size={18}/>
+                    </button>
+                </div>
+            </div>
+
+            {/* QUIZ EDITOR */}
+            {b.type === 'quiz' && (
+                <>
+                    <textarea 
+                        className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl font-medium text-xl text-slate-800 mb-8 outline-none resize-y min-h-[100px] transition-all leading-relaxed" 
+                        placeholder="Type your question prompt here..." 
+                        value={b.content?.question || ''} 
+                        onChange={e => updateBlockContent(bIdx, 'question', e.target.value, pIdx)} 
+                    />
+                    <div className="space-y-3 pl-2 md:pl-4 border-l-4 border-indigo-100">
+                        {(b.content?.options || []).map((opt: any, oIdx: number) => {
+                            const isCorrect = b.content.correctId === opt.id;
+                            return (
+                                <div key={opt.id} className={`flex items-center gap-4 p-3 pr-4 rounded-2xl border-2 transition-all group/opt ${isCorrect ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-100 bg-white hover:border-indigo-200'}`}>
+                                    <button 
+                                        onClick={() => updateBlockContent(bIdx, 'correctId', opt.id, pIdx)}
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-all ${isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 hover:border-emerald-400 bg-slate-50'}`}
+                                    >
+                                        {isCorrect && <Check size={16} strokeWidth={4} />}
+                                    </button>
+                                    <input 
+                                        className={`flex-1 bg-transparent text-base font-bold outline-none ${isCorrect ? 'text-emerald-900' : 'text-slate-700'}`} 
+                                        value={opt.text} 
+                                        onChange={(e) => {
+                                            const newOpts = [...b.content.options];
+                                            newOpts[oIdx] = { ...opt, text: e.target.value };
+                                            updateBlockContent(bIdx, 'options', newOpts, pIdx);
+                                        }} 
+                                        placeholder={`Option ${oIdx + 1}`}
+                                    />
+                                    {b.content.options.length > 2 && (
+                                        <button onClick={() => { const newOpts = b.content.options.filter((_:any, i:number) => i !== oIdx); updateBlockContent(bIdx, 'options', newOpts, pIdx); }} className="text-slate-300 hover:text-rose-500 p-2 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover/opt:opacity-100">
+                                            <X size={18} strokeWidth={3} />
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        <button onClick={() => {
+                            const newOpts = [...b.content.options, { id: `opt_${Date.now()}`, text: `New Option` }];
+                            updateBlockContent(bIdx, 'options', newOpts, pIdx);
+                        }} className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-5 py-3 rounded-xl hover:bg-indigo-100 transition-colors uppercase tracking-widest mt-4 flex items-center gap-2 active:scale-95">
+                            <Plus size={16} strokeWidth={3} /> Add Option
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {/* FILL-IN-THE-BLANK EDITOR */}
+            {b.type === 'fill-blank' && (
+                <>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Prompt Text (Use [brackets] to hide words)</label>
+                    <textarea 
+                        className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl font-medium text-xl text-slate-800 mb-6 outline-none resize-y min-h-[100px] transition-all leading-relaxed" 
+                        placeholder="Example: The dog is [barking] at the mailman." 
+                        value={b.content?.text || ''} 
+                        onChange={e => updateBlockContent(bIdx, 'text', e.target.value, pIdx)} 
+                    />
+                    
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Decoy Words (Comma Separated)</label>
+                    <input 
+                        className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-700 outline-none focus:border-indigo-200 transition-all" 
+                        placeholder="running, sleeping, eating" 
+                        value={(b.content?.distractors || []).join(', ')} 
+                        onChange={e => {
+                            const arr = e.target.value.split(',').map(s => s.trim());
+                            updateBlockContent(bIdx, 'distractors', arr, pIdx);
+                        }} 
+                    />
+                </>
+            )}
+
+            {/* ESSAY EDITOR */}
+            {b.type === 'essay' && (
+                <>
+                    <input 
+                        className="w-full text-2xl font-black text-slate-900 placeholder-slate-200 outline-none transition-colors border-b-2 border-transparent focus:border-indigo-100 pb-2 mb-6" 
+                        placeholder="Essay Prompt Header..." 
+                        value={b.title || ''} 
+                        onChange={e => updateBlockRoot(bIdx, 'title', e.target.value, pIdx)} 
+                    />
+                    <textarea 
+                        className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl font-medium text-xl text-slate-800 mb-4 outline-none resize-y min-h-[120px] transition-all leading-relaxed" 
+                        placeholder="Write the full prompt or instructions here..." 
+                        value={b.content || ''} 
+                        onChange={e => updateBlockRoot(bIdx, 'content', e.target.value, pIdx)} 
+                    />
+                    <div className="pl-4 border-l-4 border-indigo-100 py-3">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-3"><AlignLeft size={16} className="text-indigo-400"/> Student will receive a rich-text box to answer.</p>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+
     return (
         <div className="flex flex-col h-full bg-slate-50/50 relative animate-in fade-in duration-500">
             
             {/* --- HEADER --- */}
-            <div className="px-8 py-6 border-b border-slate-100 bg-white flex justify-between items-center shrink-0 sticky top-0 z-20 shadow-sm">
+            <div className="px-8 py-6 border-b border-slate-100 bg-white flex justify-between items-center shrink-0 sticky top-0 z-30 shadow-sm">
                 <div>
                     <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 mb-1">
                         <FileText size={24} className="text-indigo-600" /> Exam Builder
                     </h2>
                     <div className="flex gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        <span className="bg-slate-100 px-2 py-1 rounded-md">{(examData.blocks || []).length} Blocks</span>
+                        {examData.isProgressive ? (
+                            <span className="bg-slate-100 px-2 py-1 rounded-md">{(examData.phases || []).length} Phases</span>
+                        ) : (
+                            <span className="bg-slate-100 px-2 py-1 rounded-md">{(examData.blocks || []).length} Blocks</span>
+                        )}
                         <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md">{totalPoints} Points</span>
                     </div>
                 </div>
@@ -123,7 +331,7 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
                             <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600"><Code size={20}/></div>
                             <div>
                                 <h3 className="font-black text-slate-800">Raw JSON Payload</h3>
-                                <p className="text-xs font-bold text-slate-400">Paste your AI-generated exam array here (it will import the first exam).</p>
+                                <p className="text-xs font-bold text-slate-400">Paste your AI-generated exam array here.</p>
                             </div>
                         </div>
                         {jsonError && <div className="mb-4 p-4 bg-rose-50 text-rose-600 border border-rose-200 rounded-2xl font-bold text-sm flex items-center gap-2"><Zap size={16}/> {jsonError}</div>}
@@ -138,13 +346,27 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
                         </button>
                     </div>
                 ) : (
-                    <div className="p-6 md:p-10 max-w-3xl mx-auto space-y-8">
+                    <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-8">
                         
                         {/* --- METADATA SETTINGS PANEL --- */}
                         <div className="bg-white p-8 md:p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-6 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
-                            <div className="flex items-center gap-3 text-indigo-600 mb-4">
-                                <Settings size={20} /> <h3 className="font-black uppercase tracking-widest text-xs">Exam Configuration</h3>
+                            
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-50 pb-6">
+                                <div className="flex items-center gap-3 text-indigo-600">
+                                    <Settings size={20} /> <h3 className="font-black uppercase tracking-widest text-xs">Exam Configuration</h3>
+                                </div>
+                                
+                                {/* 🔥 PROGRESSIVE EXAM TOGGLE */}
+                                <button 
+                                    onClick={toggleProgressiveMode}
+                                    className={`flex items-center gap-3 px-5 py-2.5 rounded-full transition-all active:scale-95 border ${examData.isProgressive ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                                >
+                                    <GitBranch size={16} className={examData.isProgressive ? "text-indigo-500" : ""} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">
+                                        {examData.isProgressive ? 'Progressive Mode: ON' : 'Progressive Mode: OFF'}
+                                    </span>
+                                </button>
                             </div>
                             
                             <input 
@@ -196,136 +418,96 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
                             )}
                         </div>
 
-                        {/* --- INTERACTIVE BLOCK CARDS --- */}
-                        <div className="space-y-8">
-                            {(examData.blocks || []).map((b: any, idx: number) => (
-                                <div key={idx} className="bg-white p-8 md:p-10 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative group hover:border-indigo-200 transition-all animate-in slide-in-from-bottom-4">
-                                    
-                                    {/* Block Header */}
-                                    <div className="flex justify-between items-center mb-8 pb-6 border-b border-slate-50">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-slate-900 text-white rounded-[1rem] flex items-center justify-center font-black text-xl shadow-md">{idx + 1}</div>
-                                            <div>
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">Block Type</span>
-                                                <span className="text-sm font-bold text-indigo-600 capitalize">{b.type.replace('-', ' ')}</span>
+                        {/* --- EXAM CONTENT RENDERER --- */}
+                        {!examData.isProgressive ? (
+                            
+                            // FLAT EXAM MODE
+                            <div className="space-y-8">
+                                {(examData.blocks || []).map((b: any, idx: number) => renderBlockCard(b, idx, null))}
+                                
+                                {(examData.blocks || []).length === 0 && (
+                                    <div className="text-center py-20 px-6 border-2 border-dashed border-slate-200 rounded-[3rem]">
+                                        <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 mx-auto mb-6"><List size={32} /></div>
+                                        <h3 className="text-xl font-black text-slate-800 mb-2">No Questions Yet</h3>
+                                        <p className="text-slate-400 font-bold text-sm max-w-sm mx-auto">Use the bottom dock to add interactive blocks, or use the JSON Engine to paste an AI generated exam.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                        ) : (
+                            
+                            // PROGRESSIVE EXAM MODE
+                            <div className="space-y-12">
+                                {(examData.phases || []).map((phase: any, pIdx: number) => (
+                                    <div key={phase.id || pIdx} className="bg-slate-100/50 p-6 md:p-8 rounded-[3.5rem] border-2 border-slate-200/60 shadow-inner relative">
+                                        
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div className="flex-1 pr-6">
+                                                <div className="flex items-center gap-3 mb-3">
+                                                    <div className="w-10 h-10 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-md font-black">
+                                                        {pIdx + 1}
+                                                    </div>
+                                                    <input 
+                                                        className="bg-transparent text-2xl font-black text-slate-800 placeholder-slate-300 outline-none border-b-2 border-transparent focus:border-indigo-300 transition-colors w-full"
+                                                        value={phase.title || ''}
+                                                        onChange={e => updatePhase(pIdx, 'title', e.target.value)}
+                                                        placeholder={`Phase ${pIdx + 1} Title...`}
+                                                    />
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex items-center gap-2 bg-amber-50 px-3 py-2 rounded-xl border border-amber-100 focus-within:border-amber-300 focus-within:bg-white transition-all">
-                                                <input className="w-12 bg-transparent text-right font-black text-amber-600 outline-none text-lg" type="number" min="1" value={b.points || 10} onChange={e => updateBlockRoot(idx, 'points', parseInt(e.target.value) || 0)} />
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 mt-1">pts</span>
-                                            </div>
-                                            <button onClick={() => { const n = [...examData.blocks]; n.splice(idx,1); setExamData({...examData, blocks: n}); }} className="p-3 bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all active:scale-90">
-                                                <Trash2 size={18}/>
+                                            <button onClick={() => removePhase(pIdx)} className="p-3 bg-white text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-2xl shadow-sm transition-all active:scale-90 shrink-0">
+                                                <Trash2 size={18} />
                                             </button>
                                         </div>
-                                    </div>
+                                        
+                                        {/* Phase Logic Configuration */}
+                                        <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex flex-wrap items-center gap-4 md:gap-8 mb-8">
+                                            <div className="flex items-center gap-3">
+                                                <Target size={18} className="text-indigo-400" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pass Threshold</span>
+                                                <div className="flex items-center gap-1 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                                                    <input type="number" min="0" max="100" value={phase.passingThreshold || 80} onChange={e => updatePhase(pIdx, 'passingThreshold', parseInt(e.target.value) || 0)} className="w-10 bg-transparent text-right font-black text-slate-700 outline-none" />
+                                                    <span className="text-[10px] font-black text-slate-400">%</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <ArrowRightCircle size={18} className="text-emerald-400" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">On Success</span>
+                                                <input type="text" value={phase.nextPhaseId || ''} onChange={e => updatePhase(pIdx, 'nextPhaseId', e.target.value)} placeholder="Next Phase ID (opt)" className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 outline-none focus:border-emerald-300 w-32" />
+                                            </div>
+                                        </div>
 
-                                    {/* --- QUIZ EDITOR --- */}
-                                    {b.type === 'quiz' && (
-                                        <>
-                                            <textarea 
-                                                className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl font-medium text-xl text-slate-800 mb-8 outline-none resize-y min-h-[100px] transition-all leading-relaxed" 
-                                                placeholder="Type your question prompt here..." 
-                                                value={b.content?.question || ''} 
-                                                onChange={e => updateBlockContent(idx, 'question', e.target.value)} 
-                                            />
-                                            <div className="space-y-3 pl-2 md:pl-4 border-l-4 border-indigo-100">
-                                                {(b.content?.options || []).map((opt: any, oIdx: number) => {
-                                                    const isCorrect = b.content.correctId === opt.id;
-                                                    return (
-                                                        <div key={opt.id} className={`flex items-center gap-4 p-3 pr-4 rounded-2xl border-2 transition-all group/opt ${isCorrect ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-100 bg-white hover:border-indigo-200'}`}>
-                                                            <button 
-                                                                onClick={() => updateBlockContent(idx, 'correctId', opt.id)}
-                                                                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-all ${isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 hover:border-emerald-400 bg-slate-50'}`}
-                                                            >
-                                                                {isCorrect && <Check size={16} strokeWidth={4} />}
-                                                            </button>
-                                                            <input 
-                                                                className={`flex-1 bg-transparent text-base font-bold outline-none ${isCorrect ? 'text-emerald-900' : 'text-slate-700'}`} 
-                                                                value={opt.text} 
-                                                                onChange={(e) => {
-                                                                    const newOpts = [...b.content.options];
-                                                                    newOpts[oIdx] = { ...opt, text: e.target.value };
-                                                                    updateBlockContent(idx, 'options', newOpts);
-                                                                }} 
-                                                                placeholder={`Option ${oIdx + 1}`}
-                                                            />
-                                                            {b.content.options.length > 2 && (
-                                                                <button onClick={() => { const newOpts = b.content.options.filter((_:any, i:number) => i !== oIdx); updateBlockContent(idx, 'options', newOpts); }} className="text-slate-300 hover:text-rose-500 p-2 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover/opt:opacity-100">
-                                                                    <X size={18} strokeWidth={3} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                                <button onClick={() => {
-                                                    const newOpts = [...b.content.options, { id: `opt_${Date.now()}`, text: `New Option` }];
-                                                    updateBlockContent(idx, 'options', newOpts);
-                                                }} className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-5 py-3 rounded-xl hover:bg-indigo-100 transition-colors uppercase tracking-widest mt-4 flex items-center gap-2 active:scale-95">
-                                                    <Plus size={16} strokeWidth={3} /> Add Option
+                                        {/* Phase Blocks */}
+                                        <div className="space-y-6 pl-4 md:pl-8 border-l-4 border-indigo-200/50 relative">
+                                            {(phase.blocks || []).map((b: any, bIdx: number) => renderBlockCard(b, bIdx, pIdx))}
+                                            
+                                            {/* Phase-specific Add Buttons */}
+                                            <div className="pt-4 flex flex-wrap gap-2">
+                                                <button onClick={() => addBlock('quiz', pIdx)} className="px-4 py-2.5 bg-white hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95">
+                                                    <List size={14} /> Add Quiz
+                                                </button>
+                                                <button onClick={() => addBlock('fill-blank', pIdx)} className="px-4 py-2.5 bg-white hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95">
+                                                    <Edit3 size={14} /> Add Fill Blank
+                                                </button>
+                                                <button onClick={() => addBlock('essay', pIdx)} className="px-4 py-2.5 bg-white hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95">
+                                                    <AlignLeft size={14} /> Add Essay
                                                 </button>
                                             </div>
-                                        </>
-                                    )}
+                                        </div>
 
-                                    {/* --- FILL-IN-THE-BLANK EDITOR --- */}
-                                    {b.type === 'fill-blank' && (
-                                        <>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Prompt Text (Use [brackets] to hide words)</label>
-                                            <textarea 
-                                                className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl font-medium text-xl text-slate-800 mb-6 outline-none resize-y min-h-[100px] transition-all leading-relaxed" 
-                                                placeholder="Example: The dog is [barking] at the mailman." 
-                                                value={b.content?.text || ''} 
-                                                onChange={e => updateBlockContent(idx, 'text', e.target.value)} 
-                                            />
-                                            
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Decoy Words (Comma Separated)</label>
-                                            <input 
-                                                className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-700 outline-none focus:border-indigo-200 transition-all" 
-                                                placeholder="running, sleeping, eating" 
-                                                value={(b.content?.distractors || []).join(', ')} 
-                                                onChange={e => {
-                                                    const arr = e.target.value.split(',').map(s => s.trim());
-                                                    updateBlockContent(idx, 'distractors', arr);
-                                                }} 
-                                            />
-                                        </>
-                                    )}
+                                    </div>
+                                ))}
 
-                                    {/* --- ESSAY EDITOR --- */}
-                                    {b.type === 'essay' && (
-                                        <>
-                                            <input 
-                                                className="w-full text-2xl font-black text-slate-900 placeholder-slate-200 outline-none transition-colors border-b-2 border-transparent focus:border-indigo-100 pb-2 mb-6" 
-                                                placeholder="Essay Prompt Header..." 
-                                                value={b.title || ''} 
-                                                onChange={e => updateBlockRoot(idx, 'title', e.target.value)} 
-                                            />
-                                            <textarea 
-                                                className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl font-medium text-xl text-slate-800 mb-4 outline-none resize-y min-h-[120px] transition-all leading-relaxed" 
-                                                placeholder="Write the full prompt or instructions here..." 
-                                                value={b.content || ''} 
-                                                onChange={e => updateBlockRoot(idx, 'content', e.target.value)} 
-                                            />
-                                            <div className="pl-4 border-l-4 border-indigo-100 py-3">
-                                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-3"><AlignLeft size={16} className="text-indigo-400"/> Student will receive a rich-text box to answer.</p>
-                                            </div>
-                                        </>
-                                    )}
+                                {(examData.phases || []).length === 0 && (
+                                    <div className="text-center py-20 px-6 border-2 border-dashed border-indigo-200 bg-indigo-50/30 rounded-[3rem]">
+                                        <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-indigo-300 mx-auto mb-6 shadow-sm border border-indigo-100"><GitBranch size={32} /></div>
+                                        <h3 className="text-xl font-black text-indigo-900 mb-2">No Phases Defined</h3>
+                                        <p className="text-indigo-400 font-bold text-sm max-w-sm mx-auto">Use the bottom dock to add your first progressive phase.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-                                </div>
-                            ))}
-                            
-                            {/* Empty State / Call to Action */}
-                            {(examData.blocks || []).length === 0 && (
-                                <div className="text-center py-20 px-6 border-2 border-dashed border-slate-200 rounded-[3rem]">
-                                    <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 mx-auto mb-6"><List size={32} /></div>
-                                    <h3 className="text-xl font-black text-slate-800 mb-2">No Questions Yet</h3>
-                                    <p className="text-slate-400 font-bold text-sm max-w-sm mx-auto">Use the bottom dock to add interactive blocks, or use the JSON Engine to paste an AI generated exam.</p>
-                                </div>
-                            )}
-                        </div>
                     </div>
                 )}
             </div>
@@ -333,16 +515,25 @@ export default function ExamBuilderView({ onSave, initialData }: any) {
             {/* --- ACTION DOCK (Sticky Bottom) --- */}
             {!jsonMode && (
                 <div className="absolute bottom-0 left-0 right-0 px-6 py-5 bg-white/90 backdrop-blur-2xl border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 z-30 shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
+                    
                     <div className="flex gap-2">
-                        <button onClick={() => addBlock('quiz')} className="px-5 py-3.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95">
-                            <List size={16} strokeWidth={2.5}/> Quiz
-                        </button>
-                        <button onClick={() => addBlock('fill-blank')} className="px-5 py-3.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95">
-                            <Edit3 size={16} strokeWidth={2.5}/> Fill Blank
-                        </button>
-                        <button onClick={() => addBlock('essay')} className="px-5 py-3.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 hidden md:flex">
-                            <AlignLeft size={16} strokeWidth={2.5}/> Essay
-                        </button>
+                        {examData.isProgressive ? (
+                            <button onClick={addPhase} className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg">
+                                <GitBranch size={16} /> Add New Phase
+                            </button>
+                        ) : (
+                            <>
+                                <button onClick={() => addBlock('quiz')} className="px-5 py-3.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95">
+                                    <List size={16} strokeWidth={2.5}/> Quiz
+                                </button>
+                                <button onClick={() => addBlock('fill-blank')} className="px-5 py-3.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95">
+                                    <Edit3 size={16} strokeWidth={2.5}/> Fill Blank
+                                </button>
+                                <button onClick={() => addBlock('essay')} className="px-5 py-3.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 hidden md:flex">
+                                    <AlignLeft size={16} strokeWidth={2.5}/> Essay
+                                </button>
+                            </>
+                        )}
                     </div>
 
                     <button onClick={() => onSave(examData)} className="w-full md:w-auto px-10 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-200 flex items-center justify-center gap-3 transition-transform active:scale-95">
