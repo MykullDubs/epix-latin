@@ -30,7 +30,8 @@ import BuilderHub from './components/instructor/BuilderHub';
 import ProfileView from './components/ProfileView';
 import AuthView from './components/AuthView';
 import ClassView from './components/ClassView';
-import ExamPlayerView from './components/ExamPlayerView'; // 🔥 IMPORTED EXAM PLAYER
+import ExamPlayerView from './components/ExamPlayerView';
+import HoloAvatar from './components/HoloAvatar'; // 🔥 ADDED FOR NAV BAR
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -481,34 +482,41 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
 // ============================================================================
 //  4-BUTTON NAVIGATION BAR
 // ============================================================================
-function StudentNavBar({ activeTab, setActiveTab }: any) {
+function StudentNavBar({ activeTab, setActiveTab, userData }: any) {
     const tabs = [
-        { id: 'home', label: 'Home', icon: LayoutDashboard },
-        { id: 'discovery', label: 'Explore', icon: Compass },   
-        { id: 'flashcards', label: 'Practice', icon: Layers },
-        { id: 'profile', label: 'Me', icon: User }
+        { id: 'home', label: 'Home', icon: <LayoutDashboard size={24} /> },
+        { id: 'discovery', label: 'Explore', icon: <Compass size={24} /> },   
+        { id: 'flashcards', label: 'Practice', icon: <Layers size={24} /> },
+        { id: 'profile', label: 'Me', icon: userData ? <HoloAvatar student={userData} size="sm" className="w-[26px] h-[26px] border-none ring-0 shadow-none bg-transparent" /> : <User size={24} /> }
     ];
 
     return (
-        <nav className="fixed bottom-0 w-full max-w-md bg-white/90 backdrop-blur-xl border-t border-slate-200 pb-safe pt-2 px-6 z-40 flex justify-between items-center h-[85px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-            {tabs.map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                    <button 
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)} 
-                        className={`flex flex-col items-center gap-1 transition-all duration-300 w-16 ${isActive ? 'text-indigo-600 -translate-y-1' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        <div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-indigo-50 shadow-sm ring-1 ring-indigo-100' : ''}`}>
-                            <tab.icon size={24} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'fill-indigo-100' : ''}/>
-                        </div>
-                        <span className={`text-[10px] font-bold ${isActive ? 'opacity-100' : 'opacity-0 scale-0'} transition-all duration-300 absolute -bottom-2`}>
-                            {tab.label}
-                        </span>
-                    </button>
-                );
-            })}
-        </nav>
+        <div className="absolute bottom-0 left-0 w-full bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800/60 px-6 py-4 pb-8 z-40 rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] transition-colors duration-300">
+            <div className="flex justify-between items-center w-full mx-auto px-2">
+                {tabs.map(tab => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex flex-col items-center justify-center w-14 transition-all duration-300 relative ${
+                                isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                        >
+                            <div className={`transition-transform duration-300 ${isActive ? '-translate-y-2 scale-110 drop-shadow-md' : 'hover:scale-110'}`}>
+                                {tab.icon}
+                            </div>
+                            <span className={`text-[9px] font-black uppercase tracking-widest transition-all duration-300 absolute -bottom-4 whitespace-nowrap ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+                                {tab.label}
+                            </span>
+                            {isActive && (
+                                <div className="absolute -bottom-6 w-1.5 h-1.5 rounded-full shadow-lg transition-all duration-300 animate-in zoom-in bg-indigo-600 shadow-[0_0_12px_#4f46e5]" />
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
     );
 }
 
@@ -625,7 +633,27 @@ function App() {
   const handleCreateCard = useCallback(async (c: any) => { if(!user) return; const cardId = doc(collection(db, 'artifacts', appId, 'custom_cards')).id; await setDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), {...c, id: cardId, instructorId: user.uid}); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); }, [user]);
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Delete card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId)); } catch (e) { console.error(e); } }, [user]);
-  const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'custom_lessons'), { ...l, instructorId: user.uid }); } setActiveTab('home'); }, [user]);
+  
+  // 🔥 UPDATED TO PRESERVE PROGRESSIVE EXAM STATE
+  const handleCreateLesson = useCallback(async (l: any, id = null) => { 
+      if(!user) return; 
+      
+      const payload = { 
+          ...l, 
+          isProgressive: l.isProgressive || false,
+          phases: l.phases || [],
+          blocks: l.blocks || [],
+          instructorId: user.uid 
+      };
+
+      if (id) { 
+          await updateDoc(doc(db, 'artifacts', appId, 'custom_lessons', id), payload); 
+      } else { 
+          await addDoc(collection(db, 'artifacts', appId, 'custom_lessons'), payload); 
+      } 
+      setActiveTab('home'); 
+  }, [user]);
+
   const handleCreateCurriculum = useCallback(async (c: any) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_curriculums'), c); }, [user]);
   const handleUpdatePreferences = useCallback(async (prefs: any) => { if (!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { deckPreferences: prefs }); setUserData((prev: any) => ({ ...prev, deckPreferences: prefs })); }, [user]);
   const handleDeleteDeck = useCallback(async (deckId: string) => { if(!user) return; if(!window.confirm("Delete this deck?")) return; try { const toDelete = customCards.filter(c => c.deckId === deckId); for(const c of toDelete) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', c.id)); } setSelectedDeckKey('custom'); } catch(e) { console.error(e); } }, [user, customCards]);
@@ -638,13 +666,26 @@ function App() {
       } catch (e) { console.error("Log failed", e); } 
   }, [user, displayName]);
 
+  // 🔥 UPDATED: Guaranteed save to gradebook regardless of XP score
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
     setActiveLesson(null); 
     setActiveTab('home'); 
-    if (xp > 0 && user) { 
+    if (user) { 
         try { 
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
-            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, xp: xp, timestamp: Date.now(), type: 'completion', scoreDetail: score });
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
+                xp: increment(xp || 0), 
+                completedAssignments: arrayUnion(lessonId) 
+            }); 
+            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
+                studentName: displayName, 
+                studentEmail: user.email, 
+                itemTitle: title, 
+                itemId: lessonId, 
+                xp: xp || 0, 
+                timestamp: Date.now(), 
+                type: 'completion', 
+                scoreDetail: score 
+            });
         } catch (e) { console.error(e); } 
     } 
   }, [user, displayName]);
@@ -703,20 +744,27 @@ function App() {
       } catch (e) { console.error("Error removing student:", e); }
   }, [user]);
 
-const handleAssign = useCallback(async (classId: string, payload: any) => {
+  // 🔥 UPDATED TO SUPPORT COHORT ASSIGNMENTS
+  const handleAssign = useCallback(async (classId: string, payload: any) => {
       if (!user || !payload) return;
       
-      // Safely extract the string ID whether it came from the dashboard (string) or modal (object)
-      const targetId = typeof payload === 'string' ? payload : (payload.id || payload.lessonId || payload.contentId);
-      
-      if (!targetId) {
+      // Support raw strings or object payloads (with cohortId)
+      const assignmentObject = typeof payload === 'string' 
+          ? payload 
+          : { 
+              lessonId: payload.lessonId || payload.id || payload.contentId, 
+              cohortId: payload.cohortId || null, 
+              assignedAt: Date.now() 
+            };
+            
+      if (!assignmentObject || (typeof assignmentObject === 'object' && !assignmentObject.lessonId)) {
           console.warn("Invalid assignment payload:", payload);
           return;
       }
 
       try { 
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
-              assignments: arrayUnion(targetId) 
+              assignments: arrayUnion(assignmentObject) 
           }); 
       } catch (e) { 
           console.error("Error assigning lesson:", e); 
@@ -967,7 +1015,7 @@ const handleAssign = useCallback(async (classId: string, payload: any) => {
         </div>
 
         {/* BOTTOM NAVIGATION (4 BUTTONS - HIDDEN IN FULLSCREEN EXAMS) */}
-        {!isFullscreenMode && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {!isFullscreenMode && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} />}
       </div>
       <style>{` 
         .perspective-1000 { perspective: 1000px; } 
