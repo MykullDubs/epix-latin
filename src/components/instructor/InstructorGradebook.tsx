@@ -1,8 +1,8 @@
 // src/components/instructor/InstructorGradebook.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
-import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target, User, Download } from 'lucide-react'; 
+import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target, User, Download, Clock, XCircle, Save } from 'lucide-react'; 
 import { JuicyToast } from '../Toast';
 
 export default function InstructorGradebook({ classData }: any) {
@@ -13,6 +13,12 @@ export default function InstructorGradebook({ classData }: any) {
     // PRO-LMS: SpeedModerator State
     const [reviewingLog, setReviewingLog] = useState<any | null>(null);
     const [localScoreDetails, setLocalScoreDetails] = useState<any | null>(null);
+
+    // Track if edits have been made
+    const isDirty = useMemo(() => {
+        if (!reviewingLog || !localScoreDetails) return false;
+        return JSON.stringify(reviewingLog.scoreDetail) !== JSON.stringify(localScoreDetails);
+    }, [reviewingLog, localScoreDetails]);
 
     useEffect(() => {
         if(!classData?.assignments || !classData?.students) return;
@@ -104,7 +110,11 @@ export default function InstructorGradebook({ classData }: any) {
         if (!localScoreDetails) return;
         const updatedDetails = localScoreDetails.details.map((q: any) => {
             if (q.qId === qId) {
-                return { ...q, awardedPoints: Math.min(Math.max(0, newPoints), q.maxPoints) };
+                return { 
+                    ...q, 
+                    awardedPoints: Math.min(Math.max(0, newPoints), q.maxPoints),
+                    isCorrect: Math.min(Math.max(0, newPoints), q.maxPoints) === q.maxPoints
+                };
             }
             return q;
         });
@@ -139,10 +149,11 @@ export default function InstructorGradebook({ classData }: any) {
                     ...localScoreDetails, 
                     status: 'graded' 
                 },
+                xp: localScoreDetails.score, // Ensure XP syncs with manual grade changes
                 lastUpdated: Date.now()
             }, { merge: true });
 
-            setToastMsg("Grade Released & Feedback Sent! 🎯");
+            setToastMsg("Grades Saved & Published! 🎯");
             setReviewingLog(null);
             setLocalScoreDetails(null);
         } catch (error) {
@@ -183,7 +194,7 @@ export default function InstructorGradebook({ classData }: any) {
             {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
             {/* MAIN TABLE AREA */}
-            <div className={`flex-1 flex flex-col p-6 transition-all duration-500 ${reviewingLog ? 'mr-[500px]' : ''}`}>
+            <div className={`flex-1 flex flex-col p-6 transition-all duration-500 ${reviewingLog ? 'mr-[600px] opacity-30 pointer-events-none' : ''}`}>
                 <div className="flex justify-between items-center mb-6 shrink-0">
                     <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-[1.25rem] border border-slate-300/50 dark:border-slate-700/50 shadow-inner">
                         <button onClick={() => setViewType('exams')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'exams' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200 dark:border-slate-700' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Assessments Only</button>
@@ -205,7 +216,7 @@ export default function InstructorGradebook({ classData }: any) {
                                 <th className="p-6 text-[10px] font-black uppercase tracking-widest sticky left-0 bg-slate-950 z-30 border-r border-white/10">Roster</th>
                                 {displayedAssignments.map((a: any) => (
                                     <th key={a.id} className="p-6 text-[10px] font-black uppercase tracking-widest text-center min-w-[180px] border-r border-white/5 hover:bg-slate-900 transition-colors">
-                                        <div className={`text-[8px] mb-1.5 ${a.contentType === 'test' ? 'text-rose-400' : 'text-indigo-400'}`}>{a.contentType}</div>
+                                        <div className={`text-[8px] mb-1.5 ${a.contentType === 'test' || a.contentType === 'exam' ? 'text-rose-400' : 'text-indigo-400'}`}>{a.contentType}</div>
                                         <span className="truncate block w-full px-2" title={a.title}>{a.title}</span>
                                     </th>
                                 ))}
@@ -249,23 +260,26 @@ export default function InstructorGradebook({ classData }: any) {
                 </div>
             </div>
 
-            {/* SPEED MODERATOR SIDE-PANEL */}
+            {/* SPEED MODERATOR WIDE SIDE-PANEL */}
             {reviewingLog && localScoreDetails && (
                 <div className="absolute inset-0 z-50 pointer-events-none flex justify-end">
-                    <div className="absolute inset-0 bg-slate-900/20 dark:bg-black/40 backdrop-blur-sm pointer-events-auto" onClick={() => { setReviewingLog(null); setLocalScoreDetails(null); }} />
-                    <aside className="w-full max-w-[500px] h-full bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-[-30px_0_60px_rgba(0,0,0,0.2)] flex flex-col animate-in slide-in-from-right duration-300 pointer-events-auto relative z-10 transition-colors">
+                    <div className="absolute inset-0 bg-slate-900/20 dark:bg-black/40 backdrop-blur-sm pointer-events-auto transition-opacity" onClick={() => { setReviewingLog(null); setLocalScoreDetails(null); }} />
+                    <aside className="w-full max-w-[600px] h-full bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-[-30px_0_60px_rgba(0,0,0,0.2)] flex flex-col animate-in slide-in-from-right duration-300 pointer-events-auto relative z-10 transition-colors">
                         
-                        <header className="p-8 bg-slate-950 text-white flex justify-between items-start shrink-0 border-b border-white/10">
-                            <div>
+                        {/* PANEL HEADER */}
+                        <header className="p-8 bg-slate-950 text-white flex justify-between items-start shrink-0 border-b border-white/10 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 opacity-10 rounded-full blur-3xl pointer-events-none" />
+                            <div className="relative z-10">
                                 <div className="flex items-center gap-2 text-indigo-400 mb-2">
                                     <FileText size={14} />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">{reviewingLog.itemTitle}</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest truncate max-w-[300px]">{reviewingLog.itemTitle}</span>
                                 </div>
-                                <h2 className="text-2xl font-black tracking-tight">{reviewingLog.studentEmail.split('@')[0]}</h2>
+                                <h2 className="text-2xl font-black tracking-tight">{reviewingLog.studentName || reviewingLog.studentEmail.split('@')[0]}</h2>
                             </div>
-                            <button onClick={() => { setReviewingLog(null); setLocalScoreDetails(null); }} className="p-2.5 bg-white/10 hover:bg-rose-500 rounded-full transition-colors text-white active:scale-95 shadow-sm"><X size={20} strokeWidth={3} /></button>
+                            <button onClick={() => { setReviewingLog(null); setLocalScoreDetails(null); }} className="p-2.5 bg-white/10 hover:bg-rose-500 rounded-full transition-colors text-white active:scale-95 shadow-sm relative z-10"><X size={20} strokeWidth={3} /></button>
                         </header>
 
+                        {/* PANEL TELEMETRY */}
                         <div className="px-8 py-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0 transition-colors">
                             <div>
                                 <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">Final Assessed Score</span>
@@ -273,52 +287,67 @@ export default function InstructorGradebook({ classData }: any) {
                                     {localScoreDetails.score} <span className="text-lg text-slate-400 dark:text-slate-600">/ {localScoreDetails.total}</span>
                                 </div>
                             </div>
-                            <div className={`px-5 py-3 rounded-2xl font-black text-2xl border-4 shadow-sm ${
-                                localScoreDetails.finalScorePct >= 90 ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30' :
-                                localScoreDetails.finalScorePct >= 70 ? 'bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' :
-                                'bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30'
-                            }`}>
-                                {localScoreDetails.finalScorePct}%
+                            <div className="flex flex-col items-end gap-2">
+                                {reviewingLog.scoreDetail.status === 'pending_review' && !isDirty ? (
+                                    <span className="px-2.5 py-1 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm border border-amber-200 dark:border-amber-500/30">
+                                        <Clock size={12} /> Needs Grading
+                                    </span>
+                                ) : (
+                                    <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm border border-emerald-200 dark:border-emerald-500/30">
+                                        <CheckCircle2 size={12} /> Graded
+                                    </span>
+                                )}
+                                <div className={`px-4 py-2 rounded-2xl font-black text-xl border-2 shadow-sm ${
+                                    localScoreDetails.finalScorePct >= 90 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30' :
+                                    localScoreDetails.finalScorePct >= 70 ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' :
+                                    'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30'
+                                }`}>
+                                    {localScoreDetails.finalScorePct}%
+                                </div>
                             </div>
                         </div>
 
+                        {/* QUESTION LIST */}
                         <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar bg-slate-50 dark:bg-slate-950 transition-colors">
                             {localScoreDetails.details?.map((q: any, i: number) => {
                                 const isEssay = q.type === 'essay';
                                 const needsGrading = isEssay && reviewingLog.scoreDetail.status === 'pending_review';
 
                                 return (
-                                    <div key={i} className={`bg-white dark:bg-slate-900 rounded-3xl border-2 p-6 shadow-sm transition-all ${needsGrading ? 'border-amber-400 dark:border-amber-500/50 shadow-[0_0_20px_rgba(251,191,36,0.2)] dark:shadow-[0_0_20px_rgba(245,158,11,0.1)]' : 'border-slate-200 dark:border-slate-800'}`}>
+                                    <div key={i} className={`bg-white dark:bg-slate-900 rounded-[2.5rem] border p-6 shadow-sm transition-all ${needsGrading ? 'border-amber-400 dark:border-amber-500/50 shadow-[0_0_20px_rgba(251,191,36,0.15)] ring-4 ring-amber-50 dark:ring-amber-500/10' : 'border-slate-200 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
+                                        
                                         <div className="flex justify-between items-start mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
-                                            <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm ${needsGrading ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
+                                            <span className={`text-[10px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm ${needsGrading ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
                                                 Q{i + 1} • {q.type}
                                             </span>
-                                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
+                                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 p-1.5 rounded-[1.25rem] border border-slate-200 dark:border-slate-800 shadow-inner">
                                                 <input 
                                                     type="number"
                                                     min="0"
                                                     max={q.maxPoints}
                                                     value={q.awardedPoints}
                                                     onChange={(e) => updateQuestionScore(q.qId, parseInt(e.target.value) || 0)}
-                                                    className={`w-16 h-10 text-center font-black rounded-lg border-2 outline-none focus:border-indigo-500 transition-colors shadow-sm ${needsGrading ? 'border-amber-300 dark:border-amber-500/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white'}`}
+                                                    className={`w-16 h-10 text-center font-black rounded-xl border-2 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-sm ${needsGrading ? 'border-amber-300 dark:border-amber-500/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                                                 />
-                                                <span className="text-xs font-black text-slate-400 px-2">/ {q.maxPoints} pts</span>
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 pr-3">/ {q.maxPoints} pts</span>
                                             </div>
                                         </div>
                                         
-                                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-5 leading-relaxed">{q.prompt}</p>
+                                        <h4 className="text-lg font-black text-slate-800 dark:text-white mb-6 leading-snug tracking-tight">{q.prompt}</h4>
                                         
-                                        <div className={`p-5 rounded-2xl mb-5 shadow-sm border ${isEssay ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 text-indigo-900 dark:text-indigo-200 font-serif leading-relaxed' : (q.isCorrect ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20 text-emerald-800 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20 text-rose-800 dark:text-rose-300')}`}>
-                                            <span className="text-[10px] font-black uppercase tracking-widest opacity-50 block mb-2 flex items-center gap-1"><User size={12}/> Student Answer</span>
-                                            {q.studentVal}
-                                        </div>
+                                        <div className="space-y-4">
+                                            <div className={`p-5 rounded-[1.5rem] shadow-sm border ${isEssay ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 text-indigo-900 dark:text-indigo-200' : (q.isCorrect ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20 text-emerald-800 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20 text-rose-800 dark:text-rose-300')}`}>
+                                                <span className="text-[9px] font-black uppercase tracking-widest opacity-50 block mb-2 flex items-center gap-1.5"><User size={12}/> Student Answer</span>
+                                                <p className={`text-sm leading-relaxed ${isEssay ? 'font-serif' : 'font-bold'}`}>{q.studentVal}</p>
+                                            </div>
 
-                                        {!isEssay && !q.isCorrect && q.correctVal && (
-                                            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 mb-5 shadow-sm">
-                                                <span className="text-[10px] font-black uppercase tracking-widest opacity-50 block mb-2 flex items-center gap-1"><Target size={12}/> Correct Answer</span>
-                                                {q.correctVal}
-                                            </div>
-                                        )}
+                                            {!isEssay && !q.isCorrect && q.correctVal && (
+                                                <div className="p-5 rounded-[1.5rem] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-50 block mb-2 flex items-center gap-1.5"><Target size={12}/> Correct Answer</span>
+                                                    <p className="text-sm font-bold">{q.correctVal}</p>
+                                                </div>
+                                            )}
+                                        </div>
 
                                         <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
                                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 mb-3">
@@ -328,7 +357,7 @@ export default function InstructorGradebook({ classData }: any) {
                                                 placeholder="Leave feedback for the student to review..."
                                                 value={q.teacherFeedback || ''}
                                                 onChange={(e) => updateQuestionFeedback(q.qId, e.target.value)}
-                                                className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-sm font-medium text-slate-700 dark:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none resize-none h-24 transition-all shadow-inner"
+                                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-sm font-medium text-slate-700 dark:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none resize-none h-24 transition-all shadow-inner"
                                             />
                                         </div>
                                     </div>
@@ -336,12 +365,14 @@ export default function InstructorGradebook({ classData }: any) {
                             })}
                         </div>
 
-                        <footer className="p-6 md:p-8 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 shrink-0 transition-colors">
+                        {/* PANEL FOOTER */}
+                        <footer className="p-6 md:p-8 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-end shrink-0 transition-colors shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-none">
                             <button 
                                 onClick={releaseGrade}
-                                className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] flex justify-center items-center gap-3 text-sm"
+                                disabled={!isDirty && reviewingLog.scoreDetail.status !== 'pending_review'}
+                                className="w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:active:scale-100 active:scale-95 shadow-xl shadow-indigo-600/20"
                             >
-                                <Target size={20} /> Release Grade & Publish
+                                <Save size={16} /> {reviewingLog.scoreDetail.status === 'pending_review' ? 'Finalize Grades' : isDirty ? 'Update Scores' : 'Grades Saved'}
                             </button>
                         </footer>
                     </aside>
