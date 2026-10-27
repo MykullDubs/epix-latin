@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
     FileText, Clock, CheckCircle2, AlertTriangle, 
-    Send, Check, AlignLeft, Flag, XCircle
+    Send, Check, AlignLeft, Flag, XCircle, ArrowRight, ArrowLeft
 } from 'lucide-react';
 
 // ============================================================================
-//  EXAM PLAYER (Frosted UI + Progressive State Machine)
+//  EXAM PLAYER (Frosted UI + Paginated Progressive State Machine)
 // ============================================================================
 export default function ExamPlayerView({ exam, onFinish }: any) {
     const [started, setStarted] = useState(false);
@@ -20,6 +20,9 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
     const [currentPhaseIdx, setCurrentPhaseIdx] = useState(0);
     const [phaseHistory, setPhaseHistory] = useState<any[]>([]);
     
+    // --- PAGINATION STATE ---
+    const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
+    
     // --- TIMER STATE ---
     const [timeLeft, setTimeLeft] = useState((exam.duration || 30) * 60);
 
@@ -28,7 +31,8 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
     const totalQuestions = activeBlocks.length;
     
     const answeredCount = activeBlocks.filter((b: any) => answers[b.id] !== undefined && answers[b.id] !== '').length;
-    const progressPct = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
+    const progressPct = totalQuestions > 0 ? ((currentBlockIdx + 1) / totalQuestions) * 100 : 0;
+    const isLastQuestion = currentBlockIdx === totalQuestions - 1;
 
     // --- TIMER LOGIC ---
     useEffect(() => {
@@ -125,7 +129,7 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
                 const nextIndex = exam.phases.findIndex((p: any) => p.id === nextId);
                 if (nextIndex !== -1) {
                     setCurrentPhaseIdx(nextIndex);
-                    // Do NOT finalize the exam, let them continue to the next phase
+                    setCurrentBlockIdx(0); // Reset pagination for the new phase
                     return;
                 }
             }
@@ -240,7 +244,11 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
         );
     }
 
-    // --- SCREEN 2: ACTIVE EXAM (SCROLLING LIST) ---
+    // --- SCREEN 2: ACTIVE EXAM (PAGINATED VIEW) ---
+    const q = activeBlocks[currentBlockIdx];
+    const isAnswered = answers[q.id] !== undefined && answers[q.id] !== '';
+    const qType = q.type || 'multiple-choice';
+
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden relative animate-in fade-in duration-500 transition-colors pb-safe">
             
@@ -285,7 +293,7 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
                             <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
                         </div>
                         <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest tabular-nums">
-                            {answeredCount} / {totalQuestions}
+                            {currentBlockIdx + 1} / {totalQuestions}
                         </span>
                     </div>
 
@@ -296,100 +304,110 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
                 </div>
             </div>
 
-            {/* QUESTIONS */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-40 custom-scrollbar overscroll-y-contain">
-                <div className="max-w-3xl mx-auto space-y-6">
-                    {activeBlocks.map((q: any, i: number) => {
-                        const isAnswered = answers[q.id] !== undefined && answers[q.id] !== '';
-                        const qType = q.type || 'multiple-choice';
+            {/* SINGLE PAGINATED QUESTION */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-32 custom-scrollbar overscroll-y-contain flex flex-col justify-center">
+                <div key={q.id} className="max-w-3xl mx-auto w-full bg-white dark:bg-slate-900 p-6 md:p-10 rounded-[2.5rem] border-2 shadow-sm transition-all duration-300 animate-in slide-in-from-right-8 fade-in border-slate-200 dark:border-slate-800">
+                    <div className="flex justify-between items-start mb-6">
+                        <span className={`text-[10px] font-black px-4 py-2 rounded-xl uppercase tracking-widest shadow-sm transition-colors border ${isAnswered ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'}`}>
+                            Question {currentBlockIdx + 1}
+                        </span>
+                        <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 px-3 py-2 rounded-xl shadow-sm uppercase tracking-widest">
+                            {q.points || 10} Points
+                        </span>
+                    </div>
+                    
+                    <h3 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white mb-8 leading-snug tracking-tight">
+                        {q.prompt || q.content?.question}
+                    </h3>
+                    
+                    {(qType === 'multiple-choice' || qType === 'quiz') && (
+                        <div className="space-y-3">
+                            {(q.options || q.content?.options || []).map((optData: any) => {
+                                // Handle raw strings or object options
+                                const optId = typeof optData === 'string' ? optData : optData.id;
+                                const optText = typeof optData === 'string' ? optData : optData.text;
+                                const isSelected = answers[q.id] === optId;
 
-                        return (
-                            <div key={q.id} className={`bg-white dark:bg-slate-900 p-6 md:p-10 rounded-[2.5rem] border-2 shadow-sm transition-all duration-300 ${isAnswered ? 'border-indigo-200 dark:border-indigo-500/50 shadow-[0_10px_30px_rgba(99,102,241,0.05)]' : 'border-slate-200 dark:border-slate-800'}`}>
-                                <div className="flex justify-between items-start mb-6">
-                                    <span className={`text-[10px] font-black px-4 py-2 rounded-xl uppercase tracking-widest shadow-sm transition-colors border ${isAnswered ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'}`}>
-                                        Question {i + 1}
-                                    </span>
-                                    <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 px-3 py-2 rounded-xl shadow-sm uppercase tracking-widest">
-                                        {q.points || 10} Points
-                                    </span>
-                                </div>
-                                
-                                <h3 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white mb-8 leading-snug tracking-tight">
-                                    {q.prompt || q.content?.question}
-                                </h3>
-                                
-                                {(qType === 'multiple-choice' || qType === 'quiz') && (
-                                    <div className="space-y-3">
-                                        {(q.options || q.content?.options || []).map((optData: any) => {
-                                            // Handle raw strings or object options
-                                            const optId = typeof optData === 'string' ? optData : optData.id;
-                                            const optText = typeof optData === 'string' ? optData : optData.text;
-                                            const isSelected = answers[q.id] === optId;
-
-                                            return (
-                                                <button 
-                                                    key={optId} 
-                                                    onClick={() => handleAnswer(q.id, optId)} 
-                                                    className={`w-full p-5 text-left rounded-2xl border-2 transition-all font-bold flex justify-between items-center group shadow-sm active:scale-[0.98] ${isSelected ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-900 dark:text-indigo-200 ring-4 ring-indigo-500/20' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/50 bg-slate-50 dark:bg-slate-950'}`}
-                                                >
-                                                    <div className="flex items-center gap-4">
-                                                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors shadow-inner ${isSelected ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-600 dark:bg-indigo-500 text-white' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400 bg-white dark:bg-slate-900'}`}>
-                                                            {isSelected && <Check size={14} strokeWidth={4} />}
-                                                        </div>
-                                                        <span className="text-[15px] leading-relaxed">{optText}</span>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                                
-                                {qType === 'boolean' && (
-                                    <div className="flex gap-4">
-                                        {['true', 'false'].map((val) => {
-                                            const isSelected = answers[q.id] === val;
-                                            return (
-                                                <button 
-                                                    key={val} 
-                                                    onClick={() => handleAnswer(q.id, val)} 
-                                                    className={`flex-1 p-6 rounded-2xl border-2 font-black text-lg capitalize transition-all flex items-center justify-center gap-3 shadow-sm active:scale-[0.98] ${isSelected ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-900 dark:text-indigo-200 ring-4 ring-indigo-500/20' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/50 bg-slate-50 dark:bg-slate-950'}`}
-                                                >
-                                                    {isSelected && <CheckCircle2 size={24} className="text-indigo-600 dark:text-indigo-400" />}
-                                                    {val}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                                
-                                {qType === 'essay' && (
-                                    <div className={`rounded-2xl border-2 transition-all duration-300 overflow-hidden shadow-inner ${answers[q.id] ? 'border-indigo-300 dark:border-indigo-500/50 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950'}`}>
-                                        <textarea 
-                                            className="w-full p-6 bg-transparent outline-none h-48 resize-none font-medium text-slate-700 dark:text-slate-200 text-base md:text-lg transition-all" 
-                                            placeholder="Type your response here..." 
-                                            value={answers[q.id] || ''} 
-                                            onChange={(e) => handleAnswer(q.id, e.target.value)}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                                return (
+                                    <button 
+                                        key={optId} 
+                                        onClick={() => handleAnswer(q.id, optId)} 
+                                        className={`w-full p-5 text-left rounded-2xl border-2 transition-all font-bold flex justify-between items-center group shadow-sm active:scale-[0.98] ${isSelected ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-900 dark:text-indigo-200 ring-4 ring-indigo-500/20' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/50 bg-slate-50 dark:bg-slate-950'}`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors shadow-inner ${isSelected ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-600 dark:bg-indigo-500 text-white' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400 bg-white dark:bg-slate-900'}`}>
+                                                {isSelected && <Check size={14} strokeWidth={4} />}
+                                            </div>
+                                            <span className="text-[15px] leading-relaxed">{optText}</span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                    
+                    {qType === 'boolean' && (
+                        <div className="flex gap-4">
+                            {['true', 'false'].map((val) => {
+                                const isSelected = answers[q.id] === val;
+                                return (
+                                    <button 
+                                        key={val} 
+                                        onClick={() => handleAnswer(q.id, val)} 
+                                        className={`flex-1 p-6 rounded-2xl border-2 font-black text-lg capitalize transition-all flex items-center justify-center gap-3 shadow-sm active:scale-[0.98] ${isSelected ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-900 dark:text-indigo-200 ring-4 ring-indigo-500/20' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/50 bg-slate-50 dark:bg-slate-950'}`}
+                                    >
+                                        {isSelected && <CheckCircle2 size={24} className="text-indigo-600 dark:text-indigo-400" />}
+                                        {val}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                    
+                    {qType === 'essay' && (
+                        <div className={`rounded-2xl border-2 transition-all duration-300 overflow-hidden shadow-inner ${answers[q.id] ? 'border-indigo-300 dark:border-indigo-500/50 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950'}`}>
+                            <textarea 
+                                className="w-full p-6 bg-transparent outline-none h-48 resize-none font-medium text-slate-700 dark:text-slate-200 text-base md:text-lg transition-all" 
+                                placeholder="Type your response here..." 
+                                value={answers[q.id] || ''} 
+                                onChange={(e) => handleAnswer(q.id, e.target.value)}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
             
-            {/* STICKY FOOTER */}
+            {/* PAGINATION FOOTER */}
             <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl p-6 border-t border-slate-200 dark:border-slate-800 absolute bottom-0 left-0 right-0 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] dark:shadow-none pb-safe-6">
-                <div className="max-w-3xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-                    <p className={`text-[10px] font-black uppercase tracking-widest hidden md:flex items-center gap-2 ${answeredCount === totalQuestions ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                        {answeredCount === totalQuestions ? <><CheckCircle2 size={16}/> Ready to submit.</> : <><AlertTriangle size={16}/> Complete all active questions.</>}
-                    </p>
-                    <button 
-                        onClick={() => setShowConfirm(true)} 
-                        className={`w-full md:w-auto px-10 py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${answeredCount === totalQuestions ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/30' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'}`}
-                    >
-                        {isProgressive ? 'Finalize Phase' : 'Submit Assessment'} <Send size={18}/>
-                    </button>
+                <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+                    
+                    {currentBlockIdx > 0 ? (
+                        <button 
+                            onClick={() => setCurrentBlockIdx(prev => prev - 1)} 
+                            className="px-6 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700"
+                        >
+                            <ArrowLeft size={16} /> <span className="hidden sm:inline">Back</span>
+                        </button>
+                    ) : (
+                        <div className="w-24" /> // Spacer for flex alignment
+                    )}
+
+                    {!isLastQuestion ? (
+                        <button 
+                            onClick={() => setCurrentBlockIdx(prev => prev + 1)} 
+                            className="px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-500/30 flex items-center gap-2 transition-all active:scale-95 ml-auto"
+                        >
+                            Next <ArrowRight size={16} />
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={() => setShowConfirm(true)} 
+                            className={`px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl flex items-center gap-2 transition-all active:scale-95 ml-auto ${answeredCount === totalQuestions ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/30' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'}`}
+                        >
+                            {isProgressive ? 'Finalize Phase' : 'Submit'} <Send size={16} />
+                        </button>
+                    )}
+
                 </div>
             </div>
         </div>
