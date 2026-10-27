@@ -13,7 +13,7 @@ import {
     Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2,
     Triangle, Circle, XCircle, X, ArrowDownCircle, Settings, Sparkles,
     Layers, HelpCircle, PlayCircle, BookText, Highlighter, PenTool,
-    AlignLeft, Save
+    AlignLeft, Save, Clock, AlertTriangle
 } from 'lucide-react';
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
@@ -115,7 +115,6 @@ const ReadingAnnotator = ({ reading, onExit, theme }: any) => {
     const [annotations, setAnnotations] = useState<Record<number, string>>({});
     const [draftNote, setDraftNote] = useState("");
 
-    // Fallback content if the reading object doesn't have an explicit content array
     const paragraphs = useMemo(() => {
         if (Array.isArray(reading?.content)) return reading.content;
         if (typeof reading?.content === 'string') return reading.content.split('\n').filter((p: string) => p.trim() !== '');
@@ -965,16 +964,16 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
 // ============================================================================
 export default function StudentClassView({ 
     classData, lessons = [], curriculums = [], allDecks = {}, onBack, 
-    onSelectLesson, userData, setActiveTab, setSelectedLessonId, ExamPlayerView, onLogActivity 
+    onSelectLesson, userData, user, setActiveTab, setSelectedLessonId, ExamPlayerView, onLogActivity 
 }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades' | 'live' | 'readings'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
+  const [completionLogs, setCompletionLogs] = useState<any[]>([]);
   const [liveSession, setLiveSession] = useState<any>(null);
   
   const [activeDeck, setActiveDeck] = useState<any>(null);
   const [activeReading, setActiveReading] = useState<any>(null);
   
-  // 🔥 EXTRACT CORRECT INITIAL ROADMAP ID FOR STATE
   const initialCurrId = classData?.assignedCurriculums?.[0];
   const initialExpandedId = typeof initialCurrId === 'object' ? (initialCurrId.curriculumId || initialCurrId.id) : initialCurrId;
 
@@ -983,19 +982,27 @@ export default function StudentClassView({
   });
   
   const theme = getSubjectTheme(classData?.subject);
-  const safeEmail = (userData?.email || auth?.currentUser?.email || 'unknown').replace(/\./g, ',');
+  const studentEmail = user?.email || userData?.email || auth?.currentUser?.email || '';
+  const safeEmail = (studentEmail || 'unknown').replace(/\./g, ',');
 
   // COHORT LOGIC: Extract cohort ID from user
   const studentCohortId = userData?.cohortId;
 
+  // 🔥 FIXED: Listen to completion logs using the resolved studentEmail (including user?.email and auth?.currentUser?.email)
   useEffect(() => {
-    if (!classData || !userData?.email) return;
-    const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('studentEmail', '==', userData.email), where('type', '==', 'completion'));
+    if (!classData || !studentEmail) return;
+    const q = query(
+        collection(db, 'artifacts', appId, 'activity_logs'), 
+        where('studentEmail', '==', studentEmail), 
+        where('type', '==', 'completion')
+    );
     return onSnapshot(q, (snapshot) => {
-      const ids = snapshot.docs.flatMap(d => [d.data().itemId, d.data().originalId, d.data().itemTitle].filter(Boolean));
+      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setCompletionLogs(docs);
+      const ids = docs.flatMap((d: any) => [d.itemId, d.originalId, d.itemTitle].filter(Boolean));
       setCompletedItems(ids);
     });
-  }, [classData, userData]);
+  }, [classData, studentEmail]);
 
   useEffect(() => {
     if (!classData?.id) return;
@@ -1035,7 +1042,6 @@ export default function StudentClassView({
   const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
   const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
 
-  // Filter content by cohort
   const relevantAssignments = rawAssignments.filter((assignment: any) => {
       if (typeof assignment === 'string') return true; 
       if (assignment.cohortId && studentCohortId) return assignment.cohortId === studentCohortId;
@@ -1050,17 +1056,16 @@ export default function StudentClassView({
       return true;
   });
 
-  // Map to fully hydrated nodes
   const populatedAssignments = relevantAssignments.map((assignment: any) => {
       const targetId = typeof assignment === 'string' ? assignment : (assignment.lessonId || assignment.contentId || assignment.id);
       
       let node = lessons.find((l: any) => l.id === targetId);
-      if (node) return typeof assignment === 'object' ? { ...node, ...assignment } : node;
+      if (node) return typeof assignment === 'object' ? { ...node, ...assignment, id: node.id || targetId } : node;
       
       let deck = allDecks?.[targetId] || Object.values(allDecks || {}).find((d: any) => d.id === targetId);
       if (deck) {
           return {
-              id: deck.id,
+              id: deck.id || targetId,
               title: deck.title || deck.name,
               contentType: 'deck',
               type: 'deck', 
@@ -1069,7 +1074,6 @@ export default function StudentClassView({
           };
       }
 
-      // Fallback
       if (typeof assignment === 'object' && (assignment.title || assignment.name)) return assignment;
       return null;
   }).filter(Boolean);
@@ -1082,9 +1086,29 @@ export default function StudentClassView({
 
   const standaloneLessons = populatedAssignments.filter((a: any) => !(a.contentType === 'exam' || a.contentType === 'test' || a.type === 'reading') && !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id)));
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
-  
-  // 🔥 Extract Readings
   const readingsList = populatedAssignments.filter((a: any) => a.type === 'reading' || a.contentType === 'reading');
+
+  // Helper to match an item to its completion log or userData.completedAssignments
+  const getExamCompletionLog = (item: any) => {
+      const itemIds = [item.id, item.lessonId, item.contentId, item.originalId].filter(Boolean);
+      return completionLogs.find((l: any) => 
+          (l.itemId && itemIds.includes(l.itemId)) || 
+          (item.title && l.itemTitle === item.title)
+      );
+  };
+
+  const isExamCompleted = (item: any) => {
+      const log = getExamCompletionLog(item);
+      if (log) return true;
+      const itemIds = [item.id, item.lessonId, item.contentId, item.title].filter(Boolean);
+      const userCompleted = userData?.completedAssignments || [];
+      return itemIds.some(id => completedItems.includes(id) || userCompleted.includes(id));
+  };
+
+  // 🔥 CALCULATE AVAILABLE (UNCOMPLETED) EXAMS FOR BADGES
+  const availableExamsCount = useMemo(() => {
+      return examList.filter((exam: any) => !isExamCompleted(exam)).length;
+  }, [examList, completionLogs, completedItems, userData?.completedAssignments]);
 
   const allClassNodeIds = Array.from(new Set([
       ...populatedAssignments.map((a:any) => a.id),
@@ -1092,7 +1116,7 @@ export default function StudentClassView({
   ]));
 
   const totalNodesCount = allClassNodeIds.length;
-  const completedClassNodes = allClassNodeIds.filter(id => completedItems.includes(id)).length;
+  const completedClassNodes = allClassNodeIds.filter(id => completedItems.includes(id) || (userData?.completedAssignments || []).includes(id)).length;
   const overallProgress = totalNodesCount > 0 ? Math.round((completedClassNodes / totalNodesCount) * 100) : 0;
 
   const isImmersiveLiveMode = activeSubTab === 'live' && liveSession;
@@ -1135,7 +1159,7 @@ export default function StudentClassView({
                     <ConnectFourRemote 
                         liveSession={liveSession} 
                         classId={classData.id} 
-                        studentEmail={userData?.email || auth?.currentUser?.email} 
+                        studentEmail={studentEmail} 
                         onLogActivity={onLogActivity}
                         userData={userData} 
                     />
@@ -1145,7 +1169,7 @@ export default function StudentClassView({
                         lessons={lessons} 
                         allDecks={allDecks} 
                         classId={classData.id} 
-                        studentEmail={userData?.email || auth?.currentUser?.email} 
+                        studentEmail={studentEmail} 
                         onLogActivity={onLogActivity}
                         userData={userData} 
                     />                  
@@ -1168,13 +1192,24 @@ export default function StudentClassView({
                     <ArrowLeft size={18} />
                 </button>
                 <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="px-2 py-0.5 bg-black/20 text-white rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-widest backdrop-blur-md shadow-inner truncate max-w-[100px]">
                             {classData?.grade || 'General'}
                         </span>
                         <span className="px-2 py-0.5 bg-white/20 text-white rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm truncate max-w-[100px]">
                             {classData?.subject || 'Subject'}
                         </span>
+                        {/* 🔥 NEW: HEADER EXAM AVAILABLE BADGE */}
+                        {availableExamsCount > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveSubTab('exams')}
+                                className="px-2.5 py-0.5 bg-rose-500 hover:bg-rose-400 text-white rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest shadow-lg shadow-rose-500/40 flex items-center gap-1 animate-pulse transition-all active:scale-95 border border-white/30"
+                            >
+                                <FileText size={10} strokeWidth={3} />
+                                {availableExamsCount} {availableExamsCount === 1 ? 'Exam Available' : 'Exams Available'}
+                            </button>
+                        )}
                     </div>
                     <h1 className="text-white font-black text-lg md:text-2xl uppercase tracking-tighter leading-none truncate">
                         {classData.name}
@@ -1202,6 +1237,34 @@ export default function StudentClassView({
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20 pt-6">
 
+        {/* OPTIONAL BANNER IF EXAM IS AVAILABLE AND STUDENT IS ON LESSONS TAB */}
+        {availableExamsCount > 0 && activeSubTab === 'lessons' && (
+            <div className="px-4 max-w-xl mx-auto mb-6 animate-in slide-in-from-top-2 duration-300">
+                <button
+                    type="button"
+                    onClick={() => setActiveSubTab('exams')}
+                    className="w-full p-4 rounded-[2rem] bg-rose-50/90 dark:bg-rose-950/40 backdrop-blur-xl border-2 border-rose-200 dark:border-rose-500/30 shadow-md hover:shadow-lg flex items-center justify-between gap-4 transition-all group active:scale-[0.99]"
+                >
+                    <div className="flex items-center gap-3.5 text-left">
+                        <div className="w-10 h-10 rounded-2xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                            <FileText size={18} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 dark:text-rose-400 block">
+                                Assessment Ready
+                            </span>
+                            <p className="text-sm font-black text-slate-800 dark:text-white leading-tight">
+                                You have {availableExamsCount} {availableExamsCount === 1 ? 'exam' : 'exams'} available to take
+                            </p>
+                        </div>
+                    </div>
+                    <div className="px-3.5 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shrink-0 group-hover:bg-rose-600 transition-colors">
+                        View <ChevronRight size={14} strokeWidth={3} />
+                    </div>
+                </button>
+            </div>
+        )}
+
         {liveSession && activeSubTab !== 'live' && (
             <div className="px-4 mb-8 animate-in slide-in-from-top-4 fade-in duration-500">
                 <button onClick={() => setActiveSubTab('live')} className="w-full bg-slate-900 dark:bg-black rounded-[2rem] p-1 shadow-[0_0_40px_rgba(99,102,241,0.3)] relative overflow-hidden group">
@@ -1226,7 +1289,6 @@ export default function StudentClassView({
 
         {activeSubTab === 'lessons' && (
           <div className="animate-in fade-in slide-in-from-bottom-4">
-             {/* 1. RENDER CURRICULUMS IF THEY EXIST */}
              {assignedCurriculums.length > 0 && (
                  <section className="space-y-8 mb-10 max-w-xl mx-auto">
                      {assignedCurriculums.map((curr: any) => (
@@ -1235,7 +1297,6 @@ export default function StudentClassView({
                  </section>
              )}
              
-             {/* 2. RENDER STANDALONE LESSONS IF THEY EXIST */}
              {standaloneLessons.length > 0 && (
                  <section className="space-y-4 mb-10 px-4 max-w-xl mx-auto">
                      {assignedCurriculums.length > 0 && (
@@ -1246,12 +1307,11 @@ export default function StudentClassView({
                          </div>
                      )}
                      {standaloneLessons.map((item: any) => (
-                         <StandaloneAssignmentCard key={item.id} item={item} isCompleted={completedItems.includes(item.id)} onSelectLesson={onSelectLesson} theme={theme} />
+                         <StandaloneAssignmentCard key={item.id} item={item} isCompleted={completedItems.includes(item.id) || (userData?.completedAssignments || []).includes(item.id)} onSelectLesson={onSelectLesson} theme={theme} />
                      ))}
                  </section>
              )}
 
-             {/* 3. ONLY SHOW EMPTY STATE IF BOTH ARE EMPTY */}
              {assignedCurriculums.length === 0 && standaloneLessons.length === 0 && (
                 <div className="text-center p-12 bg-white/50 dark:bg-slate-900/30 backdrop-blur-md rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800 m-4 transition-colors duration-300">
                     <Map size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
@@ -1295,31 +1355,68 @@ export default function StudentClassView({
             </section>
         )}
 
-        {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
+        {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={studentEmail} />}
+        
+        {/* 🔥 UPDATED EXAMS TAB: Passes isCompleted and examLog to ExamCard */}
         {activeSubTab === 'exams' && (
-          <section className="space-y-4 px-4 max-w-xl mx-auto">
-            {examList.length === 0 ? <div className="text-center py-20 opacity-40"><FileText size={48} className="mx-auto mb-4 text-slate-800 dark:text-slate-100" /><p className="font-black text-xs uppercase tracking-widest leading-loose text-slate-800 dark:text-slate-100">No active exams assigned.</p></div> : examList.map((item: any) => <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} />)}
+          <section className="space-y-4 px-4 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4">
+            {examList.length === 0 ? (
+                <div className="text-center py-20 opacity-40">
+                    <FileText size={48} className="mx-auto mb-4 text-slate-800 dark:text-slate-100" />
+                    <p className="font-black text-xs uppercase tracking-widest leading-loose text-slate-800 dark:text-slate-100">No active exams assigned.</p>
+                </div>
+            ) : (
+                examList.map((item: any, idx: number) => {
+                    const log = getExamCompletionLog(item);
+                    const completed = isExamCompleted(item);
+                    return (
+                        <ExamCard 
+                            key={item.id || item.lessonId || idx} 
+                            item={item} 
+                            onSelectLesson={onSelectLesson} 
+                            isCompleted={completed}
+                            examLog={log}
+                        />
+                    );
+                })
+            )}
           </section>
         )}
+
         {activeSubTab === 'forum' && <div className="h-[70vh]"><ClassForum classId={classData.id} userData={userData} /></div>}
-        {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
+        {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={user || userData} />}
       </main>
 
-      {/* THE SENSUAL BOTTOM NAV */}
+      {/* THE SENSUAL BOTTOM NAV (WITH EXAM NOTIFICATION BADGE) */}
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[650px] z-[100] px-2">
           <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-2 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/40 dark:border-white/10 flex items-center justify-between gap-1 transition-colors duration-300 ring-1 ring-white/20 dark:ring-white/5">
             {[
-              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} /> },
-              { id: 'readings', label: 'Readings', icon: <BookText size={18} /> },
-              { id: 'leaderboard', label: 'Ranks', icon: <Trophy size={18} /> },
-              { id: 'exams', label: 'Exams', icon: <FileText size={18} /> },
-              { id: 'forum', label: 'Forum', icon: <MessageSquare size={18} /> },
-              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18} /> }
+              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} />, badge: 0 },
+              { id: 'readings', label: 'Readings', icon: <BookText size={18} />, badge: 0 },
+              { id: 'leaderboard', label: 'Ranks', icon: <Trophy size={18} />, badge: 0 },
+              { id: 'exams', label: 'Exams', icon: <FileText size={18} />, badge: availableExamsCount },
+              { id: 'forum', label: 'Forum', icon: <MessageSquare size={18} />, badge: 0 },
+              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18} />, badge: 0 }
             ].map((tab) => {
               const isActive = activeSubTab === tab.id;
               return (
-                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-col flex-1 items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.6)] ring-2 ring-indigo-400/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}>
-                  {tab.icon}
+                <button 
+                    key={tab.id} 
+                    onClick={() => setActiveSubTab(tab.id as any)} 
+                    className={`relative flex flex-col flex-1 items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.6)] ring-2 ring-indigo-400/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                >
+                  <div className="relative">
+                      {tab.icon}
+                      {tab.badge > 0 && (
+                          <span className={`absolute -top-2 -right-2.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-black flex items-center justify-center shadow-sm border ${
+                              isActive 
+                                  ? 'bg-white text-indigo-600 border-indigo-200' 
+                                  : 'bg-rose-500 text-white border-white dark:border-slate-900 animate-bounce'
+                          }`}>
+                              {tab.badge}
+                          </span>
+                      )}
+                  </div>
                   {isActive && <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap animate-in zoom-in">{tab.label}</span>}
                 </button>
               );
@@ -1460,43 +1557,77 @@ const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: 
     </button>
 );
 
-// Inside src/components/StudentClassView.tsx
-// Update your ExamCard component at the very bottom of the file:
+// ============================================================================
+//  EXAM CARD (Greyed-Out When Completed + Live Score Badge)
+// ============================================================================
+const ExamCard = ({ item, onSelectLesson, isCompleted, examLog }: any) => {
+    const scoreDetail = examLog?.scoreDetail;
+    const isPending = scoreDetail?.status === 'pending_review';
+    const score = scoreDetail?.score ?? examLog?.xp ?? 0;
+    const total = scoreDetail?.total ?? 100;
+    const pct = scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score / total) * 100) : 100);
 
-const ExamCard = ({ item, onSelectLesson, isCompleted }: any) => (
-    <button 
-        disabled={isCompleted}
-        className={`w-full text-left p-6 border transition-all group duration-300 relative overflow-hidden flex items-center gap-5 rounded-[3rem] ${
-            isCompleted 
-            ? 'border-slate-300 bg-slate-50 cursor-not-allowed opacity-75 grayscale shadow-none' 
-            : 'border-rose-200 dark:border-rose-500/20 bg-rose-50/80 dark:bg-rose-900/20 backdrop-blur-xl shadow-xl hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.02]'
-        }`} 
-        onClick={() => !isCompleted && onSelectLesson(item)}
-    >
-      <div className={`absolute top-0 left-0 w-2 h-full ${isCompleted ? 'bg-slate-400' : 'bg-rose-500'}`} />
-      
-      <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shrink-0 transition-colors duration-300 relative z-10 shadow-lg border ${
-          isCompleted 
-          ? 'bg-slate-200 text-slate-500 border-slate-300' 
-          : 'bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 border-rose-100 dark:border-rose-500/20'
-      }`}>
-          {isCompleted ? <CheckCircle2 size={28} /> : <Trophy size={28} fill="currentColor" />}
-      </div>
-      
-      <div className="relative z-10">
-          <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-2 inline-block transition-colors duration-300 border ${
-              isCompleted 
-              ? 'text-slate-500 bg-slate-200 border-slate-300' 
-              : 'text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/20 border-rose-200 dark:border-rose-500/30'
-          }`}>
-              {isCompleted ? 'Completed' : 'High-Stakes Assessment'}
-          </span>
-          <h4 className="font-black text-slate-900 dark:text-white text-2xl leading-tight transition-colors tracking-tight">
-              {item.title}
-          </h4>
-      </div>
-    </button>
-);
+    return (
+        <button 
+            type="button"
+            disabled={isCompleted}
+            onClick={() => !isCompleted && onSelectLesson(item)}
+            className={`w-full text-left p-6 border-2 transition-all group duration-300 relative overflow-hidden flex items-center justify-between gap-5 rounded-[3rem] ${
+                isCompleted 
+                    ? 'border-slate-200 dark:border-slate-800 bg-slate-100/90 dark:bg-slate-900/50 cursor-not-allowed opacity-80 shadow-none' 
+                    : 'border-rose-200 dark:border-rose-500/20 bg-rose-50/80 dark:bg-rose-900/20 backdrop-blur-xl shadow-xl hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.02] cursor-pointer'
+            }`} 
+        >
+            <div className={`absolute top-0 left-0 w-2 h-full ${isCompleted ? 'bg-slate-400 dark:bg-slate-700' : 'bg-rose-500'}`} />
+            
+            <div className="flex items-center gap-5 min-w-0 flex-1">
+                <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shrink-0 transition-colors duration-300 relative z-10 shadow-lg border ${
+                    isCompleted 
+                        ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 grayscale' 
+                        : 'bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 border-rose-100 dark:border-rose-500/20'
+                }`}>
+                    {isCompleted ? <CheckCircle2 size={28} strokeWidth={2.5} /> : <Trophy size={28} fill="currentColor" />}
+                </div>
+                
+                <div className="relative z-10 min-w-0 flex-1">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-2 inline-block transition-colors duration-300 border ${
+                        isCompleted 
+                            ? 'text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700' 
+                            : 'text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/20 border-rose-200 dark:border-rose-500/30'
+                    }`}>
+                        {isCompleted ? 'Completed' : 'High-Stakes Assessment'}
+                    </span>
+                    <h4 className={`font-black text-xl md:text-2xl leading-tight transition-colors tracking-tight truncate ${
+                        isCompleted ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'
+                    }`}>
+                        {item.title}
+                    </h4>
+                </div>
+            </div>
 
-// Note: Ensure the rendering loop in StudentClassView passes isCompleted:
-// {examList.map((item: any) => <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} isCompleted={completedItems.includes(item.id)} />)}
+            {/* Score Pill when completed */}
+            {isCompleted && (
+                <div className="relative z-10 shrink-0 pl-2">
+                    {isPending ? (
+                        <div className="px-4 py-2.5 rounded-2xl bg-amber-100 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                            <Clock size={14} /> In Review
+                        </div>
+                    ) : (
+                        <div className={`px-4 py-2.5 rounded-2xl border-2 font-black shadow-sm flex flex-col items-end ${
+                            pct >= 70 
+                                ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400'
+                        }`}>
+                            <span className="text-xl leading-none tabular-nums">{pct}%</span>
+                            {scoreDetail && (
+                                <span className="text-[9px] uppercase tracking-widest opacity-75 mt-1 tabular-nums">
+                                    {score} / {total} PTS
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </button>
+    );
+};
