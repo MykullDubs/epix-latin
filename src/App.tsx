@@ -30,6 +30,7 @@ import BuilderHub from './components/instructor/BuilderHub';
 import ProfileView from './components/ProfileView';
 import AuthView from './components/AuthView';
 import ClassView from './components/ClassView';
+import ExamPlayerView from './components/ExamPlayerView'; // 🔥 IMPORTED EXAM PLAYER
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -374,7 +375,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
   
   const relevantAssignments = (assignments || [])
       .map((assignmentId: any) => {
-          // Handle string or object IDs (for cohort assignments)
           const targetId = typeof assignmentId === 'string' ? assignmentId : (assignmentId.lessonId || assignmentId.contentId || assignmentId.id);
           if (!targetId) return null;
 
@@ -396,7 +396,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
       .filter(Boolean)
       .filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email))
       .filter((l: any) => {
-          // Cohort Filtering at the global level
           if (l.cohortId && userData.cohortId) return l.cohortId === userData.cohortId;
           if (l.cohortId && !userData.cohortId) return false;
           return true;
@@ -529,11 +528,12 @@ function App() {
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   
+  // 🔥 NEW: MISSING GRADEBOOK & STUDIO ARRAYS THAT CAUSED CRASHES
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [curriculums, setCurriculums] = useState<any[]>([]);
 
   const [activeLesson, setActiveLesson] = useState<any>(null);
-  const [activeExam, setActiveExam] = useState<string | null>(null);
+  const [activeExam, setActiveExam] = useState<any | null>(null); // 🔥 FIXED TYPE TO ALLOW OBJECTS
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
   
   const [liveHostConfig, setLiveHostConfig] = useState<{ mode: string, contentId: string, classId: string } | null>(null);
@@ -576,6 +576,10 @@ function App() {
           setActiveTab('flashcards'); 
           setActiveStudentClass(null); 
           setActiveLesson(null); 
+      } else if (item && (item.contentType === 'exam' || item.contentType === 'test')) {
+          // 🔥 ROUTE EXAMS DIRECTLY TO THE EXAM PLAYER
+          setActiveExam(item);
+          setActiveLesson(null);
       } else { 
           setActiveLesson(item || { title: "Untitled Module", blocks: [] }); 
       } 
@@ -594,6 +598,7 @@ function App() {
     const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length > 0) setSystemDecks(d); });
     const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length > 0) setSystemLessons(l); });
 
+    // 🔥 NEW: LOAD GLOBAL LOGS AND CURRICULUMS FOR INSTRUCTORS TO PREVENT CRASHES
     const unsubCurriculums = onSnapshot(collection(db, 'artifacts', appId, 'curriculums'), (snap) => setCurriculums(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLogs = onSnapshot(query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(500)), (snap) => setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
@@ -620,27 +625,7 @@ function App() {
   const handleCreateCard = useCallback(async (c: any) => { if(!user) return; const cardId = doc(collection(db, 'artifacts', appId, 'custom_cards')).id; await setDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), {...c, id: cardId, instructorId: user.uid}); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); }, [user]);
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Delete card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId)); } catch (e) { console.error(e); } }, [user]);
-  
-  // 🔥 UPDATED TO PRESERVE PROGRESSIVE EXAM STATE
-  const handleCreateLesson = useCallback(async (l: any, id = null) => { 
-      if(!user) return; 
-      
-      const payload = { 
-          ...l, 
-          isProgressive: l.isProgressive || false,
-          phases: l.phases || [],
-          blocks: l.blocks || [],
-          instructorId: user.uid 
-      };
-
-      if (id) { 
-          await updateDoc(doc(db, 'artifacts', appId, 'custom_lessons', id), payload); 
-      } else { 
-          await addDoc(collection(db, 'artifacts', appId, 'custom_lessons'), payload); 
-      } 
-      setActiveTab('home'); 
-  }, [user]);
-
+  const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'custom_lessons'), { ...l, instructorId: user.uid }); } setActiveTab('home'); }, [user]);
   const handleCreateCurriculum = useCallback(async (c: any) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_curriculums'), c); }, [user]);
   const handleUpdatePreferences = useCallback(async (prefs: any) => { if (!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { deckPreferences: prefs }); setUserData((prev: any) => ({ ...prev, deckPreferences: prefs })); }, [user]);
   const handleDeleteDeck = useCallback(async (deckId: string) => { if(!user) return; if(!window.confirm("Delete this deck?")) return; try { const toDelete = customCards.filter(c => c.deckId === deckId); for(const c of toDelete) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', c.id)); } setSelectedDeckKey('custom'); } catch(e) { console.error(e); } }, [user, customCards]);
@@ -718,27 +703,20 @@ function App() {
       } catch (e) { console.error("Error removing student:", e); }
   }, [user]);
 
-  // 🔥 UPDATED TO SUPPORT COHORT ASSIGNMENTS
-  const handleAssign = useCallback(async (classId: string, payload: any) => {
+const handleAssign = useCallback(async (classId: string, payload: any) => {
       if (!user || !payload) return;
       
-      // Support raw strings or object payloads (with cohortId)
-      const assignmentObject = typeof payload === 'string' 
-          ? payload 
-          : { 
-              lessonId: payload.lessonId || payload.id, 
-              cohortId: payload.cohortId || null, 
-              assignedAt: Date.now() 
-            };
-            
-      if (!assignmentObject || (typeof assignmentObject === 'object' && !assignmentObject.lessonId)) {
+      // Safely extract the string ID whether it came from the dashboard (string) or modal (object)
+      const targetId = typeof payload === 'string' ? payload : (payload.id || payload.lessonId || payload.contentId);
+      
+      if (!targetId) {
           console.warn("Invalid assignment payload:", payload);
           return;
       }
 
       try { 
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
-              assignments: arrayUnion(assignmentObject) 
+              assignments: arrayUnion(targetId) 
           }); 
       } catch (e) { 
           console.error("Error assigning lesson:", e); 
@@ -747,14 +725,7 @@ function App() {
 
   const handleRevoke = useCallback(async (classId: string, lessonId: string) => {
       if (!user) return;
-      try { 
-          // Note: If using object assignments, this might need to map and filter 
-          // the array instead of using arrayRemove if the object references differ.
-          // For now, if passed a string, we attempt arrayRemove.
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
-              assignments: arrayRemove(lessonId) 
-          }); 
-      } 
+      try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { assignments: arrayRemove(lessonId) }); } 
       catch (e) { console.error("Error revoking lesson:", e); }
   }, [user]);
 
@@ -809,6 +780,19 @@ function App() {
                   <ArrowLeft size={14} strokeWidth={2.5} /> Exit
               </button>
               <PrepositionExam />
+          </div>
+      );
+  } else if (activeExam && typeof activeExam === 'object') {
+      // 🔥 ROUTE EXAM OBJECTS TO EXAMPLAYERVIEW
+      return (
+          <div className="relative min-h-screen w-full bg-white">
+              <ExamPlayerView 
+                  exam={activeExam} 
+                  onFinish={(id: string, xp: number, title: string, scoreDetail: any) => {
+                      setActiveExam(null);
+                      handleFinishLesson(id, xp, title, scoreDetail);
+                  }} 
+              />
           </div>
       );
   }
