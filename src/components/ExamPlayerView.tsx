@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
     FileText, Clock, CheckCircle2, AlertTriangle, 
-    Send, Check, AlignLeft, Flag, XCircle, ArrowRight, ArrowLeft
+    Send, Check, AlignLeft, Flag, ArrowRight, ArrowLeft, HelpCircle
 } from 'lucide-react';
 
 // ============================================================================
-//  EXAM PLAYER (Flat UI + Paginated Progressive State Machine)
+//  EXAM PLAYER (Unified Frosted UI + Paginated Progressive State Machine)
 // ============================================================================
 export default function ExamPlayerView({ exam, onFinish }: any) {
     const [started, setStarted] = useState(false);
@@ -24,15 +24,19 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
     const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
     
     // --- TIMER STATE ---
-    const [timeLeft, setTimeLeft] = useState((exam.duration || 30) * 60);
+    const [timeLeft, setTimeLeft] = useState((exam?.duration || 30) * 60);
 
-    // Map the active questions based on whether it's progressive or a legacy flat exam
-    const activeBlocks = isProgressive ? (exam.phases[currentPhaseIdx]?.blocks || []) : (exam.questions || exam.blocks || []);
+    // Map the active questions based on whether it's progressive or a standard flat exam
+    const activeBlocks = isProgressive 
+        ? (exam.phases[currentPhaseIdx]?.blocks || []) 
+        : (exam?.questions || exam?.blocks || []);
     const totalQuestions = activeBlocks.length;
     
+    // Safe index clamping in case phase changes dynamically
+    const safeBlockIdx = Math.min(currentBlockIdx, Math.max(0, totalQuestions - 1));
     const answeredCount = activeBlocks.filter((b: any) => answers[b.id] !== undefined && answers[b.id] !== '').length;
-    const progressPct = totalQuestions > 0 ? ((currentBlockIdx + 1) / totalQuestions) * 100 : 0;
-    const isLastQuestion = currentBlockIdx === totalQuestions - 1;
+    const progressPct = totalQuestions > 0 ? ((safeBlockIdx + 1) / totalQuestions) * 100 : 0;
+    const isLastQuestion = safeBlockIdx >= totalQuestions - 1;
 
     // --- TIMER LOGIC ---
     useEffect(() => {
@@ -56,7 +60,22 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
 
     const handleAnswer = (qId: string, val: any) => {
         if (submitted) return;
-        setAnswers({ ...answers, [qId]: val });
+        setAnswers((prev: any) => ({ ...prev, [qId]: val }));
+    };
+
+    // --- CLEAN PAGINATION HANDLERS ---
+    const handlePrevQuestion = () => {
+        setCurrentBlockIdx((prev) => Math.max(0, prev - 1));
+    };
+
+    const handleNextQuestion = () => {
+        setCurrentBlockIdx((prev) => Math.min(totalQuestions - 1, prev + 1));
+    };
+
+    // Helper to extract bracketed target words from fill-in-the-blank text
+    const extractBracketTargets = (text: string = '') => {
+        const matches = text.match(/\[(.*?)\]/g);
+        return matches ? matches.map(m => m.slice(1, -1)) : [];
     };
 
     // --- EVALUATION ENGINE ---
@@ -74,11 +93,24 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
             let awarded = 0;
 
             const qType = q.type || 'multiple-choice';
+            let correctReference: any = q.correctAnswer || q.correctId || q.content?.correctId || null;
 
-            // Support legacy flat exams and new unified blocks
             if (qType === 'multiple-choice' || qType === 'boolean' || qType === 'quiz') {
-                const correctRef = q.correctAnswer || q.correctId || q.content?.correctId;
-                if (String(studentVal) === String(correctRef)) { 
+                if (String(studentVal) === String(correctReference)) { 
+                    awarded = points;
+                    isCorrect = true;
+                }
+                // Map option ID to readable text for the gradebook if applicable
+                const opts = q.options || q.content?.options || [];
+                const foundStudentOpt = opts.find((o: any) => (typeof o === 'object' ? o.id === studentVal : o === studentVal));
+                const foundCorrectOpt = opts.find((o: any) => (typeof o === 'object' ? o.id === correctReference : o === correctReference));
+                if (foundCorrectOpt && typeof foundCorrectOpt === 'object') {
+                    correctReference = foundCorrectOpt.text;
+                }
+            } else if (qType === 'fill-blank') {
+                const targets = extractBracketTargets(q.content?.text || q.prompt || '');
+                correctReference = targets.join(', ');
+                if (studentVal && String(studentVal).trim().toLowerCase() === String(targets[0] || '').trim().toLowerCase()) {
                     awarded = points;
                     isCorrect = true;
                 }
@@ -87,13 +119,21 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
                 awarded = 0; 
             }
 
+            // Readable student value for multiple-choice option objects
+            let displayStudentVal = studentVal || "(No Answer)";
+            if (qType === 'quiz' || qType === 'multiple-choice') {
+                const opts = q.options || q.content?.options || [];
+                const matchedOpt = opts.find((o: any) => typeof o === 'object' && o.id === studentVal);
+                if (matchedOpt) displayStudentVal = matchedOpt.text;
+            }
+
             details.push({ 
                 qId: q.id, 
                 type: qType, 
-                prompt: q.prompt || q.title || q.content?.question, 
+                prompt: q.prompt || q.title || q.content?.question || q.content?.text || 'Question Prompt', 
                 maxPoints: points, 
-                studentVal: studentVal || "(No Answer)", 
-                correctVal: q.correctAnswer || q.correctId || q.content?.correctId || null, 
+                studentVal: displayStudentVal, 
+                correctVal: correctReference, 
                 awardedPoints: awarded, 
                 isCorrect,
                 teacherFeedback: "" 
@@ -122,9 +162,8 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
             const currentPhaseData = exam.phases[currentPhaseIdx];
             const passed = phaseScorePct >= (currentPhaseData.passingThreshold || 80);
             
-            let nextId = passed ? currentPhaseData.nextPhaseId : currentPhaseData.fallbackPhaseId;
+            const nextId = passed ? currentPhaseData.nextPhaseId : currentPhaseData.fallbackPhaseId;
             
-            // If there is a valid routing ID, find its index and navigate there
             if (nextId) {
                 const nextIndex = exam.phases.findIndex((p: any) => p.id === nextId);
                 if (nextIndex !== -1) {
@@ -147,7 +186,7 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
             finalScorePct,
             status: finalStatus,
             details: newHistory.flatMap(h => h.details),
-            phaseHistory: newHistory // Store the exact routing path taken
+            phaseHistory: newHistory
         };
 
         setScoreDetail(finalResultPayload);
@@ -158,57 +197,67 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
 
     if (!exam || totalQuestions === 0) return null;
 
-    // --- SCREEN 1: INTRO SCREEN ---
+    // ========================================================================
+    // SCREEN 1: INTRO SCREEN (Scrollable when description is long)
+    // ========================================================================
     if (!started) {
         return (
-            <div className="h-[100dvh] overflow-y-auto custom-scrollbar bg-zinc-100 dark:bg-zinc-950 animate-in fade-in duration-300">
-                {/* min-h-full + padding ensures it centers if short, but scrolls if tall */}
-                <div className="min-h-full flex items-center justify-center p-4 py-12">
-                    <div className="bg-white dark:bg-black max-w-xl w-full border-2 border-zinc-900 dark:border-zinc-200 p-6 sm:p-8 text-center relative shadow-sm">
+            <div className="h-[100dvh] w-full overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-950 animate-in fade-in duration-500 transition-colors">
+                <div className="min-h-full flex items-center justify-center p-6 py-12">
+                    <div className="bg-white dark:bg-slate-900 max-w-xl w-full rounded-[3rem] shadow-2xl border border-slate-100 dark:border-slate-800 p-8 sm:p-10 text-center relative overflow-hidden">
+                        <div className="absolute top-0 left-0 right-0 h-3 bg-indigo-500" />
                         
-                        <div className="w-20 h-20 bg-black text-white border-2 border-zinc-900 dark:border-zinc-200 flex items-center justify-center mx-auto mb-6">
-                            <FileText size={40} strokeWidth={2.5} />
+                        <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inner border border-indigo-100 dark:border-indigo-500/20">
+                            <FileText size={48} strokeWidth={2.5} />
                         </div>
                         
-                        <h1 className="text-3xl font-black text-zinc-950 dark:text-white mb-2 uppercase tracking-tighter leading-tight">
+                        <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white mb-3 tracking-tight leading-tight">
                             {exam.title}
                         </h1>
-                        
+
                         {isProgressive && (
-                            <span className="inline-block bg-indigo-600 text-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
-                                Adaptive Assessment Protocol
+                            <span className="inline-block bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100 dark:border-indigo-500/20 mb-4 shadow-sm">
+                                Adaptive Assessment
                             </span>
                         )}
 
-                        <div className="max-h-[30vh] overflow-y-auto custom-scrollbar mb-8 px-2">
-                            <p className="text-zinc-600 dark:text-zinc-400 font-bold leading-relaxed text-sm">
-                                {exam.description || "You are about to begin this assessment. Ensure a stable connection before proceeding."}
+                        <div className="max-h-[32vh] overflow-y-auto custom-scrollbar mb-8 px-4">
+                            <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed text-sm md:text-base">
+                                {exam.description || "You are about to begin this assessment. Please ensure you have a stable connection and enough time."}
                             </p>
                         </div>
                         
-                        <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
-                            <div className="border-2 border-zinc-900 dark:border-zinc-200 flex-1 py-4">
-                                <span className="block text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Time Limit</span>
-                                <span className="text-xl font-black text-zinc-900 dark:text-white flex items-center gap-2 justify-center">
-                                    <Clock size={18} className="text-indigo-600"/> {exam.duration || 30} MIN
+                        <div className="flex flex-col sm:flex-row justify-center gap-4 mb-10 px-2">
+                            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex-1 py-5 rounded-2xl shadow-sm">
+                                <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Time Limit</span>
+                                <span className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2 justify-center">
+                                    <Clock size={20} className="text-indigo-500"/> {exam.duration || 30} min
                                 </span>
                             </div>
-                            <div className="border-2 border-zinc-900 dark:border-zinc-200 flex-1 py-4">
-                                <span className="block text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">
-                                    {isProgressive ? 'Initial Nodes' : 'Questions'}
+                            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex-1 py-5 rounded-2xl shadow-sm">
+                                <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                                    {isProgressive ? 'Phase 1 Questions' : 'Questions'}
                                 </span>
-                                <span className="text-xl font-black text-zinc-900 dark:text-white">
-                                    {String(totalQuestions).padStart(2, '0')}
+                                <span className="text-2xl font-black text-slate-800 dark:text-white">
+                                    {totalQuestions}
                                 </span>
                             </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <button onClick={() => onFinish(null, 0)} className="w-full sm:w-auto py-4 sm:px-6 font-black text-zinc-500 hover:text-black dark:hover:text-white bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors uppercase tracking-[0.2em] text-xs">
+                        <div className="flex flex-col sm:flex-row gap-4 px-2">
+                            <button 
+                                type="button"
+                                onClick={() => onFinish(null, 0)} 
+                                className="w-full sm:w-auto py-5 sm:px-8 font-black text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl transition-colors uppercase tracking-widest text-xs active:scale-95"
+                            >
                                 Cancel
                             </button>
-                            <button onClick={() => setStarted(true)} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-[0.2em] transition-colors text-xs flex items-center justify-center gap-2">
-                                Initialize Sequence <AlignLeft size={16} />
+                            <button 
+                                type="button"
+                                onClick={() => setStarted(true)} 
+                                className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-[0_10px_30px_rgba(99,102,241,0.3)] transition-all active:scale-95 text-sm flex items-center justify-center gap-3"
+                            >
+                                Begin Assessment <AlignLeft size={18} />
                             </button>
                         </div>
                     </div>
@@ -217,31 +266,38 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
         );
     }
 
-    // --- SCREEN 3: COMPLETED SCREEN ---
+    // ========================================================================
+    // SCREEN 3: COMPLETED SCREEN
+    // ========================================================================
     if (submitted) {
         return (
-            <div className="h-[100dvh] overflow-y-auto custom-scrollbar bg-zinc-100 dark:bg-zinc-950 animate-in zoom-in duration-200">
-                <div className="min-h-full flex items-center justify-center p-4 py-12">
-                    <div className="bg-white dark:bg-black p-8 text-center max-w-md w-full border-2 border-zinc-900 dark:border-zinc-200 relative shadow-sm">
+            <div className="h-[100dvh] w-full overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-950 animate-in zoom-in duration-300 transition-colors">
+                <div className="min-h-full flex items-center justify-center p-6 py-12">
+                    <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-2xl text-center max-w-md w-full border border-slate-100 dark:border-slate-800 relative overflow-hidden">
+                        <div className={`absolute top-0 left-0 right-0 h-3 ${scoreDetail.status === 'pending_review' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
                         
-                        <div className={`w-20 h-20 flex items-center justify-center mx-auto mb-6 border-4 ${scoreDetail.status === 'pending_review' ? 'bg-amber-400 border-black text-black' : 'bg-emerald-600 border-black text-white'}`}>
-                            {scoreDetail.status === 'pending_review' ? <Clock size={40} strokeWidth={2.5}/> : <CheckCircle2 size={40} strokeWidth={3}/>}
+                        <div className={`w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner border-2 ${scoreDetail.status === 'pending_review' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-500 border-amber-100 dark:border-amber-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 border-emerald-100 dark:border-emerald-500/20'}`}>
+                            {scoreDetail.status === 'pending_review' ? <Clock size={48} strokeWidth={2.5}/> : <CheckCircle2 size={48} strokeWidth={2.5}/>}
                         </div>
                         
-                        <h2 className="text-2xl font-black text-zinc-950 dark:text-white mb-2 uppercase tracking-tight">
-                            {scoreDetail.status === 'pending_review' ? 'Pending Review' : 'Sequence Terminated'}
+                        <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-3 tracking-tight">
+                            {scoreDetail.status === 'pending_review' ? 'Under Review' : 'Assessment Submitted'}
                         </h2>
                         
-                        <div className="bg-zinc-100 dark:bg-zinc-900 p-5 mb-8 border-2 border-zinc-900 dark:border-zinc-200 max-h-[30vh] overflow-y-auto custom-scrollbar">
-                            <p className="text-zinc-600 dark:text-zinc-400 font-bold leading-relaxed text-sm">
+                        <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl mb-8 border border-slate-100 dark:border-slate-800 shadow-sm">
+                            <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed text-sm">
                                 {scoreDetail.status === 'pending_review' 
-                                    ? "Written responses logged for instructor evaluation. Score pending." 
-                                    : `Final calculation complete. \nScore: ${scoreDetail.score} / ${scoreDetail.total}`}
+                                    ? "Your written answers have been sent to your instructor for grading. Your final score will be updated soon." 
+                                    : `You scored ${scoreDetail.score} out of ${scoreDetail.total} total points (${scoreDetail.finalScorePct}%).`}
                             </p>
                         </div>
 
-                        <button onClick={() => onFinish(null, 0)} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black font-black uppercase tracking-[0.2em] hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors text-xs">
-                            Return to Hub
+                        <button 
+                            type="button"
+                            onClick={() => onFinish(null, 0)} 
+                            className="w-full py-5 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-[0_10px_30px_rgba(0,0,0,0.1)] hover:scale-[1.02] active:scale-95 transition-all text-xs"
+                        >
+                            Return to Dashboard
                         </button>
                     </div>
                 </div>
@@ -249,117 +305,212 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
         );
     }
 
-    // --- SCREEN 2: ACTIVE EXAM (PAGINATED VIEW) ---
-    const q = activeBlocks[currentBlockIdx];
+    // ========================================================================
+    // SCREEN 2: ACTIVE EXAM (Paginated + Static Header/Footer + Grey Track)
+    // ========================================================================
+    const q = activeBlocks[safeBlockIdx];
+    if (!q) return null;
+
     const isAnswered = answers[q.id] !== undefined && answers[q.id] !== '';
     const qType = q.type || 'multiple-choice';
 
+    // Prepare fill-in-the-blank word bank if needed
+    const fillBlankText = q.content?.text || q.prompt || '';
+    const bracketTargets = qType === 'fill-blank' ? extractBracketTargets(fillBlankText) : [];
+    const wordBank = qType === 'fill-blank' 
+        ? Array.from(new Set([...bracketTargets, ...(q.content?.distractors || [])])) 
+        : [];
+    const promptWithBlank = qType === 'fill-blank'
+        ? fillBlankText.replace(/\[(.*?)\]/g, () => answers[q.id] ? `[ ${answers[q.id]} ]` : '_______')
+        : (q.prompt || q.title || q.content?.question);
+
     return (
-        <div className="h-[100dvh] flex flex-col bg-zinc-100 dark:bg-zinc-950 overflow-hidden relative animate-in fade-in duration-300">
+        <div className="h-[100dvh] w-full flex flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden relative animate-in fade-in duration-500 transition-colors">
             
             {/* SUBMIT CONFIRMATION MODAL */}
             {showConfirm && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/80 dark:bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-black w-full max-w-sm border-2 border-zinc-900 dark:border-zinc-200 p-8 text-center">
-                        <div className="w-16 h-16 bg-rose-600 text-white flex items-center justify-center mx-auto mb-6">
-                            <AlertTriangle size={32} strokeWidth={2.5} />
+                <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 p-8 text-center animate-in zoom-in-95 duration-200">
+                        <div className="w-20 h-20 bg-rose-50 dark:bg-rose-500/10 text-rose-500 border border-rose-100 dark:border-rose-500/20 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-inner">
+                            <AlertTriangle size={36} strokeWidth={2.5} />
                         </div>
-                        <h3 className="text-xl font-black text-zinc-950 dark:text-white mb-2 uppercase tracking-tight">
-                            {isProgressive ? 'Finalize Phase?' : 'Finalize Sequence?'}
+                        <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
+                            {isProgressive ? 'Complete Phase?' : 'Submit Assessment?'}
                         </h3>
-                        <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-8 font-bold">
-                            Cannot reverse data entry after this point.
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed font-medium px-2">
+                            {isProgressive 
+                                ? "Your answers for this phase will be locked and evaluated to determine your next phase."
+                                : "Final confirmation required. You cannot change your answers after this point."}
                         </p>
                         <div className="flex gap-3">
-                            <button onClick={() => setShowConfirm(false)} className="flex-1 py-4 bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 font-black uppercase tracking-[0.2em] text-[10px] hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors border-2 border-transparent">Cancel</button>
-                            <button onClick={evaluateSubmission} className="flex-1 py-4 bg-rose-600 hover:bg-rose-500 text-white font-black uppercase tracking-[0.2em] text-[10px] transition-colors border-2 border-rose-600">Execute</button>
+                            <button 
+                                type="button"
+                                onClick={() => setShowConfirm(false)} 
+                                className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95 border border-slate-200 dark:border-slate-700"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={evaluateSubmission} 
+                                className="flex-1 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-rose-500/30 transition-all active:scale-95 border border-rose-500/50"
+                            >
+                                Submit
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* STICKY HEADER (LOCKED TO TOP) */}
-            <header className="shrink-0 px-4 sm:px-6 py-4 bg-white dark:bg-black border-b-2 border-zinc-900 dark:border-zinc-200 z-30 flex justify-between items-center">
+            {/* LOCKED TOP HEADER */}
+            <header className="shrink-0 px-6 py-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800 z-30 flex justify-between items-center shadow-sm transition-colors">
                 <div className="flex flex-col min-w-0 pr-4">
-                    <h1 className="text-base sm:text-lg font-black text-zinc-950 dark:text-white uppercase tracking-tight truncate leading-none mb-1">
+                    <h1 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-tight leading-none mb-1 truncate">
                         {exam.title}
                     </h1>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
-                        <Flag size={12} className="text-indigo-600" /> 
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        <Flag size={12} className="text-indigo-500 shrink-0" /> 
                         <span className="truncate">
-                            {isProgressive ? exam.phases[currentPhaseIdx].title : 'Assessment Active'}
+                            {isProgressive ? exam.phases[currentPhaseIdx]?.title : 'Assessment Active'}
                         </span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4 shrink-0">
-                    <div className="hidden sm:flex items-center gap-2">
-                        <div className="w-24 h-2 bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
-                            <div className="h-full bg-indigo-600 transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+                    <div className="hidden md:flex items-center gap-3">
+                        <div className="w-32 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                            <div className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-500" style={{ width: `${progressPct}%` }} />
                         </div>
-                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] tabular-nums">
-                            {String(answeredCount).padStart(2, '0')}/{String(totalQuestions).padStart(2, '0')}
+                        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest tabular-nums">
+                            {safeBlockIdx + 1} / {totalQuestions}
                         </span>
                     </div>
 
-                    <div className={`px-3 py-2 font-black flex items-center gap-1.5 border-2 transition-colors ${timeLeft < 60 ? 'bg-rose-600 text-white border-rose-600 animate-pulse' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white border-transparent'}`}>
-                        <Clock size={14} className={timeLeft < 60 ? 'text-white' : 'text-zinc-500'} /> 
+                    <div className={`px-4 py-2.5 rounded-xl font-black flex items-center gap-2 border-2 shadow-sm transition-colors ${timeLeft < 60 ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30 animate-pulse' : 'bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
+                        <Clock size={16} className={timeLeft < 60 ? 'text-rose-500' : 'text-slate-400'} /> 
                         <span className="tabular-nums">{formatTime(timeLeft)}</span>
                     </div>
                 </div>
             </header>
 
-            {/* SCROLLABLE QUESTION AREA (BACKGROUND REMAINS GREY) */}
-            <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar flex flex-col justify-center">
-                <div key={q.id} className="w-full max-w-3xl mx-auto bg-white dark:bg-black p-6 md:p-10 border-2 shadow-sm transition-all duration-300 animate-in slide-in-from-right-8 fade-in border-zinc-300 dark:border-zinc-800">
-                    <div className="flex justify-between items-start mb-6 border-b-2 border-zinc-100 dark:border-zinc-900 pb-4">
-                        <span className={`text-[10px] font-black px-3 py-1 uppercase tracking-[0.2em] transition-colors border-2 ${isAnswered ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 border-transparent'}`}>
-                            Target {String(currentBlockIdx + 1).padStart(2, '0')}
+            {/* UNIFIED GREY BACKGROUND TRACK OUTSIDE THE QUESTION BOUNDARY */}
+            <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 custom-scrollbar bg-slate-100/80 dark:bg-slate-950 flex flex-col">
+                <div 
+                    key={`${currentPhaseIdx}_${q.id}`} 
+                    className={`w-full max-w-3xl my-auto mx-auto bg-white dark:bg-slate-900 p-6 sm:p-8 md:p-10 rounded-[2.5rem] border-2 shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-right-4 ${
+                        isAnswered 
+                            ? 'border-indigo-200 dark:border-indigo-500/50 shadow-[0_15px_35px_rgba(99,102,241,0.06)]' 
+                            : 'border-slate-200/80 dark:border-slate-800'
+                    }`}
+                >
+                    {/* Question Card Header */}
+                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                        <span className={`text-[10px] font-black px-4 py-2 rounded-xl uppercase tracking-widest shadow-sm transition-colors border ${
+                            isAnswered 
+                                ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' 
+                                : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                        }`}>
+                            Question {safeBlockIdx + 1} of {totalQuestions}
                         </span>
-                        <span className="text-[10px] font-black text-amber-500 bg-amber-100 dark:bg-amber-900/30 px-3 py-1 uppercase tracking-[0.2em]">
-                            {q.points || 10} PTS
+                        <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 px-3.5 py-2 rounded-xl shadow-sm uppercase tracking-widest">
+                            {q.points || 10} Points
                         </span>
                     </div>
                     
-                    <h3 className="text-xl md:text-2xl font-black text-zinc-900 dark:text-white mb-8 uppercase tracking-tight leading-snug">
-                        {q.prompt || q.content?.question}
+                    {/* Question Prompt */}
+                    <h3 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white mb-8 leading-snug tracking-tight">
+                        {promptWithBlank}
                     </h3>
                     
+                    {/* 1. MULTIPLE CHOICE / QUIZ */}
                     {(qType === 'multiple-choice' || qType === 'quiz') && (
                         <div className="space-y-3">
-                            {(q.options || q.content?.options || []).map((optData: any) => {
-                                const optId = typeof optData === 'string' ? optData : optData.id;
+                            {(q.options || q.content?.options || []).map((optData: any, oIdx: number) => {
+                                const optId = typeof optData === 'string' ? optData : (optData.id || `opt_${oIdx}`);
                                 const optText = typeof optData === 'string' ? optData : optData.text;
                                 const isSelected = answers[q.id] === optId;
 
                                 return (
                                     <button 
+                                        type="button"
                                         key={optId} 
                                         onClick={() => handleAnswer(q.id, optId)} 
-                                        className={`w-full p-4 text-left border-2 transition-colors font-bold flex justify-between items-center group ${isSelected ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100' : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-indigo-400 bg-white dark:bg-black'}`}
+                                        className={`w-full p-5 text-left rounded-2xl border-2 transition-all font-bold flex justify-between items-center group shadow-sm active:scale-[0.99] ${
+                                            isSelected 
+                                                ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-900 dark:text-indigo-200 ring-4 ring-indigo-500/15' 
+                                                : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/50 bg-slate-50/70 dark:bg-slate-950'
+                                        }`}
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-5 h-5 border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-zinc-300 dark:border-zinc-600 group-hover:border-indigo-400 bg-transparent'}`}>
-                                                {isSelected && <Check size={12} strokeWidth={4} />}
+                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors shadow-inner ${
+                                                isSelected 
+                                                    ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-600 dark:bg-indigo-500 text-white' 
+                                                    : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400 bg-white dark:bg-slate-900'
+                                            }`}>
+                                                {isSelected && <Check size={14} strokeWidth={4} />}
                                             </div>
-                                            <span className="text-sm md:text-base leading-snug">{optText}</span>
+                                            <span className="text-[15px] leading-relaxed">{optText}</span>
                                         </div>
                                     </button>
                                 );
                             })}
                         </div>
                     )}
+
+                    {/* 2. FILL-IN-THE-BLANK */}
+                    {qType === 'fill-blank' && (
+                        <div className="space-y-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                                Select or type the missing word:
+                            </span>
+                            {wordBank.length > 0 && (
+                                <div className="flex flex-wrap gap-3">
+                                    {wordBank.map((word: string, wIdx: number) => {
+                                        const isSelected = answers[q.id] === word;
+                                        return (
+                                            <button
+                                                type="button"
+                                                key={`${word}_${wIdx}`}
+                                                onClick={() => handleAnswer(q.id, word)}
+                                                className={`px-5 py-3.5 rounded-2xl border-2 font-black text-sm transition-all active:scale-95 shadow-sm ${
+                                                    isSelected
+                                                        ? 'border-indigo-500 bg-indigo-600 text-white ring-4 ring-indigo-500/20'
+                                                        : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 hover:border-indigo-300'
+                                                }`}
+                                            >
+                                                {word}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            <input
+                                type="text"
+                                placeholder="Or type your answer directly..."
+                                value={answers[q.id] || ''}
+                                onChange={(e) => handleAnswer(q.id, e.target.value)}
+                                className="w-full p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
+                            />
+                        </div>
+                    )}
                     
+                    {/* 3. TRUE / FALSE */}
                     {qType === 'boolean' && (
                         <div className="flex gap-4">
                             {['true', 'false'].map((val) => {
                                 const isSelected = answers[q.id] === val;
                                 return (
                                     <button 
+                                        type="button"
                                         key={val} 
                                         onClick={() => handleAnswer(q.id, val)} 
-                                        className={`flex-1 p-5 border-2 font-black text-sm uppercase tracking-[0.2em] transition-colors flex items-center justify-center gap-2 ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 hover:border-indigo-400 bg-white dark:bg-black'}`}
+                                        className={`flex-1 p-6 rounded-2xl border-2 font-black text-lg capitalize transition-all flex items-center justify-center gap-3 shadow-sm active:scale-[0.98] ${
+                                            isSelected 
+                                                ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-900 dark:text-indigo-200 ring-4 ring-indigo-500/20' 
+                                                : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/50 bg-slate-50 dark:bg-slate-950'
+                                        }`}
                                     >
+                                        {isSelected && <CheckCircle2 size={24} className="text-indigo-600 dark:text-indigo-400" />}
                                         {val}
                                     </button>
                                 );
@@ -367,48 +518,74 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
                         </div>
                     )}
                     
+                    {/* 4. ESSAY */}
                     {qType === 'essay' && (
-                        <textarea 
-                            className={`w-full p-5 bg-zinc-50 dark:bg-zinc-900 outline-none h-48 resize-none font-bold text-zinc-900 dark:text-zinc-100 text-sm md:text-base transition-colors border-2 ${answers[q.id] ? 'border-indigo-600' : 'border-zinc-200 dark:border-zinc-800 focus:border-indigo-400'}`} 
-                            placeholder="Enter transmission data here..." 
-                            value={answers[q.id] || ''} 
-                            onChange={(e) => handleAnswer(q.id, e.target.value)}
-                        />
+                        <div className="space-y-4">
+                            {q.content && typeof q.content === 'string' && q.title && (
+                                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    {q.content}
+                                </p>
+                            )}
+                            <div className={`rounded-2xl border-2 transition-all duration-300 overflow-hidden shadow-inner ${
+                                answers[q.id] 
+                                    ? 'border-indigo-300 dark:border-indigo-500/50 bg-indigo-50/30 dark:bg-indigo-900/10' 
+                                    : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950'
+                            }`}>
+                                <textarea 
+                                    className="w-full p-6 bg-transparent outline-none h-48 resize-none font-medium text-slate-700 dark:text-slate-200 text-base md:text-lg transition-all" 
+                                    placeholder="Type your response here..." 
+                                    value={answers[q.id] || ''} 
+                                    onChange={(e) => handleAnswer(q.id, e.target.value)}
+                                />
+                            </div>
+                        </div>
                     )}
                 </div>
             </main>
             
-            {/* STICKY FOOTER (LOCKED TO BOTTOM) */}
-            <footer className="shrink-0 bg-white dark:bg-black p-4 md:p-6 border-t-2 border-zinc-900 dark:border-zinc-200 z-30 pb-safe-6">
+            {/* STATIC LOCKED BOTTOM NAVIGATION FOOTER */}
+            <footer className="shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl p-4 sm:p-6 border-t border-slate-200/80 dark:border-slate-800 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-none pb-safe">
                 <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
                     
-                    {currentBlockIdx > 0 ? (
-                        <button 
-                            onClick={() => setCurrentBlockIdx(prev => prev - 1)} 
-                            className="px-6 py-4 bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 font-black uppercase tracking-[0.2em] text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2 border-2 border-transparent"
-                        >
-                            <ArrowLeft size={16} strokeWidth={2.5} /> <span className="hidden sm:inline">Back</span>
-                        </button>
-                    ) : (
-                        <div className="w-24" /> 
-                    )}
+                    <button 
+                        type="button"
+                        disabled={safeBlockIdx === 0}
+                        onClick={handlePrevQuestion} 
+                        className={`px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-2 border ${
+                            safeBlockIdx > 0
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 active:scale-95 cursor-pointer'
+                                : 'opacity-0 pointer-events-none'
+                        }`}
+                    >
+                        <ArrowLeft size={16} strokeWidth={2.5} /> <span className="hidden sm:inline">Back</span>
+                    </button>
+
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        {answeredCount} of {totalQuestions} Answered
+                    </div>
 
                     {!isLastQuestion ? (
                         <button 
-                            onClick={() => setCurrentBlockIdx(prev => prev + 1)} // This is safe, it will be overridden immediately below.
-                            onPointerDown={() => setCurrentBlockIdx(prev => prev + 1)} // Fix fast click on mobile
-                            className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-[0.2em] text-xs flex items-center gap-2 transition-colors ml-auto border-2 border-indigo-600"
+                            type="button"
+                            onClick={handleNextQuestion}
+                            className="px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-500/30 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
                         >
                             Next <ArrowRight size={16} strokeWidth={2.5} />
                         </button>
                     ) : (
                         <button 
+                            type="button"
                             onClick={() => setShowConfirm(true)} 
-                            className={`px-8 py-4 font-black uppercase tracking-[0.2em] text-xs flex items-center gap-2 transition-colors ml-auto border-2 ${answeredCount === totalQuestions ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-500 border-indigo-600 text-white'}`}
+                            className={`px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                                answeredCount === totalQuestions 
+                                    ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/30' 
+                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+                            }`}
                         >
-                            {isProgressive ? 'Finalize Phase' : 'Submit'} <Send size={16} strokeWidth={2.5} />
+                            {isProgressive ? 'Complete Phase' : 'Submit'} <Send size={16} strokeWidth={2.5} />
                         </button>
                     )}
+
                 </div>
             </footer>
         </div>
