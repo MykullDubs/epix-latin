@@ -385,18 +385,18 @@ export default function InstructorDashboard({
 
            {activeTab === 'vault' && (
              <InstructorVault 
-                  decks={allDecks} 
-                  lessons={lessons} 
-                  onDeleteArtifact={onDeleteArtifact} 
-                  onMoveToFolder={onMoveToFolder} 
-                  onLaunchLive={(id: string, type: string) => {
+                 decks={allDecks} 
+                 lessons={lessons} 
+                 onDeleteArtifact={onDeleteArtifact} 
+                 onMoveToFolder={onMoveToFolder} 
+                 onLaunchLive={(id: string, type: string) => {
                      setPreselectedContent({ id, type });
                      setIsLiveModalOpen(true);
-                  }}
-                  onEditArtifact={(id: string, type: string) => {
+                 }}
+                 onEditArtifact={(id: string, type: string) => {
                      setStudioTargetId(id); 
                      handleDrillDown('studio'); 
-                  }}
+                 }}
              />
            )}
 
@@ -484,12 +484,18 @@ export default function InstructorDashboard({
                    setIsLiveModalOpen(false);
                    setPreselectedContent(null);
                    
+                   // 🔥 NEW: Pass the full targeted assignment object to App.tsx
                    if (config.mode === 'assign' && config.classId !== 'sandbox') {
+                       const assignmentPayload = {
+                           lessonId: config.contentId,
+                           cohortId: config.cohortId || null // Capture the targeted cohort
+                       };
+
                        const isCurriculum = curriculums?.some((c: any) => c.id === config.contentId);
                        if (isCurriculum) {
-                           if (onAssignCurriculum) onAssignCurriculum(config.classId, config.fullItem || config.contentId);
+                           if (onAssignCurriculum) onAssignCurriculum(config.classId, assignmentPayload);
                        } else {
-                           if (onAssign) onAssign(config.classId, config.fullItem || config.contentId);
+                           if (onAssign) onAssign(config.classId, assignmentPayload);
                        }
                    } else {
                        setTimeout(() => {
