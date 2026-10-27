@@ -1,343 +1,383 @@
-// src/components/StudentGradebook.tsx
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db, appId, auth } from '../config/firebase';
-import { 
-    X, CheckCircle2, ClipboardList, FileText, MessageCircle, 
-    ChevronRight, BarChart3, Hexagon, Zap, Activity, Trophy, Target
-} from 'lucide-react';
+// src/components/instructor/InstructorGradebook.tsx
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, query, where, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { db, appId } from '../../config/firebase';
+import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target, User, Download, Clock, XCircle, Save } from 'lucide-react'; 
+import { JuicyToast } from '../Toast';
 
-// ============================================================================
-//  GRADE DETAIL MODAL (Student View)
-// ============================================================================
-function GradeDetailModal({ log, onClose }: any) {
-    if (!log) return null;
-    const { scoreDetail, itemTitle, xp } = log;
-    const isExam = scoreDetail && scoreDetail.details; 
+export default function InstructorGradebook({ classData }: any) {
+    const [logs, setLogs] = useState<any[]>([]);
+    const [viewType, setViewType] = useState<'exams' | 'all'>('exams'); 
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+    
+    // PRO-LMS: SpeedModerator State
+    const [reviewingLog, setReviewingLog] = useState<any | null>(null);
+    const [localScoreDetails, setLocalScoreDetails] = useState<any | null>(null);
 
-    // Check if ANY question in this exam has instructor feedback
-    const hasGlobalFeedback = scoreDetail?.details?.some((q: any) => q.teacherFeedback && q.teacherFeedback.trim() !== '');
+    // Track if edits have been made
+    const isDirty = useMemo(() => {
+        if (!reviewingLog || !localScoreDetails) return false;
+        return JSON.stringify(reviewingLog.scoreDetail) !== JSON.stringify(localScoreDetails);
+    }, [reviewingLog, localScoreDetails]);
+
+    useEffect(() => {
+        if(!classData?.assignments || !classData?.students) return;
+        
+        const studentEmails = classData.students.map((s: any) => typeof s === 'string' ? s : s.email).slice(0, 10);
+        
+        if (studentEmails.length === 0) return;
+
+        const q = query(
+            collection(db, 'artifacts', appId, 'activity_logs'), 
+            where('type', '==', 'completion'),
+            where('studentEmail', 'in', studentEmails),
+            orderBy('timestamp', 'desc')
+        );
+
+        const unsub = onSnapshot(q, (snapshot) => {
+            setLogs(snapshot.docs.map(d => ({ ...d.data(), id: d.id })));
+        });
+        return () => unsub();
+    }, [classData]);
+
+    const displayedAssignments = (classData?.assignments || []).filter((a: any) => 
+        viewType === 'all' || a.contentType === 'test' || a.contentType === 'exam'
+    );
+
+    // ========================================================================
+    // CSV DATA ESCAPER (The Enterprise Export Engine)
+    // ========================================================================
+    const exportToCSV = () => {
+        if (!classData?.students || classData.students.length === 0) {
+            setToastMsg("No students to export.");
+            return;
+        }
+
+        const headers = ['Student Name', 'Email'];
+        displayedAssignments.forEach((a: any) => headers.push(a.title));
+        headers.push('Cumulative GPA');
+
+        const rows = classData.students.map((studentObj: any) => {
+            const studentEmail = typeof studentObj === 'string' ? studentObj : studentObj.email;
+            const studentName = typeof studentObj === 'string' ? studentEmail.split('@')[0] : (studentObj.name || studentEmail.split('@')[0]);
+            
+            const rowData = [studentName, studentEmail];
+            let totalScore = 0;
+            let scoredAssignmentsCount = 0;
+
+            displayedAssignments.forEach((a: any) => {
+                const log = logs.find(l => l.studentEmail === studentEmail && (l.itemId === a.id || l.itemTitle === a.title));
+                if (log) {
+                    const pct = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
+                    rowData.push(`${pct}%`);
+                    totalScore += pct;
+                    scoredAssignmentsCount++;
+                } else {
+                    rowData.push('N/A');
+                }
+            });
+
+            const gpa = scoredAssignmentsCount === 0 ? 'N/A' : `${Math.round(totalScore / scoredAssignmentsCount)}%`;
+            rowData.push(gpa);
+
+            return rowData;
+        });
+
+        const csvContent = [
+            headers.map((h: any) => `"${String(h).replace(/"/g, '""')}"`).join(','),
+            ...rows.map((row: any[]) => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${classData.name || 'Magister_OS'}_Gradebook.csv`.replace(/\s+/g, '_'));
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setToastMsg("CSV Export Complete! 📊");
+    };
+
+    // --- SPEED MODERATOR LOGIC ---
+    const openModerator = (log: any) => {
+        setReviewingLog(log);
+        setLocalScoreDetails(JSON.parse(JSON.stringify(log.scoreDetail)));
+    };
+
+    const updateQuestionScore = (qId: string, newPoints: number) => {
+        if (!localScoreDetails) return;
+        const updatedDetails = localScoreDetails.details.map((q: any) => {
+            if (q.qId === qId) {
+                return { 
+                    ...q, 
+                    awardedPoints: Math.min(Math.max(0, newPoints), q.maxPoints),
+                    isCorrect: Math.min(Math.max(0, newPoints), q.maxPoints) === q.maxPoints
+                };
+            }
+            return q;
+        });
+
+        const newScore = updatedDetails.reduce((sum: number, q: any) => sum + q.awardedPoints, 0);
+        const newPct = localScoreDetails.total > 0 ? Math.round((newScore / localScoreDetails.total) * 100) : 0;
+
+        setLocalScoreDetails({
+            ...localScoreDetails,
+            score: newScore,
+            finalScorePct: newPct,
+            details: updatedDetails
+        });
+    };
+
+    const updateQuestionFeedback = (qId: string, text: string) => {
+        if (!localScoreDetails) return;
+        const updatedDetails = localScoreDetails.details.map((q: any) => {
+            if (q.qId === qId) return { ...q, teacherFeedback: text };
+            return q;
+        });
+        setLocalScoreDetails({ ...localScoreDetails, details: updatedDetails });
+    };
+
+    const releaseGrade = async () => {
+        if (!reviewingLog || !localScoreDetails) return;
+
+        try {
+            const logRef = doc(db, 'artifacts', appId, 'activity_logs', reviewingLog.id);
+            await setDoc(logRef, {
+                scoreDetail: { 
+                    ...localScoreDetails, 
+                    status: 'graded' 
+                },
+                xp: localScoreDetails.score, 
+                lastUpdated: Date.now()
+            }, { merge: true });
+
+            setToastMsg("Grades Saved & Published! 🎯");
+            setReviewingLog(null);
+            setLocalScoreDetails(null);
+        } catch (error) {
+            setToastMsg("Error saving grade.");
+        }
+    };
+
+    const getScoreCell = (studentEmail: string, assign: any) => {
+        let log = logs.find(l => l.studentEmail === studentEmail && (l.itemId === assign.id || l.itemTitle === assign.title));
+        if (!log) return <span className="text-slate-300 dark:text-slate-700">-</span>;
+        
+        const pct = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
+        
+        if (log.scoreDetail?.status === 'pending_review') {
+            return (
+                <button 
+                    onClick={() => openModerator(log)} 
+                    className="text-[10px] bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-all shadow-sm border border-amber-200 dark:border-amber-500/30 flex items-center justify-center gap-1.5 w-full active:scale-95"
+                >
+                    <AlertTriangle size={12} strokeWidth={3} /> Review
+                </button>
+            );
+        }
+        
+        const color = pct >= 90 ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20' : pct >= 70 ? 'text-indigo-700 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20' : 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20';
+        return (
+            <button 
+                onClick={() => openModerator(log)}
+                className={`text-xs font-black px-3 py-1.5 rounded-xl cursor-pointer transition-all w-full border shadow-sm active:scale-95 ${color} hover:ring-2 hover:ring-indigo-300 dark:hover:ring-indigo-500/50`}
+            >
+                {pct}%
+            </button>
+        );
+    };
 
     return (
-        <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-slate-950 w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
-                
-                {/* Header */}
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 rounded-t-3xl shrink-0">
-                    <div>
-                        <h2 className="text-xl font-black text-slate-800 dark:text-white">{itemTitle}</h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mt-1">{new Date(log.timestamp).toLocaleDateString()} • +{xp} XP</p>
+        <div className="relative animate-in fade-in duration-500 h-full flex overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans transition-colors">
+            {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
+
+            {/* MAIN TABLE AREA */}
+            <div className={`flex-1 flex flex-col p-6 transition-all duration-500 ${reviewingLog ? 'mr-[600px] opacity-30 pointer-events-none' : ''}`}>
+                <div className="flex justify-between items-center mb-6 shrink-0">
+                    <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-[1.25rem] border border-slate-300/50 dark:border-slate-700/50 shadow-inner">
+                        <button onClick={() => setViewType('exams')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'exams' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200 dark:border-slate-700' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Assessments Only</button>
+                        <button onClick={() => setViewType('all')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'all' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200 dark:border-slate-700' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Show All Logged Data</button>
                     </div>
-                    <button onClick={onClose} className="p-2 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shadow-sm"><X size={20}/></button>
+                    
+                    <button 
+                        onClick={exportToCSV}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:shadow-lg shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-2"
+                    >
+                        <Download size={16} strokeWidth={2.5} /> Export CSV
+                    </button>
                 </div>
 
-                {/* Body */}
-                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-white dark:bg-slate-950">
-                    {/* Score Hero */}
-                    <div className="flex flex-col items-center justify-center mb-8">
-                        <div className={`text-5xl font-black mb-2 ${scoreDetail?.finalScorePct >= 70 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
-                            {scoreDetail?.finalScorePct ?? 100}%
-                        </div>
-                        <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Final Score</div>
-                    </div>
-
-                    {/* Question Breakdown (Only if it's an Exam) */}
-                    {isExam && (
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Question Breakdown</h3>
-                            {scoreDetail.details.map((q: any, idx: number) => {
-                                const isEssay = q.type === 'essay';
-                                const hasPoints = q.awardedPoints > 0;
-                                const isConsideredCorrect = isEssay ? hasPoints : q.isCorrect;
-                                
-                                const boxColor = isConsideredCorrect ? 'border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-500/5' : 'border-rose-100 dark:border-rose-500/20 bg-rose-50/30 dark:bg-rose-500/5';
-                                const badgeColor = isConsideredCorrect ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400';
-                                const badgeLabel = isEssay ? (hasPoints ? 'Graded' : 'Needs Review') : (q.isCorrect ? 'Correct' : 'Incorrect');
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden overflow-x-auto custom-scrollbar flex-1 relative transition-colors">
+                    <table className="w-full text-left border-collapse whitespace-nowrap">
+                        <thead className="sticky top-0 z-20 bg-slate-950 shadow-md">
+                            <tr className="text-white">
+                                <th className="p-6 text-[10px] font-black uppercase tracking-widest sticky left-0 bg-slate-950 z-30 border-r border-white/10">Roster</th>
+                                {displayedAssignments.map((a: any) => (
+                                    <th key={a.id} className="p-6 text-[10px] font-black uppercase tracking-widest text-center min-w-[180px] border-r border-white/5 hover:bg-slate-900 transition-colors">
+                                        <div className={`text-[8px] mb-1.5 ${a.contentType === 'test' || a.contentType === 'exam' ? 'text-rose-400' : 'text-indigo-400'}`}>{a.contentType}</div>
+                                        <span className="truncate block w-full px-2" title={a.title}>{a.title}</span>
+                                    </th>
+                                ))}
+                                <th className="p-6 text-[10px] font-black uppercase tracking-widest text-right sticky right-0 bg-slate-950 z-30 border-l border-white/10">Cumulative GPA</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                            {(classData?.students || []).map((studentObj: any) => {
+                                const studentEmail = typeof studentObj === 'string' ? studentObj : studentObj.email;
+                                const studentName = typeof studentObj === 'string' ? studentEmail.split('@')[0] : (studentObj.name || studentEmail.split('@')[0]);
 
                                 return (
-                                    <div key={idx} className={`p-5 rounded-2xl border-2 ${boxColor}`}>
-                                        <div className="flex justify-between items-start mb-3">
-                                            <span className={`text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest ${badgeColor}`}>
-                                                {badgeLabel}
-                                            </span>
-                                            <span className="text-xs font-black text-slate-400">
-                                                {q.awardedPoints || 0} / {q.maxPoints} pts
-                                            </span>
-                                        </div>
-                                        <p className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4 leading-relaxed">{q.prompt}</p>
+                                    <tr key={studentEmail} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
+                                        <td className="p-6 font-black text-slate-800 dark:text-slate-200 text-sm sticky left-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 border-r border-slate-100 dark:border-slate-800 z-10 transition-colors">
+                                            {studentName}
+                                            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-bold lowercase truncate max-w-[140px] mt-1">{studentEmail}</div>
+                                        </td>
+                                        {displayedAssignments.map((a: any) => (
+                                            <td key={a.id} className="p-4 text-center align-middle border-r border-slate-50 dark:border-slate-800/30">
+                                                {getScoreCell(studentEmail, a)}
+                                            </td>
+                                        ))}
+                                        <td className="p-6 text-right sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 border-l border-slate-100 dark:border-slate-800 z-10 transition-colors">
+                                            {(() => {
+                                                let total = 0, count = 0;
+                                                displayedAssignments.forEach((a: any) => {
+                                                    const log = logs.find(l => l.studentEmail === studentEmail && (l.itemId === a.id || l.itemTitle === a.title));
+                                                    if (log) {
+                                                        const p = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
+                                                        total += p; count++;
+                                                    }
+                                                });
+                                                return count === 0 ? <span className="text-slate-300 dark:text-slate-700">--</span> : <span className="font-black text-slate-900 dark:text-white text-base bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">{Math.round(total / count)}%</span>;
+                                            })()}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* SPEED MODERATOR WIDE SIDE-PANEL */}
+            {reviewingLog && localScoreDetails && (
+                <div className="absolute inset-0 z-50 pointer-events-none flex justify-end">
+                    <div className="absolute inset-0 bg-slate-900/20 dark:bg-black/40 backdrop-blur-sm pointer-events-auto transition-opacity" onClick={() => { setReviewingLog(null); setLocalScoreDetails(null); }} />
+                    <aside className="w-full max-w-[600px] h-full bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-[-30px_0_60px_rgba(0,0,0,0.2)] flex flex-col animate-in slide-in-from-right duration-300 pointer-events-auto relative z-10 transition-colors">
+                        
+                        {/* PANEL HEADER */}
+                        <header className="p-8 bg-slate-950 text-white flex justify-between items-start shrink-0 border-b border-white/10 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 opacity-10 rounded-full blur-3xl pointer-events-none" />
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-2 text-indigo-400 mb-2">
+                                    <FileText size={14} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest truncate max-w-[300px]">{reviewingLog.itemTitle}</span>
+                                </div>
+                                <h2 className="text-2xl font-black tracking-tight">{reviewingLog.studentName || reviewingLog.studentEmail.split('@')[0]}</h2>
+                            </div>
+                            <button onClick={() => { setReviewingLog(null); setLocalScoreDetails(null); }} className="p-2.5 bg-white/10 hover:bg-rose-500 rounded-full transition-colors text-white active:scale-95 shadow-sm relative z-10"><X size={20} strokeWidth={3} /></button>
+                        </header>
+
+                        {/* PANEL TELEMETRY */}
+                        <div className="px-8 py-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0 transition-colors">
+                            <div>
+                                <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">Final Assessed Score</span>
+                                <div className="text-3xl font-black text-slate-900 dark:text-white flex items-baseline gap-1">
+                                    {localScoreDetails.score} <span className="text-lg text-slate-400 dark:text-slate-600">/ {localScoreDetails.total}</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                                {reviewingLog.scoreDetail.status === 'pending_review' && !isDirty ? (
+                                    <span className="px-2.5 py-1 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm border border-amber-200 dark:border-amber-500/30">
+                                        <Clock size={12} /> Needs Grading
+                                    </span>
+                                ) : (
+                                    <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm border border-emerald-200 dark:border-emerald-500/30">
+                                        <CheckCircle2 size={12} /> Graded
+                                    </span>
+                                )}
+                                <div className={`px-4 py-2 rounded-2xl font-black text-xl border-2 shadow-sm ${
+                                    localScoreDetails.finalScorePct >= 90 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30' :
+                                    localScoreDetails.finalScorePct >= 70 ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' :
+                                    'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30'
+                                }`}>
+                                    {localScoreDetails.finalScorePct}%
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* QUESTION LIST */}
+                        <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar bg-slate-50 dark:bg-slate-950 transition-colors">
+                            {localScoreDetails.details?.map((q: any, i: number) => {
+                                const isEssay = q.type === 'essay';
+                                const needsGrading = isEssay && reviewingLog.scoreDetail.status === 'pending_review';
+
+                                return (
+                                    <div key={i} className={`bg-white dark:bg-slate-900 rounded-[2.5rem] border p-6 shadow-sm transition-all ${needsGrading ? 'border-amber-400 dark:border-amber-500/50 shadow-[0_0_20px_rgba(251,191,36,0.15)] ring-4 ring-amber-50 dark:ring-amber-500/10' : 'border-slate-200 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
                                         
-                                        <div className="text-sm text-slate-700 dark:text-slate-300 bg-white/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200/50 dark:border-slate-700/50 mb-3 whitespace-pre-wrap font-serif">
-                                            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-2 font-sans">Your Answer</span>
-                                            {q.studentVal}
+                                        <div className="flex justify-between items-start mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                                            <span className={`text-[10px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm ${needsGrading ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
+                                                Q{i + 1} • {q.type}
+                                            </span>
+                                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 p-1.5 rounded-[1.25rem] border border-slate-200 dark:border-slate-800 shadow-inner">
+                                                <input 
+                                                    type="number"
+                                                    min="0"
+                                                    max={q.maxPoints}
+                                                    value={q.awardedPoints}
+                                                    onChange={(e) => updateQuestionScore(q.qId, parseInt(e.target.value) || 0)}
+                                                    className={`w-16 h-10 text-center font-black rounded-xl border-2 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-sm ${needsGrading ? 'border-amber-300 dark:border-amber-500/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
+                                                />
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 pr-3">/ {q.maxPoints} pts</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <h4 className="text-lg font-black text-slate-800 dark:text-white mb-6 leading-snug tracking-tight">{q.prompt}</h4>
+                                        
+                                        <div className="space-y-4">
+                                            <div className={`p-5 rounded-[1.5rem] shadow-sm border ${isEssay ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 text-indigo-900 dark:text-indigo-200' : (q.isCorrect ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20 text-emerald-800 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20 text-rose-800 dark:text-rose-300')}`}>
+                                                <span className="text-[9px] font-black uppercase tracking-widest opacity-50 block mb-2 flex items-center gap-1.5"><User size={12}/> Student Answer</span>
+                                                <p className={`text-sm leading-relaxed ${isEssay ? 'font-serif' : 'font-bold'}`}>{q.studentVal}</p>
+                                            </div>
+
+                                            {!isEssay && !q.isCorrect && q.correctVal && (
+                                                <div className="p-5 rounded-[1.5rem] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-50 block mb-2 flex items-center gap-1.5"><Target size={12}/> Correct Answer</span>
+                                                    <p className="text-sm font-bold">{q.correctVal}</p>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {!isConsideredCorrect && q.correctVal && !isEssay && (
-                                            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 mt-3 bg-emerald-50 dark:bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
-                                                <CheckCircle2 size={14}/> Correct Answer: {q.correctVal}
-                                            </div>
-                                        )}
-
-                                        {/* 🔥 PRO-LMS: PER-QUESTION FEEDBACK INJECTION */}
-                                        {q.teacherFeedback && (
-                                            <div className="mt-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 p-4 rounded-xl">
-                                                <span className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-1.5 mb-2">
-                                                    <MessageCircle size={12} /> Instructor Note
-                                                </span>
-                                                <p className="text-indigo-900 dark:text-indigo-200 font-medium italic leading-relaxed text-sm">
-                                                    "{q.teacherFeedback}"
-                                                </p>
-                                            </div>
-                                        )}
+                                        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 mb-3">
+                                                <MessageSquare size={14} className="text-indigo-500" /> Instructor Feedback
+                                            </label>
+                                            <textarea 
+                                                placeholder="Leave feedback for the student to review..."
+                                                value={q.teacherFeedback || ''}
+                                                onChange={(e) => updateQuestionFeedback(q.qId, e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-sm font-medium text-slate-700 dark:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none resize-none h-24 transition-all shadow-inner"
+                                            />
+                                        </div>
                                     </div>
                                 );
                             })}
                         </div>
-                    )}
+
+                        {/* PANEL FOOTER */}
+                        <footer className="p-6 md:p-8 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-end shrink-0 transition-colors shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-none">
+                            <button 
+                                onClick={releaseGrade}
+                                disabled={!isDirty && reviewingLog.scoreDetail.status !== 'pending_review'}
+                                className="w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:active:scale-100 active:scale-95 shadow-xl shadow-indigo-600/20"
+                            >
+                                <Save size={16} /> {reviewingLog.scoreDetail.status === 'pending_review' ? 'Finalize Grades' : isDirty ? 'Update Scores' : 'Grades Saved'}
+                            </button>
+                        </footer>
+                    </aside>
                 </div>
-
-                {/* Footer */}
-                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-3xl shrink-0">
-                    <button onClick={onClose} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.01] transition-transform">Close Report</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ============================================================================
-//  STUDENT GRADEBOOK
-// ============================================================================
-export default function StudentGradebook({ classData, user }: any) {
-    const [logs, setLogs] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedLog, setSelectedLog] = useState<any>(null);
-
-    const studentEmail = user?.email || auth?.currentUser?.email;
-
-    useEffect(() => {
-        if(!classData.assignments || classData.assignments.length === 0 || !studentEmail) { 
-            setLoading(false); 
-            return; 
-        }
-        
-        const q = query(
-            collection(db, 'artifacts', appId, 'activity_logs'), 
-            where('studentEmail', '==', studentEmail),
-            orderBy('timestamp', 'desc'),
-            limit(100)
-        );
-
-        const unsub = onSnapshot(q, (snapshot) => {
-            const allLogs = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
-            setLogs(allLogs);
-            setLoading(false);
-        });
-        return () => unsub();
-    }, [classData, studentEmail]);
-
-    // --- THE FILTER: Only show high-stakes items ---
-    const gradedAssignments = classData.assignments?.filter((a: any) => 
-        a.contentType === 'test' || a.contentType === 'exam'
-    ) || [];
-
-    const getGradeStatus = (assign: any) => {
-        let log = logs.find(l => l.itemId === assign.id && l.type === 'completion');
-        if (!log && assign.originalId) log = logs.find(l => l.itemId === assign.originalId && l.type === 'completion');
-        if (!log) log = logs.find(l => l.itemTitle === assign.title && l.type === 'completion');
-        
-        if (!log) return { status: 'missing', label: 'Not Taken', color: 'bg-slate-100 dark:bg-slate-800 text-slate-400', interactable: false };
-        
-        if (log.scoreDetail?.status === 'pending_review') {
-            return { status: 'pending', label: 'In Review', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400', interactable: true, log };
-        }
-              
-        const score = log.scoreDetail?.score || 0;
-        const total = log.scoreDetail?.total || 100;
-        const pct = log.scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score/total)*100) : 0);
-              
-        let color = 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
-        if (pct >= 90) color = 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400';
-        else if (pct >= 70) color = 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400';
-        else color = 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400';
-
-        const hasInstructorGrade = log.scoreDetail?.finalScorePct !== undefined;
-        const displayLabel = hasInstructorGrade ? `${pct}%` : `${score}/${total} pts`;
-
-        // 🔥 PRO-LMS: Check array for any feedback
-        const hasFeedback = log.scoreDetail?.details?.some((q: any) => q.teacherFeedback && q.teacherFeedback.trim() !== '');
-
-        return { status: 'complete', label: displayLabel, color, interactable: true, log, pct, hasFeedback };
-    };
-
-    // 🔥 DYNAMIC RPG STATS CALCULATIONS
-    const totalXp = user?.xp || user?.profile?.main?.xp || 0;
-    
-    // Calculate Average Exam Score
-    const examStatuses = gradedAssignments.map((a: any) => getGradeStatus(a)).filter((s: any) => s.status === 'complete');
-    const avgScore = examStatuses.length > 0 
-        ? Math.round(examStatuses.reduce((acc: number, curr: any) => acc + (curr.pct || 0), 0) / examStatuses.length) 
-        : 100; // Default to 100 if no exams taken
-
-    // Calculate a letter grade based on average exam score
-    let grade = "S";
-    let gradeColor = "text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.8)]";
-    if (avgScore < 100) { grade = "A"; gradeColor = "text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.8)]"; }
-    if (avgScore < 90) { grade = "B+"; gradeColor = "text-indigo-400 drop-shadow-[0_0_15px_rgba(99,102,241,0.8)]"; }
-    if (avgScore < 80) { grade = "B"; gradeColor = "text-blue-400 drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]"; }
-    if (avgScore < 70) { grade = "C"; gradeColor = "text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)]"; }
-    if (avgScore < 60) { grade = "D"; gradeColor = "text-rose-400 drop-shadow-[0_0_15px_rgba(244,63,94,0.8)]"; }
-
-    return (
-        <div className="space-y-6 px-2 md:px-6 pb-24 animate-in fade-in duration-500 max-w-4xl mx-auto">
-            {selectedLog && <GradeDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
-            
-            <div className="flex items-center justify-between mb-8 px-2 mt-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center shadow-inner border border-indigo-500/30">
-                        <BarChart3 size={20} />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Service Record</h2>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-0.5">Performance Analytics</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* 🔥 TOP STATS ROW */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl relative overflow-hidden flex flex-col items-center justify-center">
-                    <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Current Standing</span>
-                    <h3 className={`text-7xl font-black italic tracking-tighter ${gradeColor}`}>{grade}</h3>
-                </div>
-
-                <div className="md:col-span-2 bg-gradient-to-br from-indigo-900 to-slate-900 p-8 rounded-[2rem] shadow-xl relative overflow-hidden text-white border border-indigo-500/30">
-                    <div className="absolute right-0 top-0 opacity-10 pointer-events-none -mt-10 -mr-10"><Hexagon size={250} /></div>
-                    <div className="relative z-10 flex flex-col h-full justify-center">
-                        <div className="flex justify-between items-end mb-4">
-                            <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">Exam Average</span>
-                                <h3 className="text-4xl font-black">{avgScore}%</h3>
-                            </div>
-                            <div className="text-right">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">Total Lifetime XP</span>
-                                <div className="text-2xl font-black text-emerald-400 flex items-center gap-2 justify-end">
-                                    <Zap size={20} fill="currentColor" /> {totalXp.toLocaleString()}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-white/10 shadow-inner">
-                            <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.8)] transition-all duration-1000" style={{ width: `${avgScore}%` }} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* 🔥 DYNAMIC RECENT ACTIVITY LOG */}
-            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden mt-6">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex justify-between items-center">
-                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                        <Activity size={16} /> Recent Engagements
-                    </h3>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                    {logs.length === 0 ? (
-                        <div className="p-12 text-center text-slate-400 text-sm font-bold">No recent activity found. Jump into a module!</div>
-                    ) : (
-                        logs.slice(0, 4).map((log, i) => {
-                            // Map log properties to UI elements
-                            const isArena = log.itemTitle?.toLowerCase().includes('arena') || log.itemTitle?.toLowerCase().includes('battle') || log.details === 'Live Arena Protocol';
-                            const isExam = log.scoreDetail !== undefined;
-                            
-                            let icon = <CheckCircle2 size={20} />;
-                            let colorClass = 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-500';
-                            
-                            if (isArena) {
-                                icon = <Trophy size={20} />;
-                                colorClass = 'bg-amber-100 dark:bg-amber-500/20 text-amber-500';
-                            } else if (isExam) {
-                                icon = <Target size={20} />;
-                                colorClass = 'bg-rose-100 dark:bg-rose-500/20 text-rose-500';
-                            }
-
-                            const displayScore = isExam ? `${log.scoreDetail?.finalScorePct || 0}%` : 'Completed';
-                            const dateStr = new Date(log.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-
-                            return (
-                                <div key={i} className="p-5 md:p-6 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                                    <div className="flex items-center gap-4 overflow-hidden pr-4">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${colorClass}`}>
-                                            {icon}
-                                        </div>
-                                        <div className="truncate">
-                                            <h4 className="font-black text-sm md:text-base text-slate-800 dark:text-slate-100 truncate">{log.itemTitle}</h4>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{dateStr}</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                        <div className="font-black text-sm md:text-lg text-slate-800 dark:text-white">{displayScore}</div>
-                                        <div className="text-[10px] md:text-xs font-black text-emerald-500 tracking-widest">+{log.xp} XP</div>
-                                    </div>
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-            </div>
-            
-            {/* OFFICIAL REPORT CARD (EXAMS) */}
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
-                <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
-                    <h3 className="font-black text-slate-800 dark:text-white flex items-center gap-3">
-                        <div className="p-2 bg-indigo-500/10 text-indigo-500 rounded-lg"><ClipboardList size={20}/></div> 
-                        Official Report Card
-                    </h3>
-                    <p className="text-xs text-slate-500 font-bold mt-2 ml-12">High-Stakes Assessment Tracking</p>
-                </div>
-                
-                {gradedAssignments.length === 0 ? (
-                    <div className="p-16 text-center text-slate-400 text-sm font-bold">
-                        No exams have been assigned to this cohort yet.
-                    </div> 
-                ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                        {gradedAssignments.map((assign: any) => {
-                            const { label, color, interactable, log, hasFeedback } = getGradeStatus(assign);
-                            return (
-                                <button 
-                                    key={assign.id} 
-                                    disabled={!interactable} 
-                                    onClick={() => interactable && setSelectedLog(log)} 
-                                    className={`w-full p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors group text-left ${interactable ? 'hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer' : 'cursor-default'}`}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-sm">
-                                            <FileText size={24}/>
-                                        </div>
-                                        <div>
-                                            <h4 className="font-black text-slate-800 dark:text-slate-100 text-base md:text-lg mb-1">{assign.title}</h4>
-                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Final Assessment</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4 md:ml-auto">
-                                        <div className="text-right">
-                                            <span className={`px-4 py-2 rounded-full text-xs font-black shadow-sm ${color}`}>{label}</span>
-                                            {/* 🔥 PRO-LMS: DYNAMIC FEEDBACK BADGE */}
-                                            {hasFeedback && (
-                                                <div className="flex items-center justify-end gap-1.5 mt-2 text-[10px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest">
-                                                    <MessageCircle size={12}/> Feedback Available
-                                                </div>
-                                            )}
-                                        </div>
-                                        {interactable && <ChevronRight size={20} className="text-slate-300 dark:text-slate-600 group-hover:text-indigo-500 transition-colors"/>}
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 }
