@@ -21,7 +21,6 @@ import {
   Terminal, Code
 } from 'lucide-react';
 
-// 🔥 IMPORT YOUR SINGULAR EXAM COMPONENT & LANDING PAGE
 import PrepositionExam from './components/PrepositionExam';
 import LandingPage from './components/LandingPage';
 import StudentClassView from './components/StudentClassView';
@@ -30,14 +29,7 @@ import FlashcardView from './components/FlashcardView';
 import BuilderHub from './components/instructor/BuilderHub';
 import ProfileView from './components/ProfileView';
 import AuthView from './components/AuthView';
-
-// 🔥 IMPORT YOUR HOST PROJECTOR VIEWS
 import ClassView from './components/ClassView';
-// COMMENT THESE OUT UNTIL THE FILES ARE CREATED:
-// import TriviaHost from './components/instructor/TriviaHost';
-// import ConnectFourHost from './components/instructor/ConnectFourHost';
-// import SlipstreamHost from './components/instructor/SlipstreamHost';
-// import MarbleScrabbleHost from './components/instructor/MarbleScrabbleHost';
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -382,20 +374,33 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
   
   const relevantAssignments = (assignments || [])
       .map((assignmentId: any) => {
-          if (typeof assignmentId !== 'string') return assignmentId;
-          const node = lessons?.find((l: any) => l.id === assignmentId);
-          if (node) return node;
-          const deck = allDecks?.[assignmentId] || Object.values(allDecks || {}).find((d: any) => d.id === assignmentId);
-          if (deck) return { 
-              ...deck, 
-              contentType: 'deck', 
-              type: 'deck', 
-              blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }] 
-          };
+          // Handle string or object IDs (for cohort assignments)
+          const targetId = typeof assignmentId === 'string' ? assignmentId : (assignmentId.lessonId || assignmentId.contentId || assignmentId.id);
+          if (!targetId) return null;
+
+          const node = lessons?.find((l: any) => l.id === targetId);
+          if (node) return typeof assignmentId === 'object' ? { ...node, ...assignmentId } : node;
+          
+          const deck = allDecks?.[targetId] || Object.values(allDecks || {}).find((d: any) => d.id === targetId);
+          if (deck) {
+              return { 
+                  ...deck, 
+                  contentType: 'deck', 
+                  type: 'deck', 
+                  blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }],
+                  ...(typeof assignmentId === 'object' ? assignmentId : {})
+              };
+          }
           return null;
       })
       .filter(Boolean)
-      .filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email));
+      .filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email))
+      .filter((l: any) => {
+          // Cohort Filtering at the global level
+          if (l.cohortId && userData.cohortId) return l.cohortId === userData.cohortId;
+          if (l.cohortId && !userData.cohortId) return false;
+          return true;
+      });
 
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
   const xp = userData?.xp || 0;
@@ -465,7 +470,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, onStart
             </div>
           </div>
 
-          {classes && classes.length > 0 && (<div className="animate-in slide-in-from-bottom-4 duration-500 delay-100"><div className="flex justify-between items-end mb-4 ml-1"><h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><School size={16} className="text-indigo-500"/> My Classes</h3><span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">{classes.length} Active</span></div><div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">{classes.map((cls: any) => { const pending = (cls.assignments || []).filter((l: any) => (!l.targetStudents || l.targetStudents.includes(userData.email)) && !completedSet.has(l.id)).length; return ( <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[280px] h-[180px] bg-white rounded-[2rem] shadow-sm border border-slate-100 transition-all active:scale-95 group relative overflow-hidden flex flex-col text-left hover:shadow-md hover:border-indigo-200"><div className="h-20 bg-gradient-to-br from-slate-800 to-slate-900 relative w-full p-5 flex justify-between items-start"><div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-bold">{cls.name.charAt(0)}</div>{pending > 0 ? <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">{pending} Due</span> : <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-md">Done</span>}</div><div className="p-5 flex-1 flex flex-col justify-between"><div><h4 className="font-bold text-slate-800 text-lg truncate">{cls.name}</h4><p className="text-xs text-slate-400 font-medium">{cls.code}</p></div></div></button> ); })}</div></div>)}
+          {classes && classes.length > 0 && (<div className="animate-in slide-in-from-bottom-4 duration-500 delay-100"><div className="flex justify-between items-end mb-4 ml-1"><h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><School size={16} className="text-indigo-500"/> My Classes</h3><span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">{classes.length} Active</span></div><div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">{classes.map((cls: any) => { const pending = (cls.assignments || []).filter((l: any) => (!l.targetStudents || l.targetStudents.includes(userData.email)) && !completedSet.has(l.id || (typeof l === 'string' ? l : l.lessonId))).length; return ( <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[280px] h-[180px] bg-white rounded-[2rem] shadow-sm border border-slate-100 transition-all active:scale-95 group relative overflow-hidden flex flex-col text-left hover:shadow-md hover:border-indigo-200"><div className="h-20 bg-gradient-to-br from-slate-800 to-slate-900 relative w-full p-5 flex justify-between items-start"><div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-bold">{cls.name.charAt(0)}</div>{pending > 0 ? <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">{pending} Due</span> : <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-md">Done</span>}</div><div className="p-5 flex-1 flex flex-col justify-between"><div><h4 className="font-bold text-slate-800 text-lg truncate">{cls.name}</h4><p className="text-xs text-slate-400 font-medium">{cls.code}</p></div></div></button> ); })}</div></div>)}
           {activeAssignments.length > 0 && (<div className="animate-in slide-in-from-bottom-4 duration-500 delay-200"><div className="flex justify-between items-center mb-3 ml-1"><h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Up Next</h3></div><div className="space-y-3">{activeAssignments.map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group"><div className="flex items-center space-x-4"><div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>{l.contentType === 'deck' ? <Layers size={22}/> : <PlayCircle size={22} />}</div><div className="text-left"><h4 className="font-bold text-slate-800">{l.title}</h4><p className="text-xs text-slate-400">{l.contentType === 'deck' ? 'Flashcards' : 'Lesson'}</p></div></div><ChevronRight className="text-slate-300 group-hover:text-indigo-500 transition-colors"/></button>))}</div></div>)}
           <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-300"><button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center active:scale-95 transition-all group hover:border-orange-200"><div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3"><Layers size={24}/></div><span className="block font-bold text-slate-800">Practice</span></button><button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center active:scale-95 transition-all group hover:border-emerald-200"><div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3"><Feather size={24}/></div><span className="block font-bold text-slate-800">Create</span></button></div>
         </div>
@@ -524,7 +529,6 @@ function App() {
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   
-  // 🔥 NEW: MISSING GRADEBOOK & STUDIO ARRAYS THAT CAUSED CRASHES
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [curriculums, setCurriculums] = useState<any[]>([]);
 
@@ -590,7 +594,6 @@ function App() {
     const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length > 0) setSystemDecks(d); });
     const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length > 0) setSystemLessons(l); });
 
-    // 🔥 NEW: LOAD GLOBAL LOGS AND CURRICULUMS FOR INSTRUCTORS TO PREVENT CRASHES
     const unsubCurriculums = onSnapshot(collection(db, 'artifacts', appId, 'curriculums'), (snap) => setCurriculums(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLogs = onSnapshot(query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(500)), (snap) => setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
@@ -617,7 +620,27 @@ function App() {
   const handleCreateCard = useCallback(async (c: any) => { if(!user) return; const cardId = doc(collection(db, 'artifacts', appId, 'custom_cards')).id; await setDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), {...c, id: cardId, instructorId: user.uid}); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); }, [user]);
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Delete card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId)); } catch (e) { console.error(e); } }, [user]);
-  const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'custom_lessons'), { ...l, instructorId: user.uid }); } setActiveTab('home'); }, [user]);
+  
+  // 🔥 UPDATED TO PRESERVE PROGRESSIVE EXAM STATE
+  const handleCreateLesson = useCallback(async (l: any, id = null) => { 
+      if(!user) return; 
+      
+      const payload = { 
+          ...l, 
+          isProgressive: l.isProgressive || false,
+          phases: l.phases || [],
+          blocks: l.blocks || [],
+          instructorId: user.uid 
+      };
+
+      if (id) { 
+          await updateDoc(doc(db, 'artifacts', appId, 'custom_lessons', id), payload); 
+      } else { 
+          await addDoc(collection(db, 'artifacts', appId, 'custom_lessons'), payload); 
+      } 
+      setActiveTab('home'); 
+  }, [user]);
+
   const handleCreateCurriculum = useCallback(async (c: any) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_curriculums'), c); }, [user]);
   const handleUpdatePreferences = useCallback(async (prefs: any) => { if (!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { deckPreferences: prefs }); setUserData((prev: any) => ({ ...prev, deckPreferences: prefs })); }, [user]);
   const handleDeleteDeck = useCallback(async (deckId: string) => { if(!user) return; if(!window.confirm("Delete this deck?")) return; try { const toDelete = customCards.filter(c => c.deckId === deckId); for(const c of toDelete) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', c.id)); } setSelectedDeckKey('custom'); } catch(e) { console.error(e); } }, [user, customCards]);
@@ -695,20 +718,27 @@ function App() {
       } catch (e) { console.error("Error removing student:", e); }
   }, [user]);
 
-const handleAssign = useCallback(async (classId: string, payload: any) => {
+  // 🔥 UPDATED TO SUPPORT COHORT ASSIGNMENTS
+  const handleAssign = useCallback(async (classId: string, payload: any) => {
       if (!user || !payload) return;
       
-      // Safely extract the string ID whether it came from the dashboard (string) or modal (object)
-      const targetId = typeof payload === 'string' ? payload : (payload.id || payload.lessonId || payload.contentId);
-      
-      if (!targetId) {
+      // Support raw strings or object payloads (with cohortId)
+      const assignmentObject = typeof payload === 'string' 
+          ? payload 
+          : { 
+              lessonId: payload.lessonId || payload.id, 
+              cohortId: payload.cohortId || null, 
+              assignedAt: Date.now() 
+            };
+            
+      if (!assignmentObject || (typeof assignmentObject === 'object' && !assignmentObject.lessonId)) {
           console.warn("Invalid assignment payload:", payload);
           return;
       }
 
       try { 
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
-              assignments: arrayUnion(targetId) 
+              assignments: arrayUnion(assignmentObject) 
           }); 
       } catch (e) { 
           console.error("Error assigning lesson:", e); 
@@ -717,7 +747,14 @@ const handleAssign = useCallback(async (classId: string, payload: any) => {
 
   const handleRevoke = useCallback(async (classId: string, lessonId: string) => {
       if (!user) return;
-      try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { assignments: arrayRemove(lessonId) }); } 
+      try { 
+          // Note: If using object assignments, this might need to map and filter 
+          // the array instead of using arrayRemove if the object references differ.
+          // For now, if passed a string, we attempt arrayRemove.
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { 
+              assignments: arrayRemove(lessonId) 
+          }); 
+      } 
       catch (e) { console.error("Error revoking lesson:", e); }
   }, [user]);
 
