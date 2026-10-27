@@ -1460,13 +1460,43 @@ const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: 
     </button>
 );
 
-const ExamCard = ({ item, onSelectLesson }: any) => (
-    <button className="w-full text-left p-6 border border-rose-200 dark:border-rose-500/20 bg-rose-50/80 dark:bg-rose-900/20 backdrop-blur-xl rounded-[3rem] flex items-center gap-5 transition-all group duration-300 shadow-xl hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.02] relative overflow-hidden" onClick={() => onSelectLesson(item)}>
-      <div className="absolute top-0 left-0 w-2 h-full bg-rose-500" />
-      <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 shadow-lg border border-rose-100 dark:border-rose-500/20 shrink-0 transition-colors duration-300 relative z-10"><Trophy size={28} fill="currentColor" /></div>
+// Inside src/components/StudentClassView.tsx
+// Update your ExamCard component at the very bottom of the file:
+
+const ExamCard = ({ item, onSelectLesson, isCompleted }: any) => (
+    <button 
+        disabled={isCompleted}
+        className={`w-full text-left p-6 border transition-all group duration-300 relative overflow-hidden flex items-center gap-5 rounded-[3rem] ${
+            isCompleted 
+            ? 'border-slate-300 bg-slate-50 cursor-not-allowed opacity-75 grayscale shadow-none' 
+            : 'border-rose-200 dark:border-rose-500/20 bg-rose-50/80 dark:bg-rose-900/20 backdrop-blur-xl shadow-xl hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.02]'
+        }`} 
+        onClick={() => !isCompleted && onSelectLesson(item)}
+    >
+      <div className={`absolute top-0 left-0 w-2 h-full ${isCompleted ? 'bg-slate-400' : 'bg-rose-500'}`} />
+      
+      <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shrink-0 transition-colors duration-300 relative z-10 shadow-lg border ${
+          isCompleted 
+          ? 'bg-slate-200 text-slate-500 border-slate-300' 
+          : 'bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 border-rose-100 dark:border-rose-500/20'
+      }`}>
+          {isCompleted ? <CheckCircle2 size={28} /> : <Trophy size={28} fill="currentColor" />}
+      </div>
+      
       <div className="relative z-10">
-          <span className="text-[9px] font-black uppercase text-rose-500 dark:text-rose-400 tracking-widest bg-rose-100 dark:bg-rose-500/20 px-3 py-1 rounded-full mb-2 inline-block transition-colors duration-300 border border-rose-200 dark:border-rose-500/30">High-Stakes Assessment</span>
-          <h4 className="font-black text-slate-900 dark:text-white text-2xl leading-tight transition-colors tracking-tight">{item.title}</h4>
+          <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-2 inline-block transition-colors duration-300 border ${
+              isCompleted 
+              ? 'text-slate-500 bg-slate-200 border-slate-300' 
+              : 'text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/20 border-rose-200 dark:border-rose-500/30'
+          }`}>
+              {isCompleted ? 'Completed' : 'High-Stakes Assessment'}
+          </span>
+          <h4 className="font-black text-slate-900 dark:text-white text-2xl leading-tight transition-colors tracking-tight">
+              {item.title}
+          </h4>
       </div>
     </button>
 );
+
+// Note: Ensure the rendering loop in StudentClassView passes isCompleted:
+// {examList.map((item: any) => <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} isCompleted={completedItems.includes(item.id)} />)}
