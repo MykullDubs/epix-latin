@@ -371,7 +371,7 @@ export const ChatDialogueBlock = ({ lines }: any) => {
 };
 
 // ============================================================================
-//  7. KINETIC CANVAS BLOCK (Storyline 360 Engine: States, Triggers & Sprites)
+//  7. KINETIC CANVAS BLOCK (Storyline 360: States, Slide Layers, Mini-Quizzes & Triggers)
 // ============================================================================
 export type KineticObjectState = 'normal' | 'selected' | 'drop_correct' | 'drop_incorrect' | 'hidden' | 'disabled';
 
@@ -379,15 +379,15 @@ export interface KineticEntity {
     id: string;
     label: string;
     sublabel?: string;
-    imageUrl?: string; // Optional imported sprite/image (URL or Base64)
+    imageUrl?: string;
     shape?: 'pill' | 'card' | 'image' | 'circle';
     color?: 'indigo' | 'emerald' | 'rose' | 'amber' | 'cyan' | 'slate';
     x: number;
     y: number;
-    width?: number; // Optional custom width in px
+    width?: number;
     scale: number;
     rotation: number;
-    draggable?: boolean; // Can be false for clickable buttons/hotspots
+    draggable?: boolean;
     initialState?: KineticObjectState;
     allowResize?: boolean;
     allowRotate?: boolean;
@@ -404,20 +404,47 @@ export interface KineticZone {
     y: number;
     width: number;
     height: number;
-    invisible?: boolean; // Act as an invisible hotspot over a background map
+    invisible?: boolean;
+}
+
+export interface KineticSlideLayerOption {
+    id: string;
+    text: string;
+}
+
+export interface KineticSlideLayer {
+    id: string;
+    name: string; // Internal layer name for Trigger Wizard (e.g., "Layer 1: Vault Inspection")
+    theme?: 'info' | 'success' | 'warning' | 'error' | 'quiz';
+    title: string;
+    body: string;
+    imageUrl?: string;
+    audioUrl?: string;
+    buttonLabel?: string;
+    // Optional embedded mini-quiz inside the Slide Layer
+    hasQuiz?: boolean;
+    quizQuestion?: string;
+    quizOptions?: KineticSlideLayerOption[];
+    correctOptionId?: string;
+    gateUntilCorrect?: boolean;
+    // Optional chained state change when the user closes this layer
+    onCloseAction?: 'hide_layer' | 'change_state' | 'complete_block';
+    onCloseTargetEntityId?: string;
+    onCloseTargetState?: KineticObjectState;
 }
 
 export interface KineticRule {
     id: string;
-    event?: 'on_drop' | 'on_click'; // Storyline Trigger "When"
-    entityId: string; // Source Object
-    zoneId: string; // Target Zone (for on_drop)
-    action?: 'reaction' | 'change_state' | 'move_to_zone' | 'complete_block'; // Storyline Trigger "Action"
-    targetEntityId?: string; // Object to change state or move
-    targetState?: KineticObjectState; // New state to apply
+    event?: 'on_drop' | 'on_click';
+    entityId: string;
+    zoneId: string;
+    action?: 'reaction' | 'change_state' | 'show_layer' | 'hide_layer' | 'move_to_zone' | 'complete_block';
+    targetEntityId?: string;
+    targetState?: KineticObjectState;
+    targetLayerId?: string; // Target Slide Layer to pop open
     reaction: 'bounce_glow' | 'chariot_march' | 'lever_tilt' | 'combine_flash' | 'shake_error';
     message: string;
-    isRequired?: boolean; // Whether this trigger is required for completion
+    isRequired?: boolean;
 }
 
 const KINETIC_COLORS: Record<string, string> = {
@@ -436,6 +463,39 @@ const KINETIC_BACKGROUNDS: Record<string, string> = {
     roman_road: 'bg-gradient-to-b from-amber-950 via-stone-900 to-slate-950',
     physics_lab: 'bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900',
     parchment: 'bg-gradient-to-br from-amber-50 via-orange-50/80 to-amber-100 text-slate-900'
+};
+
+const LAYER_THEME_STYLES: Record<string, { border: string; badge: string; headerBg: string; btn: string }> = {
+    info: {
+        border: 'border-indigo-400/50 dark:border-indigo-500/40',
+        badge: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30',
+        headerBg: 'from-indigo-600 to-cyan-500',
+        btn: 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/25'
+    },
+    success: {
+        border: 'border-emerald-400/50 dark:border-emerald-500/40',
+        badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30',
+        headerBg: 'from-emerald-500 to-teal-500',
+        btn: 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/25'
+    },
+    warning: {
+        border: 'border-amber-400/50 dark:border-amber-500/40',
+        badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',
+        headerBg: 'from-amber-500 to-orange-500',
+        btn: 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/25'
+    },
+    error: {
+        border: 'border-rose-400/50 dark:border-rose-500/40',
+        badge: 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30',
+        headerBg: 'from-rose-600 to-pink-600',
+        btn: 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/25'
+    },
+    quiz: {
+        border: 'border-indigo-400/60 dark:border-indigo-500/50',
+        badge: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/30',
+        headerBg: 'from-indigo-600 via-purple-600 to-pink-500',
+        btn: 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/25'
+    }
 };
 
 export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) => {
@@ -458,7 +518,11 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         return [];
     }, [block?.rules]);
 
-    // Build initial state map from each entity's initialState property
+    const layers: KineticSlideLayer[] = useMemo(() => {
+        if (Array.isArray(block?.layers)) return block.layers;
+        return [];
+    }, [block?.layers]);
+
     const buildInitialStateMap = (ents: KineticEntity[]) => {
         const map: Record<string, KineticObjectState> = {};
         ents.forEach(e => {
@@ -470,6 +534,11 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const [entities, setEntities] = useState<KineticEntity[]>(initialEntities);
     const [objectStates, setObjectStates] = useState<Record<string, KineticObjectState>>(() => buildInitialStateMap(initialEntities));
     const [firedRuleIds, setFiredRuleIds] = useState<string[]>([]);
+    const [completedLayerIds, setCompletedLayerIds] = useState<string[]>([]);
+    const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+    const [layerQuizSelected, setLayerQuizSelected] = useState<string | null>(null);
+    const [layerQuizSubmitted, setLayerQuizSubmitted] = useState(false);
+
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [snappedMap, setSnappedMap] = useState<Record<string, string>>({});
@@ -477,20 +546,69 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const [reactionBanner, setReactionBanner] = useState<string | null>(null);
     const [isVerified, setIsVerified] = useState(false);
 
-    // Sync when block props change in live preview
     useEffect(() => {
         setEntities(initialEntities);
         setObjectStates(buildInitialStateMap(initialEntities));
     }, [initialEntities]);
 
     useEffect(() => {
-        if (onStateChange) onStateChange({ entities, snappedMap, objectStates, isVerified });
-    }, [entities, snappedMap, objectStates, isVerified, onStateChange]);
+        if (onStateChange) onStateChange({ entities, snappedMap, objectStates, activeLayerId, isVerified });
+    }, [entities, snappedMap, objectStates, activeLayerId, isVerified, onStateChange]);
 
     const selectedEntity = entities.find(e => e.id === selectedId) || null;
+    const activeLayer = layers.find(l => l.id === activeLayerId) || null;
     const bgThemeKey = block?.backgroundTheme || 'grid';
     const customBgUrl = block?.backgroundUrl || '';
     const isLightTheme = bgThemeKey === 'parchment' || bgThemeKey === 'blank' || bgThemeKey === 'light_grid';
+
+    const openSlideLayer = (layerId: string) => {
+        setLayerQuizSelected(null);
+        setLayerQuizSubmitted(false);
+        setActiveLayerId(layerId);
+    };
+
+    const handleCloseActiveLayer = () => {
+        if (!activeLayer) {
+            setActiveLayerId(null);
+            return;
+        }
+
+        // If layer has a gated mini-quiz, verify answer first
+        if (activeLayer.hasQuiz && (activeLayer.quizOptions?.length || 0) > 0) {
+            if (!layerQuizSubmitted) {
+                setLayerQuizSubmitted(true);
+                const isCorrect = layerQuizSelected === activeLayer.correctOptionId;
+                if (!isCorrect && activeLayer.gateUntilCorrect !== false) {
+                    return; // Keep layer open so student can try again
+                }
+            } else {
+                const isCorrect = layerQuizSelected === activeLayer.correctOptionId;
+                if (!isCorrect && activeLayer.gateUntilCorrect !== false) {
+                    setLayerQuizSubmitted(false);
+                    setLayerQuizSelected(null);
+                    return;
+                }
+            }
+        }
+
+        // Mark layer completed
+        setCompletedLayerIds(prev => Array.from(new Set([...prev, activeLayer.id])));
+
+        // Execute any chained onCloseAction configured on this Slide Layer
+        if (activeLayer.onCloseAction === 'change_state' && activeLayer.onCloseTargetEntityId) {
+            setObjectStates(prev => ({
+                ...prev,
+                [activeLayer.onCloseTargetEntityId!]: activeLayer.onCloseTargetState || 'normal'
+            }));
+        } else if (activeLayer.onCloseAction === 'complete_block') {
+            setIsVerified(true);
+            if (onComplete) setTimeout(() => onComplete(), 900);
+        }
+
+        setActiveLayerId(null);
+        setLayerQuizSelected(null);
+        setLayerQuizSubmitted(false);
+    };
 
     const triggerCanvasReaction = (reactionType: string, message: string) => {
         if (reactionType) setActiveReaction(reactionType);
@@ -498,7 +616,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setTimeout(() => setActiveReaction(null), 2200);
     };
 
-    // Execute a list of matching Storyline triggers
     const executeTriggers = (matchingRules: KineticRule[], sourceEntityId: string) => {
         if (matchingRules.length === 0) return;
 
@@ -508,26 +625,24 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         matchingRules.forEach(rule => {
             const actionType = rule.action || 'reaction';
 
-            // Always show banner/reaction if provided
             if (rule.message || rule.reaction) {
                 triggerCanvasReaction(rule.reaction || 'bounce_glow', rule.message);
             }
 
-            // Storyline Action: Change State of Object
-            if (actionType === 'change_state') {
+            if (actionType === 'show_layer' && rule.targetLayerId) {
+                openSlideLayer(rule.targetLayerId);
+            } else if (actionType === 'hide_layer') {
+                setActiveLayerId(null);
+            } else if (actionType === 'change_state') {
                 const targetId = rule.targetEntityId || sourceEntityId;
                 const nextState = rule.targetState || 'drop_correct';
                 setObjectStates(prev => ({ ...prev, [targetId]: nextState }));
             } else if (actionType === 'reaction') {
-                // Automatically set source object to drop_correct or shake_error
                 setObjectStates(prev => ({
                     ...prev,
                     [sourceEntityId]: rule.reaction === 'shake_error' ? 'drop_incorrect' : 'drop_correct'
                 }));
-            }
-
-            // Storyline Action: Motion Path (Move target object to a zone)
-            if (actionType === 'move_to_zone' && rule.targetEntityId && rule.zoneId) {
+            } else if (actionType === 'move_to_zone' && rule.targetEntityId && rule.zoneId) {
                 const destZone = zones.find(z => z.id === rule.zoneId);
                 if (destZone) {
                     setEntities(prev => prev.map(ent =>
@@ -535,10 +650,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                     ));
                     setSnappedMap(prev => ({ ...prev, [rule.targetEntityId!]: destZone.id }));
                 }
-            }
-
-            // Storyline Action: Complete Block Immediately
-            if (actionType === 'complete_block') {
+            } else if (actionType === 'complete_block') {
                 setIsVerified(true);
                 if (onComplete) setTimeout(() => onComplete(), 1200);
             }
@@ -546,7 +658,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     };
 
     const handlePointerDown = (e: React.PointerEvent, entityId: string) => {
-        if (isVerified) return;
+        if (isVerified || activeLayerId) return;
         const currentState = objectStates[entityId] || 'normal';
         if (currentState === 'disabled' || currentState === 'hidden') return;
 
@@ -555,12 +667,10 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
 
         const ent = entities.find(item => item.id === entityId);
 
-        // Fire any "on_click" triggers attached to this object
         const clickRules = rules.filter(r => r.event === 'on_click' && r.entityId === entityId);
         if (clickRules.length > 0) {
             executeTriggers(clickRules, entityId);
         } else if (ent?.draggable === false) {
-            // Toggle Selected state for non-draggable interactive objects
             setObjectStates(prev => ({
                 ...prev,
                 [entityId]: prev[entityId] === 'selected' ? 'normal' : 'selected'
@@ -574,7 +684,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     };
 
     const handlePointerMove = (e: React.PointerEvent, entityId: string) => {
-        if (draggingId !== entityId || !canvasRef.current || isVerified) return;
+        if (draggingId !== entityId || !canvasRef.current || isVerified || activeLayerId) return;
         const rect = canvasRef.current.getBoundingClientRect();
         const rawX = ((e.clientX - rect.left) / rect.width) * 100;
         const rawY = ((e.clientY - rect.top) / rect.height) * 100;
@@ -612,7 +722,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             if (dropRules.length > 0) {
                 executeTriggers(dropRules, entityId);
             } else {
-                // If dropped in a zone that has a rule for a DIFFERENT entity, mark drop_incorrect
                 const zoneHasOtherRules = rules.some(r => (r.event || 'on_drop') === 'on_drop' && r.zoneId === matchedZone!.id);
                 if (zoneHasOtherRules) {
                     setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
@@ -636,6 +745,10 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setEntities(JSON.parse(JSON.stringify(initialEntities)));
         setObjectStates(buildInitialStateMap(initialEntities));
         setFiredRuleIds([]);
+        setCompletedLayerIds([]);
+        setActiveLayerId(null);
+        setLayerQuizSelected(null);
+        setLayerQuizSubmitted(false);
         setSnappedMap({});
         setSelectedId(null);
         setActiveReaction(null);
@@ -653,6 +766,9 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         }
 
         const results = requiredRules.map(rule => {
+            if (rule.action === 'show_layer' && rule.targetLayerId) {
+                return completedLayerIds.includes(rule.targetLayerId);
+            }
             if (rule.event === 'on_click') {
                 return firedRuleIds.includes(rule.id);
             }
@@ -665,7 +781,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
 
         const completedCount = results.filter(Boolean).length;
         return { completedCount, total: requiredRules.length, allComplete: completedCount === requiredRules.length };
-    }, [rules, snappedMap, entities, firedRuleIds]);
+    }, [rules, snappedMap, entities, firedRuleIds, completedLayerIds]);
 
     const handleVerifyAndComplete = () => {
         if (ruleStatus.allComplete) {
@@ -676,6 +792,9 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             setReactionBanner(`Keep going! ${ruleStatus.completedCount} of ${ruleStatus.total} interactions completed.`);
         }
     };
+
+    const activeLayerStyle = LAYER_THEME_STYLES[activeLayer?.theme || (activeLayer?.hasQuiz ? 'quiz' : 'info')] || LAYER_THEME_STYLES.info;
+    const isLayerQuizCorrect = activeLayer?.hasQuiz ? layerQuizSelected === activeLayer.correctOptionId : true;
 
     return (
         <div className="my-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in duration-500">
@@ -743,10 +862,10 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 <div 
                     ref={canvasRef}
                     onPointerDown={() => setSelectedId(null)}
-                    className={`relative w-full aspect-[16/10] min-h-[340px] rounded-[2rem] overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
+                    className={`relative w-full aspect-[16/10] min-h-[360px] rounded-[2rem] overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
                     style={customBgUrl ? { backgroundImage: `url(${customBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                 >
-                    {reactionBanner && (
+                    {reactionBanner && !activeLayer && (
                         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-5 py-2.5 rounded-full bg-slate-900/95 text-white backdrop-blur-md shadow-xl border border-white/20 text-xs font-black flex items-center gap-2 animate-in slide-in-from-top-4">
                             <Sparkles size={14} className="text-amber-400 shrink-0" />
                             <span>{reactionBanner}</span>
@@ -804,7 +923,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                         );
                     })}
 
-                    {/* Interactive Entities (Supports Sprites, Cards, Pills & Storyline States) */}
+                    {/* Interactive Entities */}
                     {entities.map((ent) => {
                         const st = objectStates[ent.id] || 'normal';
                         if (st === 'hidden') return null;
@@ -873,10 +992,127 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                             </div>
                         );
                     })}
+
+                    {/* ========================================================= */}
+                    {/* STORYLINE 360 SLIDE LAYER OVERLAY (Renders Over Canvas)   */}
+                    {/* ========================================================= */}
+                    {activeLayer && (
+                        <div
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="absolute inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200"
+                        >
+                            <div className={`relative w-full max-w-lg max-h-[92%] overflow-y-auto custom-scrollbar bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-[2rem] border-2 ${activeLayerStyle.border} shadow-2xl p-6 sm:p-7 text-left animate-in zoom-in-95 duration-200`}>
+                                {/* Top Gradient Accent */}
+                                <div className={`absolute top-0 left-0 right-0 h-2 bg-gradient-to-r ${activeLayerStyle.headerBg}`} />
+
+                                <div className="flex items-center justify-between gap-3 mb-4">
+                                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${activeLayerStyle.badge}`}>
+                                        <Layers size={11} /> {activeLayer.name || 'Slide Layer'}
+                                    </span>
+
+                                    {(!activeLayer.hasQuiz || activeLayer.gateUntilCorrect === false) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveLayerId(null)}
+                                            className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-colors"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {activeLayer.imageUrl && (
+                                    <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-40 bg-slate-100 dark:bg-slate-950 flex items-center justify-center">
+                                        <img src={activeLayer.imageUrl} alt={activeLayer.title} className="w-full h-full object-contain max-h-40" />
+                                    </div>
+                                )}
+
+                                <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
+                                    {activeLayer.title}
+                                </h4>
+
+                                {activeLayer.body && (
+                                    <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed mb-5 whitespace-pre-wrap">
+                                        {activeLayer.body}
+                                    </p>
+                                )}
+
+                                {/* EMBEDDED MINI-QUIZ INSIDE SLIDE LAYER */}
+                                {activeLayer.hasQuiz && Array.isArray(activeLayer.quizOptions) && activeLayer.quizOptions.length > 0 && (
+                                    <div className="mb-5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                                            <HelpCircle size={13} /> Layer Checkpoint
+                                        </div>
+                                        {activeLayer.quizQuestion && (
+                                            <p className="text-xs sm:text-sm font-black text-slate-800 dark:text-white mb-2">
+                                                {activeLayer.quizQuestion}
+                                            </p>
+                                        )}
+                                        <div className="space-y-2">
+                                            {activeLayer.quizOptions.map((opt) => {
+                                                const isPicked = layerQuizSelected === opt.id;
+                                                const isRight = opt.id === activeLayer.correctOptionId;
+                                                let btnStyle = 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-indigo-400';
+
+                                                if (layerQuizSubmitted) {
+                                                    if (isRight) btnStyle = 'bg-emerald-50 dark:bg-emerald-500/20 border-emerald-500 text-emerald-800 dark:text-emerald-200';
+                                                    else if (isPicked) btnStyle = 'bg-rose-50 dark:bg-rose-500/20 border-rose-500 text-rose-700 dark:text-rose-200';
+                                                } else if (isPicked) {
+                                                    btnStyle = 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-500 text-indigo-700 dark:text-indigo-200 ring-1 ring-indigo-500';
+                                                }
+
+                                                return (
+                                                    <button
+                                                        key={opt.id}
+                                                        type="button"
+                                                        disabled={layerQuizSubmitted && isLayerQuizCorrect}
+                                                        onClick={() => {
+                                                            setLayerQuizSelected(opt.id);
+                                                            setLayerQuizSubmitted(false);
+                                                        }}
+                                                        className={`w-full p-3 rounded-xl border-2 text-left text-xs font-bold transition-all flex items-center justify-between gap-2 ${btnStyle}`}
+                                                    >
+                                                        <span>{opt.text}</span>
+                                                        {layerQuizSubmitted && isRight && <Check size={15} className="text-emerald-500 shrink-0" />}
+                                                        {layerQuizSubmitted && isPicked && !isRight && <X size={15} className="text-rose-500 shrink-0" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {layerQuizSubmitted && (
+                                            <div className={`text-xs font-black pt-1 flex items-center gap-1.5 ${isLayerQuizCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                                                {isLayerQuizCorrect ? (
+                                                    <><CheckCircle2 size={14} /> Correct! Click below to continue.</>
+                                                ) : (
+                                                    <><X size={14} /> Not quite right—select another option to unlock.</>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <button
+                                    type="button"
+                                    disabled={Boolean(activeLayer.hasQuiz && !layerQuizSelected)}
+                                    onClick={handleCloseActiveLayer}
+                                    className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 ${activeLayerStyle.btn}`}
+                                >
+                                    {activeLayer.hasQuiz && !layerQuizSubmitted ? (
+                                        <>Check Answer <Check size={15} /></>
+                                    ) : activeLayer.hasQuiz && layerQuizSubmitted && !isLayerQuizCorrect && activeLayer.gateUntilCorrect !== false ? (
+                                        <>Try Again <RotateCcw size={14} /></>
+                                    ) : (
+                                        <>{activeLayer.buttonLabel || 'Continue'} <ArrowRight size={15} /></>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Transform Controls Dock */}
-                {selectedEntity && (selectedEntity.allowResize || selectedEntity.allowRotate) && (
+                {selectedEntity && !activeLayer && (selectedEntity.allowResize || selectedEntity.allowRotate) && (
                     <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-slate-800 shadow-md flex flex-wrap items-center justify-between gap-6">
                         <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
                             Transform: {selectedEntity.label}
@@ -904,7 +1140,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             {/* Footer */}
             <div className="p-5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
                 <span className="text-xs font-bold text-slate-500">
-                    {ruleStatus.allComplete ? '✨ All spatial interactions aligned!' : 'Interact with the objects and drop zones on the canvas.'}
+                    {ruleStatus.allComplete ? '✨ All spatial interactions & slide layers completed!' : 'Interact with the objects and drop zones on the canvas.'}
                 </span>
                 <button
                     type="button"
@@ -921,10 +1157,10 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
 };
 
 // ============================================================================
-//  8. KINETIC CANVAS BUILDER (Storyline 360 Authoring Studio)
+//  8. KINETIC CANVAS BUILDER (Storyline 360 Studio with Slide Layers Manager)
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
-    const [activeTab, setActiveTab] = useState<'canvas' | 'rules' | 'preview'>('canvas');
+    const [activeTab, setActiveTab] = useState<'canvas' | 'layers' | 'rules' | 'preview'>('canvas');
     const [selectedItem, setSelectedItem] = useState<{ type: 'entity' | 'zone', id: string } | null>(null);
     const [draggingTarget, setDraggingTarget] = useState<{ type: 'entity' | 'zone', id: string } | null>(null);
     const editorCanvasRef = useRef<HTMLDivElement>(null);
@@ -934,12 +1170,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     const entities: KineticEntity[] = Array.isArray(block?.entities) ? block.entities : [];
     const zones: KineticZone[] = Array.isArray(block?.zones) ? block.zones : [];
     const rules: KineticRule[] = Array.isArray(block?.rules) ? block.rules : [];
+    const layers: KineticSlideLayer[] = Array.isArray(block?.layers) ? block.layers : [];
 
     const updateBlock = (patch: any) => {
-        onChange({ ...block, type: 'kinetic_canvas', entities, zones, rules, ...patch });
+        onChange({ ...block, type: 'kinetic_canvas', entities, zones, rules, layers, ...patch });
     };
 
-    // Convert uploaded local image file to compressed Data URL so it saves cleanly in Firestore/JSON
     const handleImageFileUpload = (file: File, onResult: (dataUrl: string) => void) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -1028,6 +1264,35 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         setSelectedItem({ type: 'zone', id: newId });
     };
 
+    const addNewSlideLayer = (withQuiz = false) => {
+        const newId = `layer_${Date.now()}`;
+        const newLayer: KineticSlideLayer = {
+            id: newId,
+            name: `Layer ${layers.length + 1}: ${withQuiz ? 'Mini-Quiz Gate' : 'Feedback Pop-Up'}`,
+            theme: withQuiz ? 'quiz' : 'info',
+            title: withQuiz ? 'Quick Knowledge Check' : 'Discovery Unlocked!',
+            body: withQuiz
+                ? 'Answer this question correctly to unlock the next stage on the base slide.'
+                : 'Here is additional context and feedback triggered by your action on the canvas.',
+            buttonLabel: 'Continue',
+            hasQuiz: withQuiz,
+            quizQuestion: withQuiz ? 'What does the idiom "break the ice" mean?' : '',
+            quizOptions: withQuiz
+                ? [
+                      { id: 'opt_1', text: 'Make people feel more relaxed in a social situation' },
+                      { id: 'opt_2', text: 'Cancel an event due to freezing weather' }
+                  ]
+                : [],
+            correctOptionId: 'opt_1',
+            gateUntilCorrect: true,
+            onCloseAction: 'hide_layer',
+            onCloseTargetEntityId: entities[0]?.id || '',
+            onCloseTargetState: 'normal'
+        };
+        updateBlock({ layers: [...layers, newLayer] });
+        setActiveTab('layers');
+    };
+
     const clearToBlankCanvas = () => {
         updateBlock({
             title: block?.title || 'Interactive Slide Canvas',
@@ -1036,7 +1301,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             backgroundUrl: '',
             entities: [],
             zones: [],
-            rules: []
+            rules: [],
+            layers: []
         });
         setSelectedItem(null);
     };
@@ -1047,7 +1313,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-100 dark:border-slate-800 p-6 space-y-6 shadow-xl">
-            {/* Hidden File Inputs for Direct Image Uploads */}
+            {/* Hidden File Inputs */}
             <input
                 ref={bgFileInputRef}
                 type="file"
@@ -1076,7 +1342,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         Storyline 360 Studio
                     </span>
                     <h4 className="text-lg font-black text-slate-800 dark:text-white mt-1">
-                        Interactive States, Triggers & Sprite Canvas
+                        Interactive States, Slide Layers & Triggers
                     </h4>
                 </div>
 
@@ -1086,18 +1352,21 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         onClick={clearToBlankCanvas}
                         className="px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest transition-all"
                     >
-                        Clear to Blank Slide
+                        Clear Slide
                     </button>
 
                     <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <button type="button" onClick={() => setActiveTab('canvas')} className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'canvas' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                            1. Slide Stage ({entities.length + zones.length})
+                        <button type="button" onClick={() => setActiveTab('canvas')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'canvas' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                            1. Base Slide ({entities.length + zones.length})
                         </button>
-                        <button type="button" onClick={() => setActiveTab('rules')} className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'rules' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                            2. Trigger Wizard ({rules.length})
+                        <button type="button" onClick={() => setActiveTab('layers')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'layers' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                            2. Slide Layers ({layers.length})
                         </button>
-                        <button type="button" onClick={() => setActiveTab('preview')} className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'preview' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>
-                            3. Play Slide
+                        <button type="button" onClick={() => setActiveTab('rules')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'rules' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                            3. Triggers ({rules.length})
+                        </button>
+                        <button type="button" onClick={() => setActiveTab('preview')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'preview' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>
+                            4. Play Slide
                         </button>
                     </div>
                 </div>
@@ -1152,7 +1421,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 type="button"
                                 onClick={() => updateBlock({ backgroundUrl: '' })}
                                 className="px-2.5 py-2 rounded-xl bg-rose-100 text-rose-600 text-[10px] font-black"
-                                title="Clear Background Image"
                             >
                                 <X size={14} />
                             </button>
@@ -1162,42 +1430,25 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </div>
 
             {/* ========================================================= */}
-            {/* TAB 1: SLIDE STAGE &SELECTED ITEM INSPECTOR               */}
+            {/* TAB 1: BASE SLIDE STAGE & OBJECT INSPECTOR                */}
             {/* ========================================================= */}
             {activeTab === 'canvas' && (
                 <div className="space-y-6">
-                    {/* Object & Zone Insertion Toolbar */}
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <span className="text-xs font-bold text-slate-500">
-                            Click any object or drop zone on the slide to edit its label, image, size, or state:
+                            Click any object or drop zone on the slide to edit its label, image, size, or initial state:
                         </span>
                         <div className="flex flex-wrap gap-2">
-                            <button
-                                type="button"
-                                onClick={() => addNewZone(false)}
-                                className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 hover:bg-emerald-100 transition-all"
-                            >
+                            <button type="button" onClick={() => addNewZone(false)} className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
                                 <Plus size={12} /> Drop Zone
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => addNewZone(true)}
-                                className="px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 hover:bg-amber-100 transition-all"
-                            >
-                                <Plus size={12} /> Invisible Hotspot
+                            <button type="button" onClick={() => addNewZone(true)} className="px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 text-amber-700 dark:text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                                <Plus size={12} /> Hotspot
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => addNewEntity()}
-                                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all"
-                            >
+                            <button type="button" onClick={() => addNewEntity()} className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
                                 <Plus size={12} /> Text / Label Object
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => objFileInputRef.current?.click()}
-                                className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all"
-                            >
+                            <button type="button" onClick={() => objFileInputRef.current?.click()} className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
                                 <Plus size={12} /> Import Image Object
                             </button>
                         </div>
@@ -1212,19 +1463,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         className={`relative w-full aspect-[16/10] min-h-[340px] rounded-[2rem] border-2 border-slate-300 dark:border-slate-700 overflow-hidden select-none touch-none shadow-inner ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
                         style={block?.backgroundUrl ? { backgroundImage: `url(${block.backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                     >
-                        {zones.length === 0 && entities.length === 0 && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 pointer-events-none opacity-60">
-                                <Sparkles size={36} className="text-indigo-400 mb-2" />
-                                <p className="text-sm font-black uppercase tracking-widest text-slate-500 dark:text-slate-300">
-                                    Blank Storyline Canvas Ready
-                                </p>
-                                <p className="text-xs font-bold text-slate-400 mt-1">
-                                    Use the buttons above to add Drop Zones, Hotspots, Text Labels, or Imported Images.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Render Drop Zones */}
                         {zones.map(z => {
                             const isSelected = selectedItem?.type === 'zone' && selectedItem.id === z.id;
                             return (
@@ -1233,23 +1471,16 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                     onPointerDown={(e) => handleEditorPointerDown(e, 'zone', z.id)}
                                     style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.width}%`, height: `${z.height}%`, transform: 'translate(-50%, -50%)' }}
                                     className={`absolute rounded-3xl border-2 border-dashed flex flex-col items-center justify-center p-2 cursor-move transition-shadow ${
-                                        z.invisible
-                                            ? 'border-amber-400/90 bg-amber-500/15 text-amber-300'
-                                            : 'border-emerald-400 bg-emerald-500/15 text-emerald-300'
+                                        z.invisible ? 'border-amber-400/90 bg-amber-500/15 text-amber-300' : 'border-emerald-400 bg-emerald-500/15 text-emerald-300'
                                     } ${isSelected ? 'ring-4 ring-indigo-500 z-30 bg-emerald-500/25' : 'z-10'}`}
                                 >
                                     <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-black/50 text-white">
                                         {z.invisible ? `👁️ Hotspot: ${z.label}` : z.label}
                                     </span>
-                                    {z.sublabel && <span className="text-[8px] font-bold bg-black/40 text-white px-1.5 rounded mt-0.5">{z.sublabel}</span>}
-                                    <span className="text-[8px] opacity-75 mt-1 bg-black/40 text-white px-1.5 rounded">
-                                        {z.width}% × {z.height}%
-                                    </span>
                                 </div>
                             );
                         })}
 
-                        {/* Render Draggable / Interactive Objects */}
                         {entities.map(ent => {
                             const isSelected = selectedItem?.type === 'entity' && selectedItem.id === ent.id;
                             const colorClasses = KINETIC_COLORS[ent.color || 'indigo'] || KINETIC_COLORS.indigo;
@@ -1293,11 +1524,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         })}
                     </div>
 
-                    {/* ========================================================= */}
-                    {/* LIVE CONTEXTUAL PROPERTY INSPECTOR (For Selected Object/Zone) */}
-                    {/* ========================================================= */}
+                    {/* SELECTED OBJECT INSPECTOR */}
                     {activeEntity && (
-                        <div className="p-5 rounded-3xl bg-indigo-50/60 dark:bg-slate-950 border-2 border-indigo-200 dark:border-indigo-500/30 space-y-4 animate-in fade-in duration-200">
+                        <div className="p-5 rounded-3xl bg-indigo-50/60 dark:bg-slate-950 border-2 border-indigo-200 dark:border-indigo-500/30 space-y-4">
                             <div className="flex items-center justify-between border-b border-indigo-100 dark:border-slate-800 pb-3">
                                 <span className="text-xs font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
                                     Editing Object: {activeEntity.label}
@@ -1308,7 +1537,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                         updateBlock({ entities: entities.filter(e => e.id !== activeEntity.id) });
                                         setSelectedItem(null);
                                     }}
-                                    className="px-3 py-1.5 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase flex items-center gap-1"
+                                    className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-600 text-[10px] font-black uppercase flex items-center gap-1"
                                 >
                                     <Trash2 size={12} /> Delete Object
                                 </button>
@@ -1321,87 +1550,44 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                         type="text"
                                         value={activeEntity.label}
                                         onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, label: e.target.value } : item) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black text-slate-800 dark:text-white"
+                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Subtitle / Grammar Note</label>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Subtitle / Note</label>
                                     <input
                                         type="text"
                                         value={activeEntity.sublabel || ''}
                                         onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, sublabel: e.target.value } : item) })}
-                                        placeholder="Optional sublabel..."
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold text-slate-800 dark:text-white"
+                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Initial Storyline State</label>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Initial State</label>
                                     <select
                                         value={activeEntity.initialState || 'normal'}
                                         onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, initialState: e.target.value as any } : item) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold text-slate-800 dark:text-white"
+                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
                                     >
-                                        <option value="normal">Normal (Visible & Active)</option>
+                                        <option value="normal">Normal (Visible)</option>
                                         <option value="hidden">Hidden (Reveal via Trigger)</option>
                                         <option value="disabled">Disabled (Unlock via Trigger)</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Color Theme</label>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Color</label>
                                     <select
                                         value={activeEntity.color || 'indigo'}
                                         onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, color: e.target.value as any } : item) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold text-slate-800 dark:text-white"
+                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
                                     >
                                         <option value="indigo">Indigo</option>
                                         <option value="emerald">Emerald</option>
                                         <option value="amber">Amber</option>
                                         <option value="rose">Rose</option>
                                         <option value="cyan">Cyan</option>
-                                        <option value="slate">Dark Slate</option>
+                                        <option value="slate">Slate</option>
                                     </select>
-                                </div>
-                            </div>
-
-                            {/* Image URL / Upload & Scale/Rotation Sliders */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                                <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Object Sprite Image URL</label>
-                                    <input
-                                        type="text"
-                                        value={activeEntity.imageUrl || ''}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, imageUrl: e.target.value } : item) })}
-                                        placeholder="Paste image URL or leave blank for pill..."
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-                                        Default Scale ({activeEntity.scale?.toFixed(1) || 1.0}x)
-                                    </label>
-                                    <input
-                                        type="range"
-                                        min="0.5"
-                                        max="2.2"
-                                        step="0.1"
-                                        value={activeEntity.scale || 1}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, scale: parseFloat(e.target.value) } : item) })}
-                                        className="w-full accent-indigo-600 mt-2"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-                                        Default Rotation ({activeEntity.rotation || 0}°)
-                                    </label>
-                                    <input
-                                        type="range"
-                                        min="-180"
-                                        max="180"
-                                        step="5"
-                                        value={activeEntity.rotation || 0}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, rotation: parseInt(e.target.value) } : item) })}
-                                        className="w-full accent-indigo-600 mt-2"
-                                    />
                                 </div>
                             </div>
 
@@ -1434,11 +1620,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         </div>
                     )}
 
+                    {/* SELECTED ZONE INSPECTOR */}
                     {activeZone && (
-                        <div className="p-5 rounded-3xl bg-emerald-50/60 dark:bg-slate-950 border-2 border-emerald-200 dark:border-emerald-500/30 space-y-4 animate-in fade-in duration-200">
+                        <div className="p-5 rounded-3xl bg-emerald-50/60 dark:bg-slate-950 border-2 border-emerald-200 dark:border-emerald-500/30 space-y-4">
                             <div className="flex items-center justify-between border-b border-emerald-100 dark:border-slate-800 pb-3">
                                 <span className="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
-                                    Editing Target Zone: {activeZone.label}
+                                    Editing Zone: {activeZone.label}
                                 </span>
                                 <button
                                     type="button"
@@ -1459,7 +1646,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                         type="text"
                                         value={activeZone.label}
                                         onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, label: e.target.value } : z) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black text-slate-800 dark:text-white"
+                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
                                     />
                                 </div>
                                 <div>
@@ -1468,55 +1655,273 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                         type="text"
                                         value={activeZone.sublabel || ''}
                                         onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, sublabel: e.target.value } : z) })}
-                                        placeholder="Optional hint..."
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold text-slate-800 dark:text-white"
+                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
                                     />
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Width ({activeZone.width}%)</label>
-                                    <input
-                                        type="range"
-                                        min="10"
-                                        max="60"
-                                        value={activeZone.width}
-                                        onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, width: parseInt(e.target.value) } : z) })}
-                                        className="w-full accent-emerald-600 mt-2"
-                                    />
+                                    <input type="range" min="10" max="60" value={activeZone.width} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, width: parseInt(e.target.value) } : z) })} className="w-full accent-emerald-600 mt-2" />
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Height ({activeZone.height}%)</label>
-                                    <input
-                                        type="range"
-                                        min="10"
-                                        max="60"
-                                        value={activeZone.height}
-                                        onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, height: parseInt(e.target.value) } : z) })}
-                                        className="w-full accent-emerald-600 mt-2"
-                                    />
+                                    <input type="range" min="10" max="60" value={activeZone.height} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, height: parseInt(e.target.value) } : z) })} className="w-full accent-emerald-600 mt-2" />
                                 </div>
                             </div>
-
-                            <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={Boolean(activeZone.invisible)}
-                                    onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, invisible: e.target.checked } : z) })}
-                                />
-                                Invisible Hotspot Mode (Hides dashed border in student view—ideal for map regions)
-                            </label>
                         </div>
                     )}
                 </div>
             )}
 
             {/* ========================================================= */}
-            {/* TAB 2: STORYLINE 360 TRIGGER WIZARD                       */}
+            {/* TAB 2: STORYLINE 360 SLIDE LAYERS AUTHORING               */}
+            {/* ========================================================= */}
+            {activeTab === 'layers' && (
+                <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-xs font-bold text-slate-500">
+                            Create pop-up Slide Layers (feedback cards or gated mini-quizzes) that can be launched by any Trigger:
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => addNewSlideLayer(false)}
+                                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"
+                            >
+                                <Plus size={12} /> Add Feedback Layer
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => addNewSlideLayer(true)}
+                                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"
+                            >
+                                <Plus size={12} /> Add Mini-Quiz Layer
+                            </button>
+                        </div>
+                    </div>
+
+                    {layers.length === 0 && (
+                        <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs font-bold text-slate-400">
+                            No Slide Layers yet. Add a Feedback Layer or Mini-Quiz Layer above, then link it in the Trigger Wizard.
+                        </div>
+                    )}
+
+                    {layers.map((layer, lIdx) => (
+                        <div key={layer.id} className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 dark:border-slate-800 pb-3">
+                                <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+                                    <Layers size={15} className="text-indigo-500 shrink-0" />
+                                    <input
+                                        type="text"
+                                        value={layer.name}
+                                        onChange={(e) => {
+                                            const u = [...layers];
+                                            u[lIdx] = { ...layer, name: e.target.value };
+                                            updateBlock({ layers: u });
+                                        }}
+                                        placeholder="Internal Layer Name..."
+                                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black text-indigo-600 dark:text-indigo-400 flex-1"
+                                    />
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={layer.theme || 'info'}
+                                        onChange={(e) => {
+                                            const u = [...layers];
+                                            u[lIdx] = { ...layer, theme: e.target.value as any };
+                                            updateBlock({ layers: u });
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                    >
+                                        <option value="info">Indigo Info Theme</option>
+                                        <option value="success">Emerald Success Theme</option>
+                                        <option value="warning">Amber Warning Theme</option>
+                                        <option value="error">Rose Error Theme</option>
+                                        <option value="quiz">Purple Quiz Theme</option>
+                                    </select>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => updateBlock({ layers: layers.filter(item => item.id !== layer.id) })}
+                                        className="p-2 text-slate-400 hover:text-rose-500"
+                                    >
+                                        <Trash2 size={15} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="md:col-span-2">
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Overlay Heading</label>
+                                    <input
+                                        type="text"
+                                        value={layer.title}
+                                        onChange={(e) => {
+                                            const u = [...layers];
+                                            u[lIdx] = { ...layer, title: e.target.value };
+                                            updateBlock({ layers: u });
+                                        }}
+                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Dismiss Button Label</label>
+                                    <input
+                                        type="text"
+                                        value={layer.buttonLabel || 'Continue'}
+                                        onChange={(e) => {
+                                            const u = [...layers];
+                                            u[lIdx] = { ...layer, buttonLabel: e.target.value };
+                                            updateBlock({ layers: u });
+                                        }}
+                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Overlay Narrative / Feedback Body</label>
+                                <textarea
+                                    value={layer.body}
+                                    onChange={(e) => {
+                                        const u = [...layers];
+                                        u[lIdx] = { ...layer, body: e.target.value };
+                                        updateBlock({ layers: u });
+                                    }}
+                                    rows={2}
+                                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-medium resize-none"
+                                />
+                            </div>
+
+                            {/* Optional Mini-Quiz Toggle & Editor */}
+                            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    <label className="flex items-center gap-2 text-xs font-black text-indigo-600 dark:text-indigo-400 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(layer.hasQuiz)}
+                                            onChange={(e) => {
+                                                const u = [...layers];
+                                                u[lIdx] = {
+                                                    ...layer,
+                                                    hasQuiz: e.target.checked,
+                                                    quizOptions: layer.quizOptions?.length ? layer.quizOptions : [
+                                                        { id: 'opt_1', text: 'Correct Option' },
+                                                        { id: 'opt_2', text: 'Distractor Option' }
+                                                    ],
+                                                    correctOptionId: layer.correctOptionId || 'opt_1'
+                                                };
+                                                updateBlock({ layers: u });
+                                            }}
+                                        />
+                                        Embed Interactive Mini-Quiz on This Slide Layer
+                                    </label>
+
+                                    {/* Chained Action When Layer Closes */}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">When Layer Closes:</span>
+                                        <select
+                                            value={layer.onCloseAction || 'hide_layer'}
+                                            onChange={(e) => {
+                                                const u = [...layers];
+                                                u[lIdx] = { ...layer, onCloseAction: e.target.value as any };
+                                                updateBlock({ layers: u });
+                                            }}
+                                            className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                        >
+                                            <option value="hide_layer">Just Hide Layer</option>
+                                            <option value="change_state">Unlock / Reveal Base Object</option>
+                                            <option value="complete_block">Complete Entire Block</option>
+                                        </select>
+
+                                        {layer.onCloseAction === 'change_state' && (
+                                            <>
+                                                <select
+                                                    value={layer.onCloseTargetEntityId || ''}
+                                                    onChange={(e) => {
+                                                        const u = [...layers];
+                                                        u[lIdx] = { ...layer, onCloseTargetEntityId: e.target.value };
+                                                        updateBlock({ layers: u });
+                                                    }}
+                                                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                                >
+                                                    {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
+                                                </select>
+                                                <select
+                                                    value={layer.onCloseTargetState || 'normal'}
+                                                    onChange={(e) => {
+                                                        const u = [...layers];
+                                                        u[lIdx] = { ...layer, onCloseTargetState: e.target.value as any };
+                                                        updateBlock({ layers: u });
+                                                    }}
+                                                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                                >
+                                                    <option value="normal">Normal (Reveal / Enable)</option>
+                                                    <option value="drop_correct">Drop Correct</option>
+                                                    <option value="hidden">Hidden</option>
+                                                </select>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {layer.hasQuiz && (
+                                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-100 dark:border-slate-800 space-y-3">
+                                        <input
+                                            type="text"
+                                            value={layer.quizQuestion || ''}
+                                            onChange={(e) => {
+                                                const u = [...layers];
+                                                u[lIdx] = { ...layer, quizQuestion: e.target.value };
+                                                updateBlock({ layers: u });
+                                            }}
+                                            placeholder="Mini-quiz question prompt..."
+                                            className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-black"
+                                        />
+                                        <div className="space-y-2">
+                                            {(layer.quizOptions || []).map((opt, oIdx) => (
+                                                <div key={opt.id} className="flex items-center gap-2">
+                                                    <input
+                                                        type="radio"
+                                                        name={`correct_${layer.id}`}
+                                                        checked={layer.correctOptionId === opt.id}
+                                                        onChange={() => {
+                                                            const u = [...layers];
+                                                            u[lIdx] = { ...layer, correctOptionId: opt.id };
+                                                            updateBlock({ layers: u });
+                                                        }}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={opt.text}
+                                                        onChange={(e) => {
+                                                            const nextOpts = [...(layer.quizOptions || [])];
+                                                            nextOpts[oIdx] = { ...opt, text: e.target.value };
+                                                            const u = [...layers];
+                                                            u[lIdx] = { ...layer, quizOptions: nextOpts };
+                                                            updateBlock({ layers: u });
+                                                        }}
+                                                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-bold"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* TAB 3: STORYLINE 360 TRIGGER WIZARD                       */}
             {/* ========================================================= */}
             {activeTab === 'rules' && (
                 <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-bold text-slate-500">
-                            Build Storyline-style event triggers (e.g., When Object A is dropped on Zone B ➔ Reveal Hidden Object C or Play Reaction):
+                            Link events (`on_drop` or `on_click`) to Slide Layers, Object States, Motion Paths, or Reactions:
                         </p>
                         <button
                             type="button"
@@ -1529,7 +1934,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                             event: 'on_drop',
                                             entityId: entities[0]?.id || '',
                                             zoneId: zones[0]?.id || '',
-                                            action: 'reaction',
+                                            action: layers.length > 0 ? 'show_layer' : 'reaction',
+                                            targetLayerId: layers[0]?.id || '',
                                             targetEntityId: entities[0]?.id || '',
                                             targetState: 'normal',
                                             reaction: 'bounce_glow',
@@ -1543,12 +1949,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                             <Plus size={12} /> Add Storyline Trigger
                         </button>
                     </div>
-
-                    {rules.length === 0 && (
-                        <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs font-bold text-slate-400">
-                            No triggers defined yet. Click "+ Add Storyline Trigger" to link objects, zones, states, and reactions.
-                        </div>
-                    )}
 
                     {rules.map((r, idx) => (
                         <div key={r.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
@@ -1606,8 +2006,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                     }}
                                     className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
                                 >
-                                    <option value="reaction">Play Reaction & Banner</option>
+                                    <option value="show_layer">Pop Open Slide Layer</option>
                                     <option value="change_state">Change State of Object</option>
+                                    <option value="reaction">Play Reaction & Banner</option>
                                     <option value="move_to_zone">Move Object to Zone</option>
                                     <option value="complete_block">Complete Interaction</option>
                                 </select>
@@ -1621,8 +2022,29 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 </button>
                             </div>
 
-                            {/* Secondary Action Row */}
+                            {/* Action Target Row */}
                             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                                {r.action === 'show_layer' && (
+                                    <>
+                                        <span className="text-[10px] font-black uppercase text-purple-600">Show Layer:</span>
+                                        <select
+                                            value={r.targetLayerId || layers[0]?.id || ''}
+                                            onChange={(e) => {
+                                                const u = [...rules];
+                                                u[idx] = { ...r, targetLayerId: e.target.value };
+                                                updateBlock({ rules: u });
+                                            }}
+                                            className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black text-purple-600"
+                                        >
+                                            {layers.length === 0 ? (
+                                                <option value="">(Create a Slide Layer in Tab 2 first)</option>
+                                            ) : (
+                                                layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)
+                                            )}
+                                        </select>
+                                    </>
+                                )}
+
                                 {r.action === 'change_state' && (
                                     <>
                                         <span className="text-[10px] font-black uppercase text-slate-400">Set Object:</span>
@@ -1650,8 +2072,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                             <option value="normal">Normal (Reveal / Enable)</option>
                                             <option value="drop_correct">Drop Correct (Emerald)</option>
                                             <option value="drop_incorrect">Drop Incorrect (Rose)</option>
-                                            <option value="hidden">Hidden (Hide Object)</option>
-                                            <option value="disabled">Disabled (Lock Object)</option>
+                                            <option value="hidden">Hidden</option>
+                                            <option value="disabled">Disabled</option>
                                         </select>
                                     </>
                                 )}
@@ -1682,7 +2104,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                         updateBlock({ rules: u });
                                     }}
                                     placeholder="Feedback banner message..."
-                                    className="flex-1 min-w-[180px] px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                    className="flex-1 min-w-[160px] px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
                                 />
                             </div>
                         </div>
@@ -1690,8 +2112,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 </div>
             )}
 
-            {/* TAB 3: INTERACTIVE SLIDE PREVIEW */}
-            {activeTab === 'preview' && <KineticCanvasBlock block={{ ...block, entities, zones, rules }} />}
+            {/* TAB 4: INTERACTIVE SLIDE PREVIEW */}
+            {activeTab === 'preview' && <KineticCanvasBlock block={{ ...block, entities, zones, rules, layers }} />}
         </div>
     );
 };
