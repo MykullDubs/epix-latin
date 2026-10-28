@@ -5,7 +5,8 @@ import {
     School, Layers, Feather, Target, BookOpen, 
     Calculator, Palette, Check, Brain, Play, HeartPulse,
     Cpu, Briefcase, Utensils, Globe2, Activity,
-    MonitorPlay, Plane, Loader2, X, Plus, GripVertical, Inbox
+    MonitorPlay, Plane, Loader2, X, Plus, GripVertical, Inbox,
+    HelpCircle
 } from 'lucide-react';
 import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
 import { db, appId, auth } from '../config/firebase';
@@ -13,6 +14,7 @@ import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
 import { calculateLevel } from '../utils/profileHelpers';
 import { StudyModePlayer } from './StudyEngines'; 
 import { Toast } from './Toast';
+import TutorialOverlay from './TutorialOverlay';
 
 // ============================================================================
 //  FLAT HIGH-CONTRAST SUBJECT THEMES
@@ -143,6 +145,7 @@ export default function HomeView({
   const [compiledQueue, setCompiledQueue] = useState<any>(null);
   const [compiledStats, setCompiledStats] = useState<Record<string, any>>({});
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [replayHomeTour, setReplayHomeTour] = useState(false);
 
   // LOCAL DRAG AND DROP STATE
   const [localClasses, setLocalClasses] = useState<any[]>([]);
@@ -353,6 +356,16 @@ export default function HomeView({
     <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-white font-sans relative overflow-hidden">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
+        {/* 🔥 STUDENT HOME DASHBOARD TUTORIAL OVERLAY */}
+        <TutorialOverlay
+            key={replayHomeTour ? 'home-replay' : 'home-auto'}
+            variant="home"
+            user={user}
+            userData={userData}
+            forceOpen={replayHomeTour}
+            onComplete={() => setReplayHomeTour(false)}
+        />
+
         {/* 1. ARCHITECTURAL FLAT HEADER */}
         <header className="bg-white dark:bg-black border-b-2 border-zinc-900 dark:border-zinc-200 shrink-0 z-50">
             <div className="max-w-7xl mx-auto flex items-stretch justify-between min-h-[64px]">
@@ -393,6 +406,17 @@ export default function HomeView({
                         </span>
                     </div>
 
+                    {/* 1-CLICK REPLAY DASHBOARD TOUR BUTTON */}
+                    <button
+                        type="button"
+                        onClick={() => setReplayHomeTour(true)}
+                        title="Launch Dashboard Tour"
+                        aria-label="Launch Dashboard Tour"
+                        className="px-4 sm:px-5 bg-white dark:bg-black hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-500 dark:hover:text-white transition-colors flex items-center justify-center"
+                    >
+                        <HelpCircle size={20} strokeWidth={2.5} />
+                    </button>
+
                     <button 
                         onClick={() => setActiveTab('inbox')}
                         aria-label="Open Inbox"
@@ -415,7 +439,10 @@ export default function HomeView({
             tabIndex={-1}
         >
             {/* 2. TELEMETRY & LEVEL PROGRESS SECTION */}
-            <section className="bg-white dark:bg-black border-b-2 border-zinc-900 dark:border-zinc-200">
+            <section
+                data-tutorial="home-stats"
+                className="bg-white dark:bg-black border-b-2 border-zinc-900 dark:border-zinc-200"
+            >
                 <div className="max-w-7xl mx-auto">
                     {/* 3-Column Stat Readout */}
                     <div className="grid grid-cols-3 divide-x-2 divide-zinc-900 dark:divide-zinc-200">
@@ -492,7 +519,7 @@ export default function HomeView({
             <div className="px-4 sm:px-6 md:px-10 max-w-7xl mx-auto space-y-10 mt-8">
 
               {/* 3. ACTION CENTER (METRO LIVE TILE GRID) */}
-              <section>
+              <section data-tutorial="home-actions">
                   <div className="flex items-center gap-2.5 mb-4 pb-2.5 border-b-2 border-zinc-900 dark:border-zinc-200">
                       <div className="w-6 h-6 bg-indigo-600 text-white flex items-center justify-center shrink-0">
                           <Activity size={14} strokeWidth={2.75} />
@@ -643,7 +670,7 @@ export default function HomeView({
 
               {/* 4. ACTIVE SUBJECTS SECTION (DRAGGABLE) */}
               {localClasses && localClasses.length > 0 ? (
-                <section>
+                <section data-tutorial="home-classes">
                     <div className="flex justify-between items-center mb-4 pb-2.5 border-b-2 border-zinc-900 dark:border-zinc-200">
                         <div className="flex items-center gap-2.5">
                             <div className="w-6 h-6 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black flex items-center justify-center shrink-0">
@@ -733,7 +760,10 @@ export default function HomeView({
                     </div>
                 </section>
               ) : (
-                 <section className="p-8 md:p-12 border-2 border-dashed border-zinc-900 dark:border-zinc-200 text-center bg-white dark:bg-black">
+                 <section
+                    data-tutorial="home-classes"
+                    className="p-8 md:p-12 border-2 border-dashed border-zinc-900 dark:border-zinc-200 text-center bg-white dark:bg-black"
+                 >
                     <div className="w-14 h-14 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black flex items-center justify-center mx-auto mb-4">
                         <School size={28} strokeWidth={2.5} aria-hidden="true"/>
                     </div>
