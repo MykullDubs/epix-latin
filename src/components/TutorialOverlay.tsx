@@ -4,7 +4,8 @@ import { doc, setDoc, addDoc, collection, increment } from 'firebase/firestore';
 import { db, appId, auth } from '../config/firebase';
 import { 
     Sparkles, BookOpen, FileText, Trophy, Zap, 
-    ArrowRight, ArrowLeft, X, CheckCircle2, Layers, Shield
+    ArrowRight, ArrowLeft, X, CheckCircle2, Shield,
+    Compass, PlusCircle, Flame, UserCheck
 } from 'lucide-react';
 
 export interface TutorialStep {
@@ -18,47 +19,87 @@ export interface TutorialStep {
     accentColor: string;
 }
 
-const TUTORIAL_STEPS: TutorialStep[] = [
+// --- STEPS FOR STUDENT HOME VIEW (Main Dashboard) ---
+const HOME_TUTORIAL_STEPS: TutorialStep[] = [
     {
-        id: 'welcome',
-        badge: 'System Calibration • Step 1 of 5',
-        title: 'Welcome to Your Learning Hub',
-        description: 'Your personal command center for interactive modules, adaptive assessments, and live classroom arenas. Complete this 30-second tour to calibrate your profile and claim +50 XP.',
+        id: 'home_welcome',
+        badge: 'Command Center • Step 1 of 4',
+        title: 'Welcome to Magister OS',
+        description: 'This is your main Scholar Dashboard. From here, you can track your global XP, maintain your daily study streak, and jump into any of your enrolled classes.',
         icon: <Sparkles size={32} strokeWidth={2.2} />,
         accentColor: 'from-indigo-500 to-cyan-400'
     },
     {
-        id: 'roadmap',
+        id: 'home_stats',
+        badge: 'XP & Streaks • Step 2 of 4',
+        title: 'Level Up Your Profile',
+        description: 'Every lesson, flashcard deck, live trivia round, and exam you complete earns XP. Keep your streak alive and customize your HoloAvatar in your profile.',
+        targetSelector: '[data-tutorial="home-stats"]',
+        icon: <Flame size={32} strokeWidth={2.2} />,
+        accentColor: 'from-amber-400 to-orange-500'
+    },
+    {
+        id: 'home_join_class',
+        badge: 'Enlistment • Step 3 of 4',
+        title: 'Join a Class Cohort',
+        description: 'Have a Class Code from your instructor? Use the Join Class button to link your account to your classroom and unlock your assigned pathways.',
+        targetSelector: '[data-tutorial="home-join"]',
+        icon: <PlusCircle size={32} strokeWidth={2.2} />,
+        accentColor: 'from-emerald-500 to-teal-400'
+    },
+    {
+        id: 'home_classes',
+        badge: 'Active Classes • Step 4 of 4',
+        title: 'Launch Your Class Hub',
+        description: 'Tap any of your active class cards to open its Roadmap, interactive Kinetic Canvas labs, Live Arena remote, and Exams.',
+        targetSelector: '[data-tutorial="home-classes"]',
+        icon: <Compass size={32} strokeWidth={2.2} />,
+        accentColor: 'from-indigo-500 to-purple-500'
+    }
+];
+
+// --- STEPS FOR STUDENT CLASS VIEW (Inside a Classroom) ---
+const CLASS_TUTORIAL_STEPS: TutorialStep[] = [
+    {
+        id: 'class_welcome',
+        badge: 'Classroom Hub • Step 1 of 5',
+        title: 'Welcome to Your Class Hub',
+        description: 'Your personal classroom interface for interactive modules, adaptive assessments, and live classroom arenas. Complete this quick tour to claim +50 XP.',
+        icon: <Sparkles size={32} strokeWidth={2.2} />,
+        accentColor: 'from-indigo-500 to-cyan-400'
+    },
+    {
+        id: 'class_roadmap',
         badge: 'Curriculum Pathways • Step 2 of 5',
         title: 'Follow Your Roadmap',
-        description: 'Tap active nodes on your pathway to launch interactive lessons, flashcards, and 2D Kinetic Canvas labs. Completing modules unlocks the next checkpoint on your map.',
+        description: 'Tap active nodes on your pathway to launch interactive lessons, flashcards, and 2D Kinetic Canvas labs. Completing modules unlocks the next checkpoint.',
         targetSelector: '[data-tutorial="lessons"]',
         actionTab: 'lessons',
         icon: <BookOpen size={32} strokeWidth={2.2} />,
         accentColor: 'from-emerald-500 to-teal-400'
     },
     {
-        id: 'exams',
+        id: 'class_exams',
         badge: 'Adaptive Diagnostics • Step 3 of 5',
         title: 'High-Stakes Assessments',
-        description: 'When an exam is assigned, a red notification badge appears. Once completed, you can tap any greyed-out exam card to inspect your question breakdown and instructor feedback.',
+        description: 'When an exam is available, a red notification badge appears. Once finished, tap any greyed-out exam card to inspect your question breakdown and instructor feedback.',
         targetSelector: '[data-tutorial="exams"]',
         actionTab: 'exams',
         icon: <FileText size={32} strokeWidth={2.2} />,
         accentColor: 'from-rose-500 to-amber-500'
     },
     {
-        id: 'arena',
+        id: 'class_arena',
         badge: 'Live Protocols & Ranks • Step 4 of 5',
         title: 'Compete on the Leaderboard',
-        description: 'Earn XP from every lesson, flashcard deck, and live classroom game to climb your class ranks and customize your HoloAvatar.',
+        description: 'Earn XP from every lesson, flashcard deck, and live classroom game to climb your class ranks.',
         targetSelector: '[data-tutorial="leaderboard"]',
         actionTab: 'leaderboard',
         icon: <Trophy size={32} strokeWidth={2.2} />,
         accentColor: 'from-amber-400 to-orange-500'
     },
     {
-        id: 'grades',
+        id: 'class_grades',
         badge: 'Service Record • Step 5 of 5',
         title: 'Track Your Standing',
         description: 'Your Service Record calculates your overall standing rank (S, A, B+) and stores all official report cards and written feedback from your instructor.',
@@ -70,6 +111,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 ];
 
 interface TutorialOverlayProps {
+    variant?: 'home' | 'class';
     user?: any;
     userData?: any;
     onSelectTab?: (tabId: string) => void;
@@ -78,6 +120,7 @@ interface TutorialOverlayProps {
 }
 
 export default function TutorialOverlay({
+    variant = 'class',
     user,
     userData,
     onSelectTab,
@@ -95,12 +138,18 @@ export default function TutorialOverlay({
     const studentName = userData?.name || user?.displayName || 'Scholar';
     const isInstructor = userData?.role === 'instructor' || userData?.role === 'admin';
 
+    const steps = variant === 'home' ? HOME_TUTORIAL_STEPS : CLASS_TUTORIAL_STEPS;
+    const currentStep = steps[stepIdx] || steps[0];
     const xpReward = 50;
-    const currentStep = TUTORIAL_STEPS[stepIdx];
+
+    const firestoreFlag = variant === 'home' ? 'homeTutorialCompleted' : 'tutorialCompleted';
+    const localKey = uid ? `magister_${variant}_tutorial_done_${uid}` : '';
 
     // Determine whether this student needs the onboarding tour
     useEffect(() => {
         if (forceOpen) {
+            setStepIdx(0);
+            setShowRewardScreen(false);
             setIsVisible(true);
             return;
         }
@@ -109,19 +158,18 @@ export default function TutorialOverlay({
             return;
         }
 
-        const localKey = `magister_tutorial_done_${uid}`;
-        const completedLocally = localStorage.getItem(localKey) === 'true';
+        const completedLocally = localKey ? localStorage.getItem(localKey) === 'true' : false;
         const completedInProfile =
-            userData?.tutorialCompleted === true ||
-            userData?.profile?.main?.tutorialCompleted === true;
+            userData?.[firestoreFlag] === true ||
+            userData?.profile?.main?.[firestoreFlag] === true;
 
         if (completedInProfile) {
-            localStorage.setItem(localKey, 'true');
+            if (localKey) localStorage.setItem(localKey, 'true');
             setIsVisible(false);
         } else if (!completedLocally && userData !== undefined) {
             setIsVisible(true);
         }
-    }, [uid, userData, isInstructor, forceOpen]);
+    }, [uid, userData, isInstructor, forceOpen, firestoreFlag, localKey]);
 
     // Update spotlight bounding box and optionally switch active tab when step changes
     useEffect(() => {
@@ -130,12 +178,12 @@ export default function TutorialOverlay({
             return;
         }
 
-        if (currentStep.actionTab && onSelectTab) {
+        if (currentStep?.actionTab && onSelectTab) {
             onSelectTab(currentStep.actionTab);
         }
 
         const updateSpotlight = () => {
-            if (!currentStep.targetSelector) {
+            if (!currentStep?.targetSelector) {
                 setSpotlightRect(null);
                 return;
             }
@@ -147,22 +195,29 @@ export default function TutorialOverlay({
             }
         };
 
-        // Slight delay so any tab transition finishes before measuring coordinates
         const timer = setTimeout(updateSpotlight, 120);
         window.addEventListener('resize', updateSpotlight);
+        window.addEventListener('scroll', updateSpotlight, true);
 
         return () => {
             clearTimeout(timer);
             window.removeEventListener('resize', updateSpotlight);
+            window.removeEventListener('scroll', updateSpotlight, true);
         };
     }, [stepIdx, isVisible, showRewardScreen, currentStep, onSelectTab]);
 
     // Persist tutorial completion to Firestore and localStorage
     const markTutorialCompleted = async (awardBonusXp: boolean) => {
-        if (uid) {
-            localStorage.setItem(`magister_tutorial_done_${uid}`, 'true');
+        if (localKey) {
+            localStorage.setItem(localKey, 'true');
         }
         if (!uid) return;
+
+        // Avoid double-awarding XP if they are just replaying the tour
+        const alreadyDoneInFirestore =
+            userData?.[firestoreFlag] === true ||
+            userData?.profile?.main?.[firestoreFlag] === true;
+        const shouldGrantXp = awardBonusXp && !alreadyDoneInFirestore;
 
         setIsSaving(true);
         try {
@@ -172,9 +227,9 @@ export default function TutorialOverlay({
             await setDoc(
                 profileMainRef,
                 {
-                    tutorialCompleted: true,
-                    tutorialCompletedAt: Date.now(),
-                    ...(awardBonusXp ? { xp: increment(xpReward) } : {})
+                    [firestoreFlag]: true,
+                    [`${firestoreFlag}At`]: Date.now(),
+                    ...(shouldGrantXp ? { xp: increment(xpReward) } : {})
                 },
                 { merge: true }
             );
@@ -182,18 +237,18 @@ export default function TutorialOverlay({
             await setDoc(
                 userRootRef,
                 {
-                    tutorialCompleted: true,
-                    ...(awardBonusXp ? { xp: increment(xpReward) } : {})
+                    [firestoreFlag]: true,
+                    ...(shouldGrantXp ? { xp: increment(xpReward) } : {})
                 },
                 { merge: true }
             );
 
-            if (awardBonusXp && studentEmail) {
+            if (shouldGrantXp && studentEmail) {
                 await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
                     studentName,
                     studentEmail,
-                    itemTitle: 'Scholar Interface Calibration',
-                    itemId: 'onboarding_tutorial',
+                    itemTitle: variant === 'home' ? 'Dashboard Orientation Tour' : 'Classroom Interface Calibration',
+                    itemId: `onboarding_${variant}_tutorial`,
                     xp: xpReward,
                     timestamp: Date.now(),
                     type: 'completion'
@@ -213,7 +268,7 @@ export default function TutorialOverlay({
     };
 
     const handleNext = async () => {
-        if (stepIdx < TUTORIAL_STEPS.length - 1) {
+        if (stepIdx < steps.length - 1) {
             setStepIdx(prev => prev + 1);
         } else {
             setShowRewardScreen(true);
@@ -224,7 +279,7 @@ export default function TutorialOverlay({
     const handleFinishTour = () => {
         setIsVisible(false);
         setShowRewardScreen(false);
-        if (onSelectTab) onSelectTab('lessons');
+        if (variant === 'class' && onSelectTab) onSelectTab('lessons');
         if (onComplete) onComplete();
     };
 
@@ -243,13 +298,11 @@ export default function TutorialOverlay({
                         width: spotlightRect.width + 16,
                         height: spotlightRect.height + 16
                     }}
-                    className="z-[9510] rounded-2xl border-2 border-indigo-400 bg-indigo-500/10 shadow-[0_0_40px_rgba(99,102,241,0.8)] pointer-events-none transition-all duration-300 animate-pulse"
+                    className="z-[9510] rounded-3xl border-2 border-indigo-400 bg-indigo-500/10 shadow-[0_0_40px_rgba(99,102,241,0.8)] pointer-events-none transition-all duration-300 animate-pulse"
                 />
             )}
 
-            {/* ============================================================= */}
-            {/* REWARD COMPLETION SCREEN                                      */}
-            {/* ============================================================= */}
+            {/* REWARD COMPLETION SCREEN */}
             {showRewardScreen ? (
                 <div className="relative z-[9520] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl max-w-md w-full rounded-[3rem] p-8 sm:p-10 text-center border border-white/40 dark:border-slate-800 shadow-[0_25px_70px_rgba(0,0,0,0.45)] animate-in zoom-in-95 duration-300 overflow-hidden">
                     <div className="absolute top-0 left-0 right-0 h-2.5 bg-gradient-to-r from-emerald-400 via-indigo-500 to-cyan-400" />
@@ -259,20 +312,22 @@ export default function TutorialOverlay({
                     </div>
 
                     <span className="px-3.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-[10px] font-black uppercase tracking-widest">
-                        Calibration Complete
+                        {variant === 'home' ? 'Dashboard Calibrated' : 'Classroom Synced'}
                     </span>
 
                     <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-3 mb-2">
-                        You're Ready, {studentName}!
+                        You're All Set, {studentName}!
                     </h2>
 
                     <p className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-                        Your interface is synced and your first modules are unlocked. Here is your calibration bonus:
+                        {variant === 'home'
+                            ? 'Your Scholar Command Center is ready. Join a class or tap an enrolled class card to begin!'
+                            : 'Your classroom interface is calibrated and your modules are ready.'}
                     </p>
 
                     <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 mb-8 flex items-center justify-between">
                         <span className="text-xs font-black uppercase tracking-widest text-slate-400">
-                            Onboarding Bonus
+                            Orientation Bonus
                         </span>
                         <span className="text-2xl font-black text-emerald-500 flex items-center gap-1.5">
                             <Zap size={22} fill="currentColor" /> +{xpReward} XP
@@ -285,19 +340,15 @@ export default function TutorialOverlay({
                         onClick={handleFinishTour}
                         className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/30 transition-all active:scale-95 cursor-pointer"
                     >
-                        {isSaving ? 'Syncing Profile...' : 'Enter Learning Hub'}
+                        {isSaving ? 'Syncing Profile...' : 'Start Exploring'}
                     </button>
                 </div>
             ) : (
-                /* ============================================================= */
-                /* INTERACTIVE STEP CARD                                         */
-                /* ============================================================= */
+                /* INTERACTIVE STEP CARD */
                 <div className="relative z-[9520] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl max-w-lg w-full rounded-[2.5rem] p-7 sm:p-9 border border-white/40 dark:border-slate-800 shadow-[0_25px_70px_rgba(0,0,0,0.45)] animate-in zoom-in-95 duration-300 overflow-hidden">
                     
-                    {/* Top Gradient Accent Bar */}
                     <div className={`absolute top-0 left-0 right-0 h-2 bg-gradient-to-r ${currentStep.accentColor}`} />
 
-                    {/* Top Row: Step Badge & Skip Button */}
                     <div className="flex items-center justify-between gap-4 mb-6">
                         <span className="px-3.5 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 text-[10px] font-black uppercase tracking-widest">
                             {currentStep.badge}
@@ -312,7 +363,6 @@ export default function TutorialOverlay({
                         </button>
                     </div>
 
-                    {/* Step Icon & Copy */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 mb-6">
                         <div className={`w-16 h-16 rounded-[1.5rem] bg-gradient-to-br ${currentStep.accentColor} text-white flex items-center justify-center shrink-0 shadow-lg`}>
                             {currentStep.icon}
@@ -328,9 +378,8 @@ export default function TutorialOverlay({
                         {currentStep.description}
                     </p>
 
-                    {/* Progress Dots */}
                     <div className="flex items-center justify-center gap-2 mb-6">
-                        {TUTORIAL_STEPS.map((s, idx) => (
+                        {steps.map((s, idx) => (
                             <button
                                 key={s.id}
                                 type="button"
@@ -346,7 +395,6 @@ export default function TutorialOverlay({
                         ))}
                     </div>
 
-                    {/* Footer Navigation Buttons */}
                     <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                         <button
                             type="button"
@@ -366,7 +414,7 @@ export default function TutorialOverlay({
                             onClick={handleNext}
                             className="px-7 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/25 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
                         >
-                            {stepIdx === TUTORIAL_STEPS.length - 1 ? (
+                            {stepIdx === steps.length - 1 ? (
                                 <>Claim +{xpReward} XP <Zap size={15} fill="currentColor" /></>
                             ) : (
                                 <>Next Step <ArrowRight size={15} strokeWidth={2.5} /></>
