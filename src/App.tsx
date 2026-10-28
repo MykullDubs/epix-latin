@@ -20,7 +20,7 @@ import {
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, Maximize2,
   Terminal, Code
 } from 'lucide-react';
-
+import { KineticCanvasBlock } from './components/LessonBlocks';
 import PrepositionExam from './components/PrepositionExam';
 import LandingPage from './components/LandingPage';
 import StudentClassView from './components/StudentClassView';
@@ -298,6 +298,8 @@ function LessonView({ lesson, onFinish }: any) {
                       )}
                   </div>
               );
+          case 'kinetic_canvas':
+    return <KineticCanvasBlock block={block} onComplete={handleNextBlock} />;
           case 'wrap_up_block':
               return (
                   <div className="my-8 bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-8 text-slate-800">
