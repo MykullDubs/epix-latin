@@ -10,6 +10,154 @@ import {
 // ============================================================================
 //  GRADE DETAIL MODAL (Student View)
 // ============================================================================
+export function GradeDetailModal({ log, onClose }: any) {
+    if (!log) return null;
+    const { scoreDetail, itemTitle, xp } = log;
+    const isExam = scoreDetail && Array.isArray(scoreDetail.details);
+    const isPending = scoreDetail?.status === 'pending_review';
+
+    return (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-950 w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800 overflow-hidden">
+                
+                {/* Header */}
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800 dark:text-white">{itemTitle}</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mt-1">
+                            {log.timestamp ? new Date(log.timestamp).toLocaleDateString() : 'Completed'} • +{xp || 0} XP
+                        </p>
+                    </div>
+                    <button 
+                        type="button"
+                        onClick={onClose} 
+                        className="p-2.5 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shadow-sm"
+                    >
+                        <X size={20}/>
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-white dark:bg-slate-950">
+                    {/* Score Hero */}
+                    <div className="flex flex-col items-center justify-center mb-8">
+                        {isPending ? (
+                            <div className="px-5 py-2.5 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 font-black text-sm uppercase tracking-widest mb-2">
+                                Pending Instructor Review
+                            </div>
+                        ) : (
+                            <div className={`text-5xl font-black mb-2 ${scoreDetail?.finalScorePct >= 70 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
+                                {scoreDetail?.finalScorePct ?? 100}%
+                            </div>
+                        )}
+                        <div className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                            {scoreDetail ? `${scoreDetail.score} / ${scoreDetail.total} Points Earned` : 'Final Score'}
+                        </div>
+                    </div>
+
+                    {/* Progressive Phase Summary Pills (if applicable) */}
+                    {Array.isArray(scoreDetail?.phaseHistory) && scoreDetail.phaseHistory.length > 1 && (
+                        <div className="mb-6 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2.5">
+                                Adaptive Pathway Unlocked
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                                {scoreDetail.phaseHistory.map((p: any, pIdx: number) => (
+                                    <span 
+                                        key={p.phaseId || pIdx} 
+                                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-black text-slate-700 dark:text-slate-300 shadow-sm"
+                                    >
+                                        {p.phaseTitle}: <span className="text-indigo-600 dark:text-indigo-400">{p.scorePct}%</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Question Breakdown */}
+                    {isExam ? (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                                Question Breakdown
+                            </h3>
+                            {scoreDetail.details.map((q: any, idx: number) => {
+                                const isEssay = q.type === 'essay';
+                                const hasPoints = q.awardedPoints > 0;
+                                const isConsideredCorrect = isEssay ? hasPoints : q.isCorrect;
+                                
+                                const boxColor = isEssay && isPending
+                                    ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5'
+                                    : isConsideredCorrect 
+                                        ? 'border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-500/5' 
+                                        : 'border-rose-100 dark:border-rose-500/20 bg-rose-50/30 dark:bg-rose-500/5';
+                                const badgeColor = isEssay && isPending
+                                    ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                                    : isConsideredCorrect 
+                                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' 
+                                        : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400';
+                                const badgeLabel = isEssay 
+                                    ? (isPending ? 'Needs Review' : 'Graded') 
+                                    : (q.isCorrect ? 'Correct' : 'Incorrect');
+
+                                return (
+                                    <div key={idx} className={`p-5 rounded-2xl border-2 ${boxColor}`}>
+                                        <div className="flex justify-between items-start mb-3">
+                                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest ${badgeColor}`}>
+                                                Q{idx + 1} • {badgeLabel}
+                                            </span>
+                                            <span className="text-xs font-black text-slate-400">
+                                                {q.awardedPoints || 0} / {q.maxPoints} pts
+                                            </span>
+                                        </div>
+                                        <p className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4 leading-relaxed">{q.prompt}</p>
+                                        
+                                        <div className="text-sm text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/70 p-4 rounded-xl border border-slate-200/50 dark:border-slate-700/50 mb-3 whitespace-pre-wrap font-serif">
+                                            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-2 font-sans">Your Answer</span>
+                                            {q.studentVal}
+                                        </div>
+
+                                        {!isConsideredCorrect && q.correctVal && !isEssay && (
+                                            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 mt-3 bg-emerald-50 dark:bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
+                                                <CheckCircle2 size={14}/> Correct Answer: {q.correctVal}
+                                            </div>
+                                        )}
+
+                                        {/* PER-QUESTION FEEDBACK INJECTION */}
+                                        {q.teacherFeedback && (
+                                            <div className="mt-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 p-4 rounded-xl">
+                                                <span className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-1.5 mb-2">
+                                                    <MessageCircle size={12} /> Instructor Feedback
+                                                </span>
+                                                <p className="text-indigo-900 dark:text-indigo-200 font-medium italic leading-relaxed text-sm">
+                                                    "{q.teacherFeedback}"
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="p-8 text-center text-slate-400 font-bold text-sm bg-slate-50 dark:bg-slate-900 rounded-2xl">
+                            This assessment was completed, but itemized question logs were not recorded for this run.
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+                    <button 
+                        type="button"
+                        onClick={onClose} 
+                        className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.01] active:scale-95 transition-all"
+                    >
+                        Close Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 function GradeDetailModal({ log, onClose }: any) {
     if (!log) return null;
     const { scoreDetail, itemTitle, xp } = log;
