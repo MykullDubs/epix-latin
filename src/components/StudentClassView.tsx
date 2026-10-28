@@ -43,12 +43,6 @@ const ExamBreakdownModal = ({ log, onClose }: any) => {
     const isPending = scoreDetail?.status === 'pending_review';
 
     return (
-        {/* 🔥 NEW STUDENT ONBOARDING TUTORIAL OVERLAY */}
-      <TutorialOverlay
-          user={user}
-          userData={userData}
-          onSelectTab={(tabId: string) => setActiveSubTab(tabId as any)}
-      />
         <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-950 w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800 overflow-hidden">
                 
@@ -1133,6 +1127,7 @@ export default function StudentClassView({
   const [activeDeck, setActiveDeck] = useState<any>(null);
   const [activeReading, setActiveReading] = useState<any>(null);
   const [selectedExamLog, setSelectedExamLog] = useState<any>(null);
+  const [replayTutorial, setReplayTutorial] = useState(false);
   
   const initialCurrId = classData?.assignedCurriculums?.[0];
   const initialExpandedId = typeof initialCurrId === 'object' ? (initialCurrId.curriculumId || initialCurrId.id) : initialCurrId;
@@ -1342,7 +1337,17 @@ export default function StudentClassView({
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
       
-      {/* 🔥 POP-UP EXAM BREAKDOWN & FEEDBACK MODAL */}
+      {/* 🔥 NEW STUDENT ONBOARDING TUTORIAL OVERLAY */}
+      <TutorialOverlay
+          key={replayTutorial ? 'replay-tour' : 'auto-tour'}
+          user={user}
+          userData={userData}
+          forceOpen={replayTutorial}
+          onComplete={() => setReplayTutorial(false)}
+          onSelectTab={(tabId: string) => setActiveSubTab(tabId as any)}
+      />
+
+      {/* POP-UP EXAM BREAKDOWN & FEEDBACK MODAL */}
       {selectedExamLog && (
           <ExamBreakdownModal 
               log={selectedExamLog} 
@@ -1385,17 +1390,29 @@ export default function StudentClassView({
                 </div>
             </div>
 
-            <div className="flex bg-black/15 backdrop-blur-md border border-white/10 rounded-[1.2rem] p-2 px-3 md:px-4 items-center gap-3 md:gap-5 shrink-0 shadow-inner">
-                <div className="flex flex-col items-center">
-                    <span className="text-white/60 text-[7px] md:text-[8px] font-black uppercase tracking-widest mb-0.5 md:mb-1">Nodes</span>
-                    <span className="text-white font-black text-sm md:text-lg leading-none tabular-nums">{String(totalNodesCount).padStart(2, '0')}</span>
-                </div>
-                <div className="w-px h-6 bg-white/10" />
-                <div className="flex flex-col items-center">
-                    <span className="text-white/60 text-[7px] md:text-[8px] font-black uppercase tracking-widest mb-0.5 md:mb-1">Done</span>
-                    <div className="flex items-baseline gap-0.5">
-                        <span className="text-emerald-400 font-black text-sm md:text-lg leading-none tabular-nums">{overallProgress}</span>
-                        <span className="text-emerald-400/60 font-bold text-[9px] md:text-[10px]">%</span>
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
+                {/* 1-CLICK REPLAY TUTORIAL BUTTON */}
+                <button
+                    type="button"
+                    onClick={() => setReplayTutorial(true)}
+                    title="Launch Hub Tour"
+                    className="w-10 h-10 md:w-11 md:h-11 bg-black/20 hover:bg-black/30 text-white rounded-full flex items-center justify-center transition-all active:scale-95 border border-white/15 backdrop-blur-md shadow-inner"
+                >
+                    <HelpCircle size={18} />
+                </button>
+
+                <div className="flex bg-black/15 backdrop-blur-md border border-white/10 rounded-[1.2rem] p-2 px-3 md:px-4 items-center gap-3 md:gap-5 shrink-0 shadow-inner">
+                    <div className="flex flex-col items-center">
+                        <span className="text-white/60 text-[7px] md:text-[8px] font-black uppercase tracking-widest mb-0.5 md:mb-1">Nodes</span>
+                        <span className="text-white font-black text-sm md:text-lg leading-none tabular-nums">{String(totalNodesCount).padStart(2, '0')}</span>
+                    </div>
+                    <div className="w-px h-6 bg-white/10" />
+                    <div className="flex flex-col items-center">
+                        <span className="text-white/60 text-[7px] md:text-[8px] font-black uppercase tracking-widest mb-0.5 md:mb-1">Done</span>
+                        <div className="flex items-baseline gap-0.5">
+                            <span className="text-emerald-400 font-black text-sm md:text-lg leading-none tabular-nums">{overallProgress}</span>
+                            <span className="text-emerald-400/60 font-bold text-[9px] md:text-[10px]">%</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1525,7 +1542,7 @@ export default function StudentClassView({
 
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={studentEmail} />}
         
-        {/* 🔥 UPDATED EXAMS TAB: Passes isCompleted, examLog, and onReviewLog to ExamCard */}
+        {/* UPDATED EXAMS TAB: Passes isCompleted, examLog, and onReviewLog to ExamCard */}
         {activeSubTab === 'exams' && (
           <section className="space-y-4 px-4 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4">
             {examList.length === 0 ? (
