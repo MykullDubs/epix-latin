@@ -19,44 +19,44 @@ export interface TutorialStep {
     accentColor: string;
 }
 
-// --- STEPS FOR STUDENT HOME VIEW (Main Dashboard) ---
 const HOME_TUTORIAL_STEPS: TutorialStep[] = [
     {
         id: 'home_welcome',
         badge: 'Command Center • Step 1 of 4',
-        title: 'Welcome to Magister OS',
-        description: 'This is your main Scholar Dashboard. From here, you can track your global XP, maintain your daily study streak, and jump into any of your enrolled classes.',
+        title: 'Welcome to Your Student Portal',
+        description: 'This is your main Command Center. Track your global XP, run spaced-repetition reviews, and jump straight into your active subjects. Complete this 20-second tour to claim +50 XP.',
         icon: <Sparkles size={32} strokeWidth={2.2} />,
         accentColor: 'from-indigo-500 to-cyan-400'
     },
     {
         id: 'home_stats',
-        badge: 'XP & Streaks • Step 2 of 4',
-        title: 'Level Up Your Profile',
-        description: 'Every lesson, flashcard deck, live trivia round, and exam you complete earns XP. Keep your streak alive and customize your HoloAvatar in your profile.',
+        badge: 'Telemetry & Ranks • Step 2 of 4',
+        title: 'Streak, XP & Level Progression',
+        description: 'Every lesson, flashcard review, and live classroom game earns XP toward your next Level. Complete at least one activity each day to keep your Streak lit!',
         targetSelector: '[data-tutorial="home-stats"]',
         icon: <Flame size={32} strokeWidth={2.2} />,
         accentColor: 'from-amber-400 to-orange-500'
     },
     {
-        id: 'home_join_class',
-        badge: 'Enlistment • Step 3 of 4',
-        title: 'Join a Class Cohort',
-        description: 'Have a Class Code from your instructor? Use the Join Class button to link your account to your classroom and unlock your assigned pathways.',
-        targetSelector: '[data-tutorial="home-join"]',
-        icon: <PlusCircle size={32} strokeWidth={2.2} />,
+        id: 'home_actions',
+        badge: 'Action Center • Step 3 of 4',
+        title: 'Daily Targets & Smart Review',
+        description: 'Monitor your daily XP quests, launch your Spaced Repetition flashcard queue in Smart Review, build custom study sets in the Studio, or check instructor Messages.',
+        targetSelector: '[data-tutorial="home-actions"]',
+        icon: <Zap size={32} strokeWidth={2.2} />,
         accentColor: 'from-emerald-500 to-teal-400'
     },
     {
         id: 'home_classes',
-        badge: 'Active Classes • Step 4 of 4',
-        title: 'Launch Your Class Hub',
-        description: 'Tap any of your active class cards to open its Roadmap, interactive Kinetic Canvas labs, Live Arena remote, and Exams.',
+        badge: 'Active Subjects • Step 4 of 4',
+        title: 'Enter Your Classrooms',
+        description: 'Tap any subject tile to open its Roadmap, Kinetic Canvas labs, Live Arena remote, and Assessments. You can also drag and reorder your subject tiles!',
         targetSelector: '[data-tutorial="home-classes"]',
         icon: <Compass size={32} strokeWidth={2.2} />,
         accentColor: 'from-indigo-500 to-purple-500'
     }
 ];
+
 
 // --- STEPS FOR STUDENT CLASS VIEW (Inside a Classroom) ---
 const CLASS_TUTORIAL_STEPS: TutorialStep[] = [
