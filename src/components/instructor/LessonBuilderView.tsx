@@ -375,13 +375,13 @@ export default function LessonBuilderView({
                     <button onClick={() => updateBlock(idx, 'items', [...(block.items||[]), {term:'', definition:''}])} className="w-full py-4 mt-2 border border-dashed border-fuchsia-300 dark:border-fuchsia-500/30 rounded-2xl text-xs font-bold tracking-wider uppercase text-fuchsia-600 dark:text-fuchsia-400 hover:border-fuchsia-500 hover:bg-fuchsia-50 dark:hover:bg-fuchsia-500/10 transition-all">+ Add Word</button>
                   </div>
                 )}
-                  {block.type === 'kinetic_canvas' && (
+{block.type === 'kinetic_canvas' && (
     <div className="mt-4">
         <KineticCanvasBuilder
             block={block}
             onChange={(updatedBlock: any) => {
                 const updatedBlocks = [...(data.blocks || [])];
-                updatedBlocks[index] = updatedBlock;
+                updatedBlocks[idx] = updatedBlock;
                 setData({ ...data, blocks: updatedBlocks });
             }}
         />
