@@ -370,201 +370,824 @@ export const ChatDialogueBlock = ({ lines }: any) => {
     );
 };
 
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { CheckCircle2, Flag, Maximize2, Move, RotateCcw, RotateCw, Sparkles, Zap } from 'lucide-react';
+
 // ============================================================================
-//  7. KINETIC CANVAS BLOCK (2D Spatial Physics, Transform & Reaction Engine)
+//  KINETIC CANVAS BLOCK
+//  Instructor-authored canvas: objects + triggers + actions.
+//
+//  Authoring data is plain JSON (see KineticBlockData). The engine below is
+//  pure (no React), so it can be reused by an editor preview, unit tests, or a
+//  server-side validator. Legacy blocks ({ entities, zones, rules[reaction] })
+//  are migrated automatically by normalizeBlock().
 // ============================================================================
-export interface KineticEntity {
+
+// ─── 1. DATA MODEL ──────────────────────────────────────────────────────────
+
+export type KineticColor = 'indigo' | 'emerald' | 'rose' | 'amber' | 'cyan';
+export type AnimPreset = 'bounce' | 'shake' | 'pulse' | 'spin' | 'pop' | 'glow' | 'wobble';
+export type EffectPreset = 'march' | 'flash' | 'tilt';
+export type VarValue = number | string | boolean;
+
+export interface Range { min: number; max: number; step?: number }
+export interface Tolerance { value: number; tolerance: number }
+
+export interface KineticObject {
     id: string;
+    kind: 'token' | 'zone' | 'prop';
     label: string;
     sublabel?: string;
-    color?: 'indigo' | 'emerald' | 'rose' | 'amber' | 'cyan';
+    emoji?: string;
+    color?: KineticColor;
+    tags?: string[];
+    /** Centre position, % of the logical canvas. */
     x: number;
     y: number;
-    scale: number;
-    rotation: number;
-    allowResize?: boolean;
-    allowRotate?: boolean;
-    targetScale?: number;
-    targetRotation?: number;
+    /** Size in % of the canvas (zones). */
+    w?: number;
+    h?: number;
+    scale?: number;
+    rotation?: number;
+    visible?: boolean;
+
+    // token
+    resize?: Range;
+    rotate?: Range;
+    /** Correct answer: zone id plus optional transform targets. */
+    target?: { zone: string; scale?: Tolerance; rotation?: Tolerance };
+    /** 'return' sends a wrong drop back home (immediate feedback); 'stay' snaps anyway (check on verify). */
+    onWrong?: 'return' | 'stay';
+    lockOnCorrect?: boolean;
+    /** false = decoy; ignored by completion. */
+    required?: boolean;
     variableName?: string;
+
+    // zone
+    /** Category sorting: tags this zone accepts (used when a token has no explicit target). */
+    accepts?: string[];
+    capacity?: number;
 }
 
-export interface KineticZone {
-    id: string;
-    label: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+/** Reference to objects: an id, '#tag', or (in actions) '$self' / '$zone'. */
+export type Ref = string;
+
+export interface Condition {
+    var: string;
+    op: '==' | '!=' | '>=' | '<=' | '>' | '<';
+    value: VarValue;
 }
+
+export type Trigger =
+    | { type: 'dragStart'; object?: Ref }
+    | { type: 'drop'; object?: Ref; zone?: Ref; correct?: boolean }
+    | { type: 'reject'; object?: Ref; zone?: Ref }
+    | { type: 'release'; object?: Ref }
+    | { type: 'tap'; object?: Ref }
+    | { type: 'transform'; object?: Ref; prop: 'scale' | 'rotation'; min?: number; max?: number }
+    | { type: 'complete' };
+
+export type RuleAction =
+    | { type: 'animate'; target: Ref; preset: AnimPreset }
+    | { type: 'effect'; preset: EffectPreset }
+    | { type: 'banner'; message: string }
+    | { type: 'show' | 'hide'; target: Ref }
+    | { type: 'move'; target: Ref; x: number; y: number }
+    | { type: 'setTransform'; target: Ref; scale?: number; rotation?: number }
+    | { type: 'setVar'; name: string; op?: 'set' | 'add'; value: VarValue }
+    | { type: 'sound'; src: string };
 
 export interface KineticRule {
     id: string;
-    entityId: string;
-    zoneId: string;
-    reaction: 'bounce_glow' | 'chariot_march' | 'lever_tilt' | 'combine_flash';
-    message: string;
+    when: Trigger;
+    if?: Condition[];
+    then: RuleAction[];
+    once?: boolean;
 }
+
+export interface KineticBlockData {
+    title?: string;
+    backgroundTheme?: string;
+    canvas?: { width: number; height: number };
+    /** 'verify' shows a Verify button, 'auto' completes as soon as everything is solved. */
+    completion?: 'verify' | 'auto';
+    objects: KineticObject[];
+    variables?: { name: string; label?: string; initial: VarValue }[];
+    rules: KineticRule[];
+}
+
+// ─── 2. RUNTIME STATE ───────────────────────────────────────────────────────
+
+interface RuntimeObject { x: number; y: number; scale: number; rotation: number; visible: boolean }
+
+export interface KineticState {
+    objs: Record<string, RuntimeObject>;
+    placed: Record<string, string>; // tokenId -> zoneId
+    locked: Record<string, true>;
+    vars: Record<string, VarValue>;
+    fired: Record<string, true>;
+    attempts: number;
+    verified: boolean;
+    // transient presentation state (not persisted)
+    anims: Record<string, { preset: AnimPreset; n: number }>;
+    effect: { preset: EffectPreset; n: number } | null;
+    banner: { message: string; n: number } | null;
+    sound: { src: string; n: number } | null;
+    fx: number;
+}
+
+export type KineticSnapshot = Pick<
+    KineticState,
+    'objs' | 'placed' | 'locked' | 'vars' | 'fired' | 'attempts' | 'verified'
+>;
+
+export interface KineticResult {
+    solved: number;
+    total: number;
+    score: number;
+    attempts: number;
+    vars: Record<string, VarValue>;
+}
+
+type KineticEvent =
+    | { type: 'dragStart'; object: string }
+    | { type: 'drop'; object: string; zone: string; correct: boolean }
+    | { type: 'reject'; object: string; zone: string }
+    | { type: 'release'; object: string }
+    | { type: 'tap'; object: string }
+    | { type: 'transform'; object: string; prop: 'scale' | 'rotation'; value: number }
+    | { type: 'complete' };
+
+type Msg =
+    | { type: 'dragStart'; id: string }
+    | { type: 'drop'; id: string; x: number; y: number; zoneId: string | null }
+    | { type: 'tap'; id: string }
+    | { type: 'transform'; id: string; prop: 'scale' | 'rotation'; value: number }
+    | { type: 'verify' }
+    | { type: 'reset' };
+
+// ─── 3. ENGINE (pure) ───────────────────────────────────────────────────────
+
+type ById = Record<string, KineticObject>;
+interface Ctx { self?: string; zone?: string }
+
+const indexById = (objects: KineticObject[]): ById =>
+    objects.reduce<ById>((acc, o) => { acc[o.id] = o; return acc; }, {});
+
+const without = <T,>(rec: Record<string, T>, key: string): Record<string, T> => {
+    const next = { ...rec };
+    delete next[key];
+    return next;
+};
+
+const matchRef = (ref: Ref | undefined, id: string | undefined, byId: ById): boolean => {
+    if (ref === undefined) return true;
+    if (id === undefined) return false;
+    if (ref.startsWith('#')) return !!byId[id]?.tags?.includes(ref.slice(1));
+    return ref === id;
+};
+
+const resolveTargets = (ref: Ref, ctx: Ctx, objects: KineticObject[]): string[] => {
+    if (ref === '$self') return ctx.self ? [ctx.self] : [];
+    if (ref === '$zone') return ctx.zone ? [ctx.zone] : [];
+    if (ref.startsWith('#')) return objects.filter(o => o.tags?.includes(ref.slice(1))).map(o => o.id);
+    return objects.some(o => o.id === ref) ? [ref] : [];
+};
+
+const evalCondition = (c: Condition, vars: Record<string, VarValue>): boolean => {
+    const v = vars[c.var];
+    switch (c.op) {
+        case '==': return v === c.value;
+        case '!=': return v !== c.value;
+        case '>=': return Number(v) >= Number(c.value);
+        case '<=': return Number(v) <= Number(c.value);
+        case '>': return Number(v) > Number(c.value);
+        case '<': return Number(v) < Number(c.value);
+    }
+};
+
+const ruleMatches = (rule: KineticRule, ev: KineticEvent, byId: ById): boolean => {
+    const t = rule.when;
+    if (t.type !== ev.type) return false;
+    if (t.type === 'complete' || ev.type === 'complete') return true;
+    if (!matchRef(t.object, ev.object, byId)) return false;
+    if (t.type === 'drop' && ev.type === 'drop') {
+        if (!matchRef(t.zone, ev.zone, byId)) return false;
+        if (t.correct !== undefined && t.correct !== ev.correct) return false;
+    }
+    if (t.type === 'reject' && ev.type === 'reject' && !matchRef(t.zone, ev.zone, byId)) return false;
+    if (t.type === 'transform' && ev.type === 'transform') {
+        if (t.prop !== ev.prop) return false;
+        if (t.min !== undefined && ev.value < t.min) return false;
+        if (t.max !== undefined && ev.value > t.max) return false;
+    }
+    return true;
+};
+
+/** Mutates `s` (which must already be a fresh shallow copy). */
+const applyAction = (s: KineticState, a: RuleAction, ctx: Ctx, objects: KineticObject[]): void => {
+    switch (a.type) {
+        case 'animate':
+            resolveTargets(a.target, ctx, objects).forEach(id => { s.anims[id] = { preset: a.preset, n: ++s.fx }; });
+            break;
+        case 'effect':
+            s.effect = { preset: a.preset, n: ++s.fx };
+            break;
+        case 'banner':
+            s.banner = { message: a.message, n: ++s.fx };
+            break;
+        case 'show':
+        case 'hide':
+            resolveTargets(a.target, ctx, objects).forEach(id => {
+                if (s.objs[id]) s.objs[id] = { ...s.objs[id], visible: a.type === 'show' };
+            });
+            break;
+        case 'move':
+            resolveTargets(a.target, ctx, objects).forEach(id => {
+                if (!s.objs[id]) return;
+                s.objs[id] = { ...s.objs[id], x: a.x, y: a.y };
+                s.placed = without(s.placed, id);
+            });
+            break;
+        case 'setTransform':
+            resolveTargets(a.target, ctx, objects).forEach(id => {
+                if (!s.objs[id]) return;
+                s.objs[id] = {
+                    ...s.objs[id],
+                    scale: a.scale ?? s.objs[id].scale,
+                    rotation: a.rotation ?? s.objs[id].rotation,
+                };
+            });
+            break;
+        case 'setVar': {
+            const cur = s.vars[a.name];
+            s.vars[a.name] = a.op === 'add' ? Number(cur ?? 0) + Number(a.value) : a.value;
+            break;
+        }
+        case 'sound':
+            s.sound = { src: a.src, n: ++s.fx };
+            break;
+    }
+};
+
+const runEvent = (state: KineticState, ev: KineticEvent, data: KineticBlockData, byId: ById): KineticState => {
+    const s: KineticState = {
+        ...state,
+        objs: { ...state.objs },
+        placed: { ...state.placed },
+        vars: { ...state.vars },
+        fired: { ...state.fired },
+        anims: { ...state.anims },
+    };
+    const ctx: Ctx = ev.type === 'complete' ? {} : { self: ev.object, zone: 'zone' in ev ? ev.zone : undefined };
+
+    // Rules run in order against the progressively updated state, so a later
+    // rule can react to variables an earlier rule just changed.
+    for (const rule of data.rules) {
+        if (rule.once && s.fired[rule.id]) continue;
+        if (!ruleMatches(rule, ev, byId)) continue;
+        if (rule.if && !rule.if.every(c => evalCondition(c, s.vars))) continue;
+        if (rule.once) s.fired[rule.id] = true;
+        rule.then.forEach(a => applyAction(s, a, ctx, data.objects));
+    }
+    return s;
+};
+
+const checkTolerance = (v: number, t?: Tolerance) => !t || Math.abs(v - t.value) <= t.tolerance;
+
+export const isCorrectPlacement = (tok: KineticObject, zone: KineticObject): boolean => {
+    if (tok.target) return tok.target.zone === zone.id;
+    if (zone.accepts) return zone.accepts.some(tag => tok.tags?.includes(tag));
+    return true;
+};
+
+const computeProgress = (data: KineticBlockData, s: KineticState, byId: ById) => {
+    const required = data.objects.filter(o => o.kind === 'token' && o.required !== false);
+    const solved = required.filter(tok => {
+        const zone = s.placed[tok.id] ? byId[s.placed[tok.id]] : undefined;
+        const rt = s.objs[tok.id];
+        return !!zone && !!rt
+            && isCorrectPlacement(tok, zone)
+            && checkTolerance(rt.scale, tok.target?.scale)
+            && checkTolerance(rt.rotation, tok.target?.rotation);
+    }).length;
+    return { solved, total: required.length, allSolved: required.length > 0 && solved === required.length };
+};
+
+/** Lays out every token in a zone (centred; spread horizontally if capacity > 1). */
+const relayout = (objs: Record<string, RuntimeObject>, placed: Record<string, string>, zoneId: string | undefined, byId: ById) => {
+    if (!zoneId || !byId[zoneId] || !objs[zoneId]) return;
+    const ids = Object.keys(placed).filter(id => placed[id] === zoneId);
+    const n = ids.length;
+    const gap = Math.min(12, (byId[zoneId].w ?? 20) / Math.max(n, 1));
+    ids.forEach((id, i) => {
+        objs[id] = { ...objs[id], x: objs[zoneId].x + (n > 1 ? (i - (n - 1) / 2) * gap : 0), y: objs[zoneId].y };
+    });
+};
+
+export const createInitialState = (data: KineticBlockData, saved?: Partial<KineticSnapshot>): KineticState => {
+    const objs: Record<string, RuntimeObject> = {};
+    data.objects.forEach(o => {
+        objs[o.id] = { x: o.x, y: o.y, scale: o.scale ?? 1, rotation: o.rotation ?? 0, visible: o.visible !== false };
+    });
+    const vars: Record<string, VarValue> = {};
+    data.variables?.forEach(v => { vars[v.name] = v.initial; });
+
+    return {
+        objs: { ...objs, ...(saved?.objs ?? {}) },
+        placed: saved?.placed ?? {},
+        locked: saved?.locked ?? {},
+        vars: { ...vars, ...(saved?.vars ?? {}) },
+        fired: saved?.fired ?? {},
+        attempts: saved?.attempts ?? 0,
+        verified: saved?.verified ?? false,
+        anims: {}, effect: null, banner: null, sound: null, fx: 0,
+    };
+};
+
+const createReducer = (data: KineticBlockData) => {
+    const byId = indexById(data.objects);
+
+    return (state: KineticState, msg: Msg): KineticState => {
+        switch (msg.type) {
+            case 'reset':
+                return createInitialState(data);
+
+            case 'dragStart': {
+                if (state.verified || state.locked[msg.id]) return state;
+                return runEvent(state, { type: 'dragStart', object: msg.id }, data, byId);
+            }
+
+            case 'tap':
+                return runEvent(state, { type: 'tap', object: msg.id }, data, byId);
+
+            case 'transform': {
+                if (state.verified || state.locked[msg.id] || !state.objs[msg.id]) return state;
+                const next = { ...state, objs: { ...state.objs, [msg.id]: { ...state.objs[msg.id], [msg.prop]: msg.value } } };
+                return runEvent(next, { type: 'transform', object: msg.id, prop: msg.prop, value: msg.value }, data, byId);
+            }
+
+            case 'drop': {
+                const tok = byId[msg.id];
+                if (!tok || state.verified || state.locked[msg.id]) return state;
+                const prevZone = state.placed[tok.id];
+                const zone = msg.zoneId ? byId[msg.zoneId] : undefined;
+                const placedWithout = without(state.placed, tok.id);
+
+                if (!zone) {
+                    // Released in open space.
+                    const objs = { ...state.objs, [tok.id]: { ...state.objs[tok.id], x: msg.x, y: msg.y } };
+                    relayout(objs, placedWithout, prevZone, byId);
+                    return runEvent({ ...state, objs, placed: placedWithout }, { type: 'release', object: tok.id }, data, byId);
+                }
+
+                const correct = isCorrectPlacement(tok, zone);
+                const occupied = Object.keys(placedWithout).filter(id => placedWithout[id] === zone.id).length;
+                const full = occupied >= (zone.capacity ?? 1);
+
+                if (full || (!correct && (tok.onWrong ?? 'return') === 'return')) {
+                    const objs = { ...state.objs, [tok.id]: { ...state.objs[tok.id], x: tok.x, y: tok.y } };
+                    relayout(objs, placedWithout, prevZone, byId);
+                    return runEvent(
+                        { ...state, objs, placed: placedWithout, attempts: state.attempts + 1 },
+                        { type: 'reject', object: tok.id, zone: zone.id }, data, byId,
+                    );
+                }
+
+                const placed = { ...placedWithout, [tok.id]: zone.id };
+                const objs = { ...state.objs };
+                relayout(objs, placed, zone.id, byId);
+                if (prevZone && prevZone !== zone.id) relayout(objs, placed, prevZone, byId);
+                const locked = correct && tok.lockOnCorrect ? { ...state.locked, [tok.id]: true as const } : state.locked;
+                return runEvent({ ...state, objs, placed, locked }, { type: 'drop', object: tok.id, zone: zone.id, correct }, data, byId);
+            }
+
+            case 'verify': {
+                if (state.verified) return state;
+                const { solved, total, allSolved } = computeProgress(data, state, byId);
+                if (!allSolved) {
+                    const n = state.fx + 1;
+                    return { ...state, fx: n, banner: { message: `Keep going! ${solved} of ${total} interactions aligned.`, n } };
+                }
+                const done = runEvent({ ...state, verified: true }, { type: 'complete' }, data, byId);
+                if (!data.rules.some(r => r.when.type === 'complete')) {
+                    done.banner = { message: 'All canvas objectives verified!', n: ++done.fx };
+                }
+                return done;
+            }
+        }
+    };
+};
+
+// ─── 4. BLOCK NORMALISATION (+ legacy migration) ────────────────────────────
+
+const DEFAULT_BLOCK: KineticBlockData = {
+    title: 'Build the Sentence: Marcus Carries the Sword',
+    backgroundTheme: 'roman_road',
+    canvas: { width: 800, height: 500 },
+    completion: 'verify',
+    variables: [{ name: 'locked', label: 'Words locked', initial: 0 }],
+    objects: [
+        { id: 'zone_1', kind: 'zone', label: '1. Agent (Nominative)', x: 22, y: 32, w: 26, h: 24 },
+        { id: 'zone_2', kind: 'zone', label: '2. Target (Accusative)', x: 50, y: 32, w: 26, h: 24 },
+        { id: 'zone_3', kind: 'zone', label: '3. Action (Verb)', x: 78, y: 32, w: 26, h: 24 },
+        { id: 'ent_1', kind: 'token', label: 'Marcus', sublabel: 'Nominative (Subj)', color: 'indigo', x: 20, y: 78, variableName: 'Subject', target: { zone: 'zone_1' }, lockOnCorrect: true },
+        { id: 'ent_2', kind: 'token', label: 'gladium', sublabel: 'Accusative (Obj)', color: 'amber', x: 50, y: 78, variableName: 'Direct Object', resize: { min: 0.6, max: 1.8, step: 0.1 }, target: { zone: 'zone_2' }, lockOnCorrect: true },
+        { id: 'ent_3', kind: 'token', label: 'portat', sublabel: '3rd Sing. Verb', color: 'emerald', x: 80, y: 78, variableName: 'Action Verb', target: { zone: 'zone_3' }, lockOnCorrect: true },
+        { id: 'legion', kind: 'prop', label: 'Legion', emoji: '🛡️', x: 91, y: 11, tags: ['legion'] },
+    ],
+    rules: [
+        { id: 'r1', when: { type: 'drop', object: 'ent_1', correct: true }, then: [
+            { type: 'animate', target: '$self', preset: 'bounce' }, { type: 'animate', target: '$self', preset: 'glow' },
+            { type: 'setVar', name: 'locked', op: 'add', value: 1 }, { type: 'banner', message: 'Subject locked: Marcus!' } ] },
+        { id: 'r2', when: { type: 'drop', object: 'ent_2', correct: true }, then: [
+            { type: 'effect', preset: 'flash' }, { type: 'animate', target: '$zone', preset: 'pulse' },
+            { type: 'setVar', name: 'locked', op: 'add', value: 1 }, { type: 'banner', message: 'Accusative object linked!' } ] },
+        { id: 'r3', when: { type: 'drop', object: 'ent_3', correct: true }, then: [
+            { type: 'animate', target: '$self', preset: 'pop' },
+            { type: 'setVar', name: 'locked', op: 'add', value: 1 }, { type: 'banner', message: 'Verb locked: portat!' } ] },
+        // Runs after r1–r3 in the same event, so it sees the updated counter.
+        { id: 'r4', when: { type: 'drop', correct: true }, if: [{ var: 'locked', op: '>=', value: 3 }], then: [
+            { type: 'effect', preset: 'march' }, { type: 'animate', target: '#legion', preset: 'bounce' },
+            { type: 'banner', message: 'Syntax complete! The legion advances!' } ] },
+        { id: 'r5', when: { type: 'reject' }, then: [
+            { type: 'animate', target: '$self', preset: 'shake' }, { type: 'banner', message: 'Not quite. Check the case ending.' } ] },
+        { id: 'r6', when: { type: 'tap', object: '#legion' }, then: [
+            { type: 'animate', target: '$self', preset: 'wobble' }, { type: 'banner', message: 'The legion awaits your orders.' } ] },
+        { id: 'r7', once: true, when: { type: 'transform', object: 'ent_2', prop: 'scale', min: 1.5 }, then: [
+            { type: 'banner', message: 'A mighty gladius!' } ] },
+        { id: 'r8', when: { type: 'complete' }, then: [
+            { type: 'effect', preset: 'march' }, { type: 'animate', target: '#legion', preset: 'pop' },
+            { type: 'banner', message: 'All canvas objectives verified!' } ] },
+    ],
+};
+
+interface LegacyEntity {
+    id: string; label: string; sublabel?: string; color?: KineticColor; x: number; y: number;
+    scale?: number; rotation?: number; allowResize?: boolean; allowRotate?: boolean;
+    targetScale?: number; targetRotation?: number; variableName?: string;
+}
+interface LegacyZone { id: string; label: string; x: number; y: number; width: number; height: number }
+interface LegacyRule { id: string; entityId: string; zoneId: string; reaction: string; message: string }
+
+const legacyReaction = (reaction: string, message: string): RuleAction[] => {
+    const banner: RuleAction = { type: 'banner', message };
+    switch (reaction) {
+        case 'bounce_glow': return [{ type: 'animate', target: '$self', preset: 'bounce' }, { type: 'animate', target: '$self', preset: 'glow' }, banner];
+        case 'chariot_march': return [{ type: 'effect', preset: 'march' }, banner];
+        case 'lever_tilt': return [{ type: 'effect', preset: 'tilt' }, banner];
+        default: return [{ type: 'effect', preset: 'flash' }, banner];
+    }
+};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const normalizeBlock = (block: any): KineticBlockData => {
+    if (Array.isArray(block?.objects) && block.objects.length > 0) {
+        return { ...block, objects: block.objects, rules: Array.isArray(block.rules) ? block.rules : [] };
+    }
+    if (Array.isArray(block?.entities) && block.entities.length > 0) {
+        const entities: LegacyEntity[] = block.entities;
+        const zones: LegacyZone[] = Array.isArray(block.zones) ? block.zones : [];
+        const legacyRules: LegacyRule[] = Array.isArray(block.rules) ? block.rules : [];
+
+        const objects: KineticObject[] = [
+            ...zones.map((z): KineticObject => ({ id: z.id, kind: 'zone', label: z.label, x: z.x, y: z.y, w: z.width, h: z.height })),
+            ...entities.map((e): KineticObject => {
+                const r = legacyRules.find(lr => lr.entityId === e.id);
+                return {
+                    id: e.id, kind: 'token', label: e.label, sublabel: e.sublabel, color: e.color,
+                    x: e.x, y: e.y, scale: e.scale, rotation: e.rotation, variableName: e.variableName,
+                    resize: e.allowResize ? { min: 0.6, max: 1.8, step: 0.1 } : undefined,
+                    rotate: e.allowRotate ? { min: -90, max: 90, step: 5 } : undefined,
+                    // Legacy behaviour: snap anywhere, check everything on Verify.
+                    onWrong: 'stay',
+                    target: r ? {
+                        zone: r.zoneId,
+                        scale: e.allowResize && e.targetScale ? { value: e.targetScale, tolerance: 0.25 } : undefined,
+                        rotation: e.allowRotate && e.targetRotation !== undefined ? { value: e.targetRotation, tolerance: 15 } : undefined,
+                    } : undefined,
+                };
+            }),
+        ];
+        const rules: KineticRule[] = [
+            ...legacyRules.map((r): KineticRule => ({
+                id: r.id, when: { type: 'drop', object: r.entityId, zone: r.zoneId }, then: legacyReaction(r.reaction, r.message),
+            })),
+            { id: 'legacy_complete', when: { type: 'complete' }, then: legacyReaction(block.successAnimation || 'chariot_march', 'All Canvas Objectives Verified!') },
+        ];
+        return { title: block.title, backgroundTheme: block.backgroundTheme, objects, rules, completion: 'verify' };
+    }
+    return { ...DEFAULT_BLOCK, title: block?.title ?? DEFAULT_BLOCK.title };
+};
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+// ─── 5. PRESENTATION ────────────────────────────────────────────────────────
 
 const KINETIC_COLORS: Record<string, string> = {
     indigo: 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-500/30',
     emerald: 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-500/30',
     rose: 'bg-rose-600 text-white border-rose-400 shadow-rose-500/30',
     amber: 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/30',
-    cyan: 'bg-cyan-600 text-white border-cyan-400 shadow-cyan-500/30'
+    cyan: 'bg-cyan-600 text-white border-cyan-400 shadow-cyan-500/30',
 };
 
 const KINETIC_BACKGROUNDS: Record<string, string> = {
     grid: 'bg-slate-900 bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:24px_24px]',
     roman_road: 'bg-gradient-to-b from-amber-950 via-stone-900 to-slate-950',
     physics_lab: 'bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900',
-    parchment: 'bg-gradient-to-br from-amber-50 via-orange-50/80 to-amber-100 text-slate-900'
+    parchment: 'bg-gradient-to-br from-amber-50 via-orange-50/80 to-amber-100 text-slate-900',
 };
 
-export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) => {
-    const canvasRef = useRef<HTMLDivElement>(null);
+const ANIMATIONS: Record<AnimPreset, { keyframes: Keyframe[]; options: KeyframeAnimationOptions }> = {
+    bounce: {
+        keyframes: [
+            { transform: 'translateY(0)' }, { transform: 'translateY(-22px)', offset: 0.3 },
+            { transform: 'translateY(0)', offset: 0.55 }, { transform: 'translateY(-9px)', offset: 0.75 }, { transform: 'translateY(0)' },
+        ],
+        options: { duration: 720, easing: 'ease-out' },
+    },
+    shake: {
+        keyframes: [
+            { transform: 'translateX(0)' }, { transform: 'translateX(-9px)' }, { transform: 'translateX(9px)' },
+            { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' },
+        ],
+        options: { duration: 420 },
+    },
+    pulse: { keyframes: [{ transform: 'scale(1)' }, { transform: 'scale(1.14)' }, { transform: 'scale(1)' }], options: { duration: 500, easing: 'ease-in-out' } },
+    spin: { keyframes: [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], options: { duration: 700, easing: 'ease-in-out' } },
+    pop: {
+        keyframes: [{ transform: 'scale(1)' }, { transform: 'scale(1.3)', offset: 0.4 }, { transform: 'scale(0.95)', offset: 0.7 }, { transform: 'scale(1)' }],
+        options: { duration: 450, easing: 'ease-out' },
+    },
+    glow: {
+        keyframes: [
+            { boxShadow: '0 0 0 0 rgba(251,191,36,0)' }, { boxShadow: '0 0 32px 10px rgba(251,191,36,0.85)' }, { boxShadow: '0 0 0 0 rgba(251,191,36,0)' },
+        ],
+        options: { duration: 900, easing: 'ease-out' },
+    },
+    wobble: {
+        keyframes: [
+            { transform: 'rotate(0deg)' }, { transform: 'rotate(-8deg)' }, { transform: 'rotate(8deg)' },
+            { transform: 'rotate(-4deg)' }, { transform: 'rotate(4deg)' }, { transform: 'rotate(0deg)' },
+        ],
+        options: { duration: 600 },
+    },
+};
 
-    const initialEntities: KineticEntity[] = useMemo(() => {
-        if (Array.isArray(block?.entities) && block.entities.length > 0) {
-            return JSON.parse(JSON.stringify(block.entities));
-        }
-        return [
-            { id: 'ent_1', label: 'Marcus', sublabel: 'Nominative (Subj)', color: 'indigo', x: 20, y: 78, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Subject' },
-            { id: 'ent_2', label: 'gladium', sublabel: 'Accusative (Obj)', color: 'amber', x: 50, y: 78, scale: 1, rotation: 0, allowResize: true, allowRotate: false, variableName: 'Direct Object' },
-            { id: 'ent_3', label: 'portat', sublabel: '3rd Sing. Verb', color: 'emerald', x: 80, y: 78, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Action Verb' }
-        ];
-    }, [block]);
-
-    const zones: KineticZone[] = useMemo(() => {
-        if (Array.isArray(block?.zones) && block.zones.length > 0) return block.zones;
-        return [
-            { id: 'zone_1', label: '1. Agent (Nominative)', x: 22, y: 32, width: 26, height: 24 },
-            { id: 'zone_2', label: '2. Target (Accusative)', x: 50, y: 32, width: 26, height: 24 },
-            { id: 'zone_3', label: '3. Action (Verb)', x: 78, y: 32, width: 26, height: 24 }
-        ];
-    }, [block]);
-
-    const rules: KineticRule[] = useMemo(() => {
-        if (Array.isArray(block?.rules) && block.rules.length > 0) return block.rules;
-        return [
-            { id: 'r1', entityId: 'ent_1', zoneId: 'zone_1', reaction: 'bounce_glow', message: 'Subject locked: Marcus!' },
-            { id: 'r2', entityId: 'ent_2', zoneId: 'zone_2', reaction: 'combine_flash', message: 'Accusative Object linked!' },
-            { id: 'r3', entityId: 'ent_3', zoneId: 'zone_3', reaction: 'chariot_march', message: 'Syntax Complete! The Legion advances!' }
-        ];
-    }, [block]);
-
-    const [entities, setEntities] = useState<KineticEntity[]>(initialEntities);
-    const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [draggingId, setDraggingId] = useState<string | null>(null);
-    const [snappedMap, setSnappedMap] = useState<Record<string, string>>({});
-    const [activeReaction, setActiveReaction] = useState<string | null>(null);
-    const [reactionBanner, setReactionBanner] = useState<string | null>(null);
-    const [isVerified, setIsVerified] = useState(false);
-
+const usePrefersReducedMotion = (): boolean => {
+    const query = '(prefers-reduced-motion: reduce)';
+    const [reduced, setReduced] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches);
     useEffect(() => {
-        if (onStateChange) onStateChange({ entities, snappedMap, isVerified });
-    }, [entities, snappedMap, isVerified, onStateChange]);
+        if (typeof window === 'undefined' || !window.matchMedia) return;
+        const mq = window.matchMedia(query);
+        const onChange = () => setReduced(mq.matches);
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
+    return reduced;
+};
 
-    const selectedEntity = entities.find(e => e.id === selectedId) || null;
-    const bgThemeKey = block?.backgroundTheme || 'grid';
+/** Scale factor that fits a fixed logical canvas width into its container. */
+const useFitScale = (ref: React.RefObject<HTMLDivElement | null>, logicalWidth: number): number => {
+    const [k, setK] = useState(1);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver(entries => setK(entries[0].contentRect.width / logicalWidth));
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [ref, logicalWidth]);
+    return k;
+};
+
+/** Own layer so Web Animations never fight the positioning/transform layers. */
+const AnimatedLayer: React.FC<{
+    anim?: { preset: AnimPreset; n: number };
+    reduced: boolean;
+    className?: string;
+    children: React.ReactNode;
+}> = ({ anim, reduced, className, children }) => {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!anim || reduced || !el || typeof el.animate !== 'function') return;
+        const def = ANIMATIONS[anim.preset];
+        el.animate(def.keyframes, def.options);
+    }, [anim, reduced]);
+    return <div ref={ref} className={className}>{children}</div>;
+};
+
+export interface KineticCanvasBlockProps {
+    /** New object-based block data, or a legacy { entities, zones, rules } block. */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    block?: any;
+    /** Previously emitted snapshot, to resume a learner's progress. */
+    savedState?: Partial<KineticSnapshot>;
+    onComplete?: (result: KineticResult) => void;
+    onStateChange?: (snapshot: KineticSnapshot) => void;
+}
+
+export const KineticCanvasBlock = ({ block, onComplete, onStateChange, savedState }: KineticCanvasBlockProps) => {
+    // Key on content so a parent re-creating the same block object doesn't reset progress.
+    const dataKey = JSON.stringify(block ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const data = useMemo(() => normalizeBlock(block), [dataKey]);
+    const byId = useMemo(() => indexById(data.objects), [data]);
+    const reducer = useMemo(() => createReducer(data), [data]);
+    const [state, dispatch] = useReducer(reducer, undefined, () => createInitialState(data, savedState));
+
+    // Live authoring preview: reset when the block definition changes.
+    const firstRender = useRef(true);
+    useEffect(() => {
+        if (firstRender.current) { firstRender.current = false; return; }
+        dispatch({ type: 'reset' });
+    }, [data]);
+
+    const reducedMotion = usePrefersReducedMotion();
+    const logicalW = data.canvas?.width ?? 800;
+    const logicalH = data.canvas?.height ?? 500;
+    const stageRef = useRef<HTMLDivElement>(null);
+    const k = useFitScale(stageRef, logicalW);
+
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [held, setHeld] = useState<string | null>(null); // keyboard "picked up" token
+    const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null);
+    const dragMeta = useRef<{ offX: number; offY: number; sx: number; sy: number; moved: boolean } | null>(null);
+    const tokenRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const zoneRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+    const [bannerText, setBannerText] = useState<string | null>(null);
+    const [activeEffect, setActiveEffect] = useState<EffectPreset | null>(null);
+
+    const progress = useMemo(() => computeProgress(data, state, byId), [data, state, byId]);
+    const bgThemeKey = data.backgroundTheme && KINETIC_BACKGROUNDS[data.backgroundTheme] ? data.backgroundTheme : 'grid';
     const isLightTheme = bgThemeKey === 'parchment';
 
-    const triggerCanvasReaction = (reactionType: string, message: string) => {
-        setActiveReaction(reactionType);
-        setReactionBanner(message);
-        setTimeout(() => setActiveReaction(null), 2200);
+    // Keep latest callbacks without re-running effects.
+    const onStateChangeRef = useRef(onStateChange);
+    const onCompleteRef = useRef(onComplete);
+    onStateChangeRef.current = onStateChange;
+    onCompleteRef.current = onComplete;
+
+    // Persistable snapshot: only committed state (never mid-drag positions).
+    useEffect(() => {
+        onStateChangeRef.current?.({
+            objs: state.objs, placed: state.placed, locked: state.locked, vars: state.vars,
+            fired: state.fired, attempts: state.attempts, verified: state.verified,
+        });
+    }, [state.objs, state.placed, state.locked, state.vars, state.fired, state.attempts, state.verified]);
+
+    useEffect(() => {
+        if (!state.verified) return;
+        const t = setTimeout(() => onCompleteRef.current?.({
+            solved: progress.solved, total: progress.total,
+            score: progress.total ? progress.solved / progress.total : 0,
+            attempts: state.attempts, vars: state.vars,
+        }), 1200);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.verified]);
+
+    useEffect(() => {
+        if (data.completion === 'auto' && !state.verified && progress.allSolved) dispatch({ type: 'verify' });
+    }, [data.completion, state.verified, progress.allSolved]);
+
+    useEffect(() => {
+        if (!state.banner) return;
+        setBannerText(state.banner.message);
+        const t = setTimeout(() => setBannerText(null), 3600);
+        return () => clearTimeout(t);
+    }, [state.banner]);
+
+    useEffect(() => {
+        if (!state.effect || reducedMotion) return;
+        setActiveEffect(state.effect.preset);
+        const t = setTimeout(() => setActiveEffect(null), 2200);
+        return () => clearTimeout(t);
+    }, [state.effect, reducedMotion]);
+
+    useEffect(() => {
+        if (!state.sound) return;
+        try { void new Audio(state.sound.src).play().catch(() => undefined); } catch { /* autoplay blocked */ }
+    }, [state.sound]);
+
+    // ── pointer drag ────────────────────────────────────────────────────────
+    const toPercent = (clientX: number, clientY: number) => {
+        const r = stageRef.current?.getBoundingClientRect();
+        if (!r || r.width === 0) return { x: 0, y: 0 };
+        return { x: ((clientX - r.left) / r.width) * 100, y: ((clientY - r.top) / r.height) * 100 };
     };
 
-    const handlePointerDown = (e: React.PointerEvent, entityId: string) => {
-        if (isVerified) return;
+    const hitTestZone = (x: number, y: number): KineticObject | null => {
+        let best: KineticObject | null = null;
+        let bestDist = Infinity;
+        for (const z of data.objects) {
+            const rt = state.objs[z.id];
+            if (z.kind !== 'zone' || !rt?.visible) continue;
+            const hw = (z.w ?? 20) / 2;
+            const hh = (z.h ?? 20) / 2;
+            if (x < rt.x - hw || x > rt.x + hw || y < rt.y - hh || y > rt.y + hh) continue;
+            const d = Math.hypot(x - rt.x, y - rt.y);
+            if (d < bestDist) { best = z; bestDist = d; }
+        }
+        return best;
+    };
+
+    const isInteractive = (tok: KineticObject) => !state.verified && !state.locked[tok.id];
+
+    const onTokenPointerDown = (e: React.PointerEvent<HTMLDivElement>, tok: KineticObject) => {
         e.stopPropagation();
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-        setSelectedId(entityId);
-        setDraggingId(entityId);
+        setSelectedId(tok.id);
+        if (!isInteractive(tok)) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const p = toPercent(e.clientX, e.clientY);
+        const rt = state.objs[tok.id];
+        dragMeta.current = { offX: p.x - rt.x, offY: p.y - rt.y, sx: e.clientX, sy: e.clientY, moved: false };
+        setDrag({ id: tok.id, x: rt.x, y: rt.y });
+        dispatch({ type: 'dragStart', id: tok.id });
     };
 
-    const handlePointerMove = (e: React.PointerEvent, entityId: string) => {
-        if (draggingId !== entityId || !canvasRef.current || isVerified) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const rawX = ((e.clientX - rect.left) / rect.width) * 100;
-        const rawY = ((e.clientY - rect.top) / rect.height) * 100;
-        const clampedX = Math.max(6, Math.min(94, rawX));
-        const clampedY = Math.max(8, Math.min(92, rawY));
-
-        setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: clampedX, y: clampedY } : ent));
+    const onTokenPointerMove = (e: React.PointerEvent<HTMLDivElement>, tok: KineticObject) => {
+        const meta = dragMeta.current;
+        if (!drag || drag.id !== tok.id || !meta) return;
+        if (!meta.moved && Math.hypot(e.clientX - meta.sx, e.clientY - meta.sy) > 4) meta.moved = true;
+        const p = toPercent(e.clientX, e.clientY);
+        setDrag({
+            id: tok.id,
+            x: Math.max(5, Math.min(95, p.x - meta.offX)),
+            y: Math.max(6, Math.min(94, p.y - meta.offY)),
+        });
     };
 
-    const handlePointerUp = (e: React.PointerEvent, entityId: string) => {
-        if (draggingId !== entityId) return;
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-        setDraggingId(null);
+    const onTokenPointerUp = (e: React.PointerEvent<HTMLDivElement>, tok: KineticObject) => {
+        const meta = dragMeta.current;
+        if (!drag || drag.id !== tok.id || !meta) return;
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+        const final = drag;
+        dragMeta.current = null;
+        setDrag(null);
+        if (!meta.moved) { dispatch({ type: 'tap', id: tok.id }); return; }
+        const zone = hitTestZone(final.x, final.y);
+        dispatch({ type: 'drop', id: tok.id, x: final.x, y: final.y, zoneId: zone?.id ?? null });
+    };
 
-        const movedEntity = entities.find(ent => ent.id === entityId);
-        if (!movedEntity) return;
+    // ── keyboard alternative to dragging ────────────────────────────────────
+    const firstZoneId = data.objects.find(o => o.kind === 'zone' && state.objs[o.id]?.visible)?.id;
 
-        let matchedZone: KineticZone | null = null;
-        for (const z of zones) {
-            const halfW = z.width / 2;
-            const halfH = z.height / 2;
-            if (movedEntity.x >= (z.x - halfW) && movedEntity.x <= (z.x + halfW) &&
-                movedEntity.y >= (z.y - halfH) && movedEntity.y <= (z.y + halfH)) {
-                matchedZone = z;
-                break;
-            }
+    const cancelHold = (refocusId?: string | null) => {
+        setHeld(null);
+        if (refocusId) requestAnimationFrame(() => tokenRefs.current[refocusId]?.focus());
+    };
+
+    const onTokenKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, tok: KineticObject) => {
+        if (!isInteractive(tok)) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (held === tok.id) { cancelHold(); return; }
+            setHeld(tok.id);
+            setSelectedId(tok.id);
+            dispatch({ type: 'dragStart', id: tok.id });
+            if (firstZoneId) requestAnimationFrame(() => zoneRefs.current[firstZoneId]?.focus());
+        } else if (e.key === 'Escape') {
+            cancelHold();
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();
+            dispatch({ type: 'drop', id: tok.id, x: tok.x, y: tok.y, zoneId: null });
         }
-
-        if (matchedZone) {
-            setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: matchedZone!.x, y: matchedZone!.y } : ent));
-            const nextSnapped = { ...snappedMap, [entityId]: matchedZone.id };
-            setSnappedMap(nextSnapped);
-
-            const matchedRule = rules.find(r => r.entityId === entityId && r.zoneId === matchedZone!.id);
-            if (matchedRule) triggerCanvasReaction(matchedRule.reaction, matchedRule.message);
-        } else {
-            const nextSnapped = { ...snappedMap };
-            delete nextSnapped[entityId];
-            setSnappedMap(nextSnapped);
-        }
     };
 
-    const updateEntityTransform = (id: string, field: 'scale' | 'rotation', value: number) => {
-        if (isVerified) return;
-        setEntities(prev => prev.map(ent => ent.id === id ? { ...ent, [field]: value } : ent));
+    const dropHeldInto = (zoneId: string) => {
+        if (!held) return;
+        const zr = state.objs[zoneId];
+        const id = held;
+        dispatch({ type: 'drop', id, x: zr.x, y: zr.y, zoneId });
+        cancelHold(id);
     };
+
+    const onZoneKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, zone: KineticObject) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dropHeldInto(zone.id); }
+        else if (e.key === 'Escape') cancelHold(held);
+    };
+
+    // ── derived view data ───────────────────────────────────────────────────
+    const tokens = data.objects.filter(o => o.kind === 'token');
+    const zones = data.objects.filter(o => o.kind === 'zone');
+    const props = data.objects.filter(o => o.kind === 'prop');
+    const selected = selectedId ? byId[selectedId] : undefined;
+    const selectedRt = selected ? state.objs[selected.id] : undefined;
+    const heldToken = held ? byId[held] : undefined;
 
     const handleReset = () => {
-        setEntities(JSON.parse(JSON.stringify(initialEntities)));
-        setSnappedMap({});
-        setSelectedId(null);
-        setActiveReaction(null);
-        setReactionBanner(null);
-        setIsVerified(false);
-    };
-
-    const ruleStatus = useMemo(() => {
-        const results = rules.map(rule => {
-            const isZoneMatched = snappedMap[rule.entityId] === rule.zoneId;
-            const ent = entities.find(e => e.id === rule.entityId);
-            const scaleOk = (ent?.allowResize && ent.targetScale) ? Math.abs(ent.scale - ent.targetScale) <= 0.25 : true;
-            const rotateOk = (ent?.allowRotate && ent.targetRotation !== undefined) ? Math.abs(ent.rotation - ent.targetRotation) <= 15 : true;
-            return isZoneMatched && scaleOk && rotateOk;
-        });
-        const completedCount = results.filter(Boolean).length;
-        return { completedCount, total: rules.length, allComplete: rules.length > 0 && completedCount === rules.length };
-    }, [rules, snappedMap, entities]);
-
-    const handleVerifyAndComplete = () => {
-        if (ruleStatus.allComplete) {
-            setIsVerified(true);
-            triggerCanvasReaction(block?.successAnimation || 'chariot_march', 'All Canvas Objectives Verified!');
-            if (onComplete) setTimeout(() => onComplete(), 1200);
-        } else {
-            setReactionBanner(`Keep going! ${ruleStatus.completedCount} of ${ruleStatus.total} interactions aligned.`);
-        }
+        dispatch({ type: 'reset' });
+        setSelectedId(null); setHeld(null); setDrag(null);
+        setBannerText(null); setActiveEffect(null);
     };
 
     return (
-        <div className="my-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in duration-500">
+        <div className="my-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
+            {/* Screen-reader announcements */}
+            <div className="sr-only" aria-live="polite" role="status">{state.banner?.message}</div>
+
             {/* Header */}
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 bg-slate-50/60 dark:bg-slate-950/50">
                 <div>
@@ -573,11 +1196,11 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                             <Sparkles size={12} /> Kinetic Canvas Lab
                         </span>
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {ruleStatus.completedCount} / {ruleStatus.total} Aligned
+                            {progress.solved} / {progress.total} Aligned
                         </span>
                     </div>
                     <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                        {String(block?.title || 'Interactive Spatial Assembly')}
+                        {data.title || 'Interactive Spatial Assembly'}
                     </h3>
                 </div>
                 <button
@@ -589,136 +1212,225 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 </button>
             </div>
 
-            {/* Live Variable Telemetry */}
-            <div className="px-6 py-2.5 bg-slate-100/70 dark:bg-slate-950 border-b border-slate-200/70 dark:border-slate-800 flex items-center gap-2.5 overflow-x-auto custom-scrollbar">
+            {/* Live variable telemetry */}
+            <div className="px-6 py-2.5 bg-slate-100/70 dark:bg-slate-950 border-b border-slate-200/70 dark:border-slate-800 flex items-center gap-2.5 overflow-x-auto">
                 <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 shrink-0 flex items-center gap-1">
                     <Zap size={12} className="text-amber-500" /> Variables:
                 </span>
-                {entities.map(ent => {
-                    const matchedZone = zones.find(z => z.id === snappedMap[ent.id]);
+                {data.variables?.map(v => (
+                    <div key={v.name} className="px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1.5 shrink-0 border bg-white border-slate-200 text-slate-600">
+                        <span>{v.label ?? v.name}:</span>
+                        <span className="text-indigo-600 tabular-nums">{String(state.vars[v.name])}</span>
+                    </div>
+                ))}
+                {tokens.map(tok => {
+                    const zoneLabel = state.placed[tok.id] ? byId[state.placed[tok.id]]?.label : undefined;
+                    const rt = state.objs[tok.id];
                     return (
-                        <div key={ent.id} className={`px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1.5 shrink-0 border ${matchedZone ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-600'}`}>
-                            <span>{ent.variableName || ent.label}:</span>
-                            <span className="text-indigo-600">{matchedZone ? matchedZone.label : 'Unplaced'}</span>
-                            {ent.allowResize && <span className="opacity-70">({ent.scale.toFixed(1)}x)</span>}
-                            {ent.allowRotate && <span className="opacity-70">({ent.rotation}°)</span>}
+                        <div key={tok.id} className={`px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1.5 shrink-0 border ${zoneLabel ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-600'}`}>
+                            <span>{tok.variableName || tok.label}:</span>
+                            <span className="text-indigo-600">{zoneLabel ?? 'Unplaced'}</span>
+                            {tok.resize && <span className="opacity-70">({rt.scale.toFixed(1)}x)</span>}
+                            {tok.rotate && <span className="opacity-70">({rt.rotation}°)</span>}
                         </div>
                     );
                 })}
             </div>
 
-            {/* 2D Stage */}
+            {/* Stage */}
             <div className="p-4 sm:p-6 bg-slate-100 dark:bg-slate-950">
-                <div 
-                    ref={canvasRef}
-                    onPointerDown={() => setSelectedId(null)}
-                    className={`relative w-full aspect-[16/10] min-h-[320px] rounded-[2rem] overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
-                >
-                    {reactionBanner && (
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-5 py-2 rounded-full bg-slate-900/90 text-white backdrop-blur-md shadow-xl border border-white/20 text-xs font-black flex items-center gap-2 animate-in slide-in-from-top-4">
-                            <Sparkles size={14} className="text-amber-400 shrink-0" />
-                            <span>{reactionBanner}</span>
-                        </div>
-                    )}
+                <div className={`relative w-full rounded-[2rem] overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey]}`}>
+                    {/* Measured box: height follows the scaled logical canvas */}
+                    <div ref={stageRef} className="relative w-full overflow-hidden" style={{ height: logicalH * k }} onPointerDown={() => setSelectedId(null)}>
+                        <div className="absolute left-0 top-0" style={{ width: logicalW, height: logicalH, transform: `scale(${k})`, transformOrigin: 'top left' }}>
 
-                    {activeReaction === 'chariot_march' && (
-                        <div className="absolute inset-x-0 bottom-5 z-30 pointer-events-none flex items-center justify-center animate-in slide-in-from-left-full duration-700">
-                            <div className="px-6 py-2.5 rounded-2xl bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2 border-2 border-amber-200">
-                                <Flag size={16} /> Legion & Chariot Advance Triggered!
-                            </div>
-                        </div>
-                    )}
-
-                    {activeReaction === 'lever_tilt' && (
-                        <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
-                            <div className="w-56 h-2.5 bg-indigo-400 rounded-full shadow-[0_0_30px_rgba(99,102,241,0.9)] animate-spin" style={{ animationDuration: '1.4s' }} />
-                        </div>
-                    )}
-
-                    {activeReaction === 'combine_flash' && (
-                        <div className="absolute inset-0 z-30 pointer-events-none bg-indigo-500/20 animate-pulse flex items-center justify-center">
-                            <div className="w-28 h-28 rounded-full bg-emerald-400/30 blur-2xl animate-ping" />
-                        </div>
-                    )}
-
-                    {/* Target Snap Zones */}
-                    {zones.map((zone) => {
-                        const occupiedByEntityId = Object.keys(snappedMap).find(k => snappedMap[k] === zone.id);
-                        const isMatchedCorrectly = rules.some(r => r.zoneId === zone.id && r.entityId === occupiedByEntityId);
-
-                        return (
-                            <div
-                                key={zone.id}
-                                style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%`, transform: 'translate(-50%, -50%)' }}
-                                className={`absolute rounded-3xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center p-2 text-center pointer-events-none ${
-                                    isMatchedCorrectly ? 'border-emerald-400 bg-emerald-500/15 scale-105' :
-                                    occupiedByEntityId ? 'border-indigo-400 bg-indigo-500/15' :
-                                    isLightTheme ? 'border-slate-400/70 bg-white/50 text-slate-600' : 'border-slate-600/80 bg-slate-800/40 text-slate-300'
-                                }`}
-                            >
-                                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest opacity-80">{zone.label}</span>
-                            </div>
-                        );
-                    })}
-
-                    {/* Draggable Entities */}
-                    {entities.map((ent) => {
-                        const isSelected = selectedId === ent.id;
-                        const isDragging = draggingId === ent.id;
-                        const isSnapped = Boolean(snappedMap[ent.id]);
-                        const colorClasses = KINETIC_COLORS[ent.color || 'indigo'] || KINETIC_COLORS.indigo;
-
-                        return (
-                            <div
-                                key={ent.id}
-                                onPointerDown={(e) => handlePointerDown(e, ent.id)}
-                                onPointerMove={(e) => handlePointerMove(e, ent.id)}
-                                onPointerUp={(e) => handlePointerUp(e, ent.id)}
-                                style={{
-                                    left: `${ent.x}%`,
-                                    top: `${ent.y}%`,
-                                    transform: `translate(-50%, -50%) scale(${ent.scale}) rotate(${ent.rotation}deg)`,
-                                    touchAction: 'none'
-                                }}
-                                className={`absolute z-20 px-4 py-3 rounded-2xl border-2 shadow-xl cursor-grab active:cursor-grabbing select-none ${colorClasses} ${
-                                    isDragging ? 'z-30 shadow-2xl ring-4 ring-white/40 scale-105' : ''
-                                } ${isSelected ? 'ring-4 ring-indigo-300' : ''} ${
-                                    activeReaction === 'bounce_glow' && isSnapped ? 'animate-bounce' : ''
-                                }`}
-                            >
-                                <div className="flex items-center gap-2 whitespace-nowrap">
-                                    <Move size={14} className="opacity-70 shrink-0" />
-                                    <div className="text-left">
-                                        <div className="font-black text-xs sm:text-sm leading-tight">{ent.label}</div>
-                                        {ent.sublabel && <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">{ent.sublabel}</div>}
-                                    </div>
-                                    {isSnapped && <CheckCircle2 size={14} className="text-white shrink-0 ml-1" />}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Transform Controls Dock */}
-                {selectedEntity && (selectedEntity.allowResize || selectedEntity.allowRotate) && (
-                    <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200 shadow-md flex flex-wrap items-center justify-between gap-6">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
-                            Transform: {selectedEntity.label}
-                        </span>
-                        <div className="flex flex-wrap items-center gap-6 flex-1 justify-end">
-                            {selectedEntity.allowResize && (
-                                <div className="flex items-center gap-3 min-w-[170px]">
-                                    <Maximize2 size={14} className="text-slate-400" />
-                                    <input type="range" min="0.6" max="1.8" step="0.1" value={selectedEntity.scale} onChange={(e) => updateEntityTransform(selectedEntity.id, 'scale', parseFloat(e.target.value))} className="flex-1 accent-indigo-600 cursor-pointer" />
-                                    <span className="text-xs font-black text-slate-700 tabular-nums w-9">{selectedEntity.scale.toFixed(1)}x</span>
+                            {bannerText && (
+                                <div aria-hidden="true" className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-5 py-2 rounded-full bg-slate-900/90 text-white backdrop-blur-md shadow-xl border border-white/20 text-xs font-black flex items-center gap-2 whitespace-nowrap">
+                                    <Sparkles size={14} className="text-amber-400 shrink-0" />
+                                    <span>{bannerText}</span>
                                 </div>
                             )}
-                            {selectedEntity.allowRotate && (
-                                <div className="flex items-center gap-3 min-w-[170px]">
-                                    <RotateCw size={14} className="text-slate-400" />
-                                    <input type="range" min="-90" max="90" step="5" value={selectedEntity.rotation} onChange={(e) => updateEntityTransform(selectedEntity.id, 'rotation', parseInt(e.target.value))} className="flex-1 accent-indigo-600 cursor-pointer" />
-                                    <span className="text-xs font-black text-slate-700 tabular-nums w-9">{selectedEntity.rotation}°</span>
+
+                            {activeEffect === 'march' && (
+                                <div className="absolute inset-x-0 bottom-5 z-30 pointer-events-none flex items-center justify-center animate-in slide-in-from-left-full duration-700">
+                                    <div className="px-6 py-2.5 rounded-2xl bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2 border-2 border-amber-200">
+                                        <Flag size={16} /> Legion &amp; chariot advance!
+                                    </div>
                                 </div>
+                            )}
+                            {activeEffect === 'tilt' && (
+                                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+                                    <div className="w-56 h-2.5 bg-indigo-400 rounded-full shadow-[0_0_30px_rgba(99,102,241,0.9)] animate-spin" style={{ animationDuration: '1.4s' }} />
+                                </div>
+                            )}
+                            {activeEffect === 'flash' && (
+                                <div className="absolute inset-0 z-30 pointer-events-none bg-indigo-500/20 animate-pulse flex items-center justify-center">
+                                    <div className="w-28 h-28 rounded-full bg-emerald-400/30 blur-2xl animate-ping" />
+                                </div>
+                            )}
+
+                            {/* Zones */}
+                            {zones.map(zone => {
+                                const rt = state.objs[zone.id];
+                                if (!rt?.visible) return null;
+                                const occupants = tokens.filter(t => state.placed[t.id] === zone.id);
+                                const hasCorrect = occupants.some(t => isCorrectPlacement(t, zone));
+                                const free = occupants.length < (zone.capacity ?? 1);
+                                return (
+                                    <div
+                                        key={zone.id}
+                                        className="absolute z-10"
+                                        style={{
+                                            left: `${rt.x}%`, top: `${rt.y}%`, width: `${zone.w ?? 20}%`, height: `${zone.h ?? 20}%`,
+                                            transform: `translate(-50%, -50%) scale(${rt.scale}) rotate(${rt.rotation}deg)`,
+                                        }}
+                                    >
+                                        <AnimatedLayer anim={state.anims[zone.id]} reduced={reducedMotion} className="h-full w-full rounded-3xl">
+                                            <div
+                                                ref={el => { zoneRefs.current[zone.id] = el; }}
+                                                role="button"
+                                                tabIndex={held ? 0 : -1}
+                                                aria-disabled={!held}
+                                                aria-label={`Drop zone: ${zone.label}${occupants.length ? `. Contains ${occupants.map(o => o.label).join(', ')}` : '. Empty'}`}
+                                                onClick={() => dropHeldInto(zone.id)}
+                                                onKeyDown={e => onZoneKeyDown(e, zone)}
+                                                className={`h-full w-full rounded-3xl border-2 border-dashed transition-all duration-300 motion-reduce:transition-none flex flex-col items-center justify-center p-2 text-center outline-none focus-visible:ring-4 focus-visible:ring-indigo-300 ${
+                                                    hasCorrect ? 'border-emerald-400 bg-emerald-500/15'
+                                                    : occupants.length ? 'border-indigo-400 bg-indigo-500/15'
+                                                    : isLightTheme ? 'border-slate-400/70 bg-white/50 text-slate-600' : 'border-slate-600/80 bg-slate-800/40 text-slate-300'
+                                                } ${held && free ? 'ring-2 ring-indigo-300' : ''}`}
+                                            >
+                                                <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{zone.label}</span>
+                                                {zone.sublabel && <span className="text-[9px] opacity-60">{zone.sublabel}</span>}
+                                            </div>
+                                        </AnimatedLayer>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Props: decorative or tappable reaction targets */}
+                            {props.map(p => {
+                                const rt = state.objs[p.id];
+                                if (!rt?.visible) return null;
+                                const tappable = data.rules.some(r => r.when.type === 'tap' && matchRef(r.when.object, p.id, byId));
+                                return (
+                                    <div
+                                        key={p.id}
+                                        className="absolute z-10"
+                                        style={{ left: `${rt.x}%`, top: `${rt.y}%`, transform: `translate(-50%, -50%) scale(${rt.scale}) rotate(${rt.rotation}deg)` }}
+                                    >
+                                        <AnimatedLayer anim={state.anims[p.id]} reduced={reducedMotion} className="rounded-2xl">
+                                            <div
+                                                role={tappable ? 'button' : undefined}
+                                                tabIndex={tappable ? 0 : undefined}
+                                                aria-label={tappable ? p.label : undefined}
+                                                onPointerDown={e => e.stopPropagation()}
+                                                onClick={tappable ? () => dispatch({ type: 'tap', id: p.id }) : undefined}
+                                                onKeyDown={tappable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dispatch({ type: 'tap', id: p.id }); } } : undefined}
+                                                className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-indigo-300 ${tappable ? 'cursor-pointer' : ''}`}
+                                            >
+                                                {p.emoji && <span className="text-4xl leading-none" aria-hidden="true">{p.emoji}</span>}
+                                                <span className={`text-[9px] font-black uppercase tracking-widest ${isLightTheme ? 'text-slate-700' : 'text-slate-300'}`}>{p.label}</span>
+                                            </div>
+                                        </AnimatedLayer>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Draggable tokens */}
+                            {tokens.map(tok => {
+                                const rt = state.objs[tok.id];
+                                if (!rt?.visible) return null;
+                                const isDragging = drag?.id === tok.id;
+                                const pos = isDragging && drag ? drag : rt;
+                                const zoneId = state.placed[tok.id];
+                                const zone = zoneId ? byId[zoneId] : undefined;
+                                const correct = !!zone && isCorrectPlacement(tok, zone);
+                                const locked = !!state.locked[tok.id];
+                                const isHeld = held === tok.id;
+                                const colorClasses = KINETIC_COLORS[tok.color || 'indigo'] || KINETIC_COLORS.indigo;
+                                return (
+                                    <div
+                                        key={tok.id}
+                                        className={`absolute ${isDragging ? 'z-30' : 'z-20'} ${isDragging ? '' : 'transition-[left,top] duration-200 motion-reduce:transition-none'}`}
+                                        style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
+                                    >
+                                        <div style={{ transform: `scale(${rt.scale}) rotate(${rt.rotation}deg)` }} className="transition-transform duration-200 motion-reduce:transition-none">
+                                            <AnimatedLayer anim={state.anims[tok.id]} reduced={reducedMotion} className="rounded-2xl">
+                                                <div
+                                                    ref={el => { tokenRefs.current[tok.id] = el; }}
+                                                    role="button"
+                                                    tabIndex={held && !isHeld ? -1 : 0}
+                                                    aria-pressed={isHeld}
+                                                    aria-label={`${tok.label}${tok.sublabel ? `, ${tok.sublabel}` : ''}. ${zone ? `Placed in ${zone.label}.` : 'Not placed.'} ${locked ? 'Locked.' : 'Press Enter to pick up.'}`}
+                                                    onFocus={() => setSelectedId(tok.id)}
+                                                    onPointerDown={e => onTokenPointerDown(e, tok)}
+                                                    onPointerMove={e => onTokenPointerMove(e, tok)}
+                                                    onPointerUp={e => onTokenPointerUp(e, tok)}
+                                                    onPointerCancel={() => { dragMeta.current = null; setDrag(null); }}
+                                                    onKeyDown={e => onTokenKeyDown(e, tok)}
+                                                    style={{ touchAction: 'none' }}
+                                                    className={`px-4 py-3 rounded-2xl border-2 shadow-xl outline-none focus-visible:ring-4 focus-visible:ring-white ${colorClasses} ${
+                                                        isInteractive(tok) ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+                                                    } ${isDragging ? 'shadow-2xl ring-4 ring-white/40' : ''} ${selectedId === tok.id ? 'ring-4 ring-indigo-300' : ''} ${isHeld ? 'ring-4 ring-white' : ''}`}
+                                                >
+                                                    <div className="flex items-center gap-2 whitespace-nowrap">
+                                                        <Move size={14} className="opacity-70 shrink-0" aria-hidden="true" />
+                                                        <div className="text-left">
+                                                            <div className="font-black text-sm leading-tight">{tok.label}</div>
+                                                            {tok.sublabel && <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">{tok.sublabel}</div>}
+                                                        </div>
+                                                        {correct && <CheckCircle2 size={14} className="text-white shrink-0 ml-1" aria-hidden="true" />}
+                                                    </div>
+                                                </div>
+                                            </AnimatedLayer>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Keyboard hint */}
+                {heldToken && (
+                    <div role="status" className="mt-3 px-4 py-2.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-700">
+                        Holding “{heldToken.label}”. Tab to a zone and press Enter to drop it, or Esc to cancel.
+                    </div>
+                )}
+
+                {/* Transform dock */}
+                {selected && selectedRt && (selected.resize || selected.rotate) && (
+                    <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200 shadow-md flex flex-wrap items-center justify-between gap-6">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
+                            Transform: {selected.label}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-6 flex-1 justify-end">
+                            {selected.resize && (
+                                <label className="flex items-center gap-3 min-w-[170px]">
+                                    <Maximize2 size={14} className="text-slate-400" aria-hidden="true" />
+                                    <span className="sr-only">Size of {selected.label}</span>
+                                    <input
+                                        type="range" min={selected.resize.min} max={selected.resize.max} step={selected.resize.step ?? 0.1}
+                                        value={selectedRt.scale} disabled={!isInteractive(selected)}
+                                        onChange={e => dispatch({ type: 'transform', id: selected.id, prop: 'scale', value: parseFloat(e.target.value) })}
+                                        className="flex-1 accent-indigo-600 cursor-pointer disabled:opacity-50"
+                                    />
+                                    <span className="text-xs font-black text-slate-700 tabular-nums w-9">{selectedRt.scale.toFixed(1)}x</span>
+                                </label>
+                            )}
+                            {selected.rotate && (
+                                <label className="flex items-center gap-3 min-w-[170px]">
+                                    <RotateCw size={14} className="text-slate-400" aria-hidden="true" />
+                                    <span className="sr-only">Rotation of {selected.label}</span>
+                                    <input
+                                        type="range" min={selected.rotate.min} max={selected.rotate.max} step={selected.rotate.step ?? 5}
+                                        value={selectedRt.rotation} disabled={!isInteractive(selected)}
+                                        onChange={e => dispatch({ type: 'transform', id: selected.id, prop: 'rotation', value: parseInt(e.target.value, 10) })}
+                                        className="flex-1 accent-indigo-600 cursor-pointer disabled:opacity-50"
+                                    />
+                                    <span className="text-xs font-black text-slate-700 tabular-nums w-9">{selectedRt.rotation}°</span>
+                                </label>
                             )}
                         </div>
                     </div>
@@ -728,21 +1440,28 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             {/* Footer */}
             <div className="p-5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
                 <span className="text-xs font-bold text-slate-500">
-                    {ruleStatus.allComplete ? '✨ All spatial interactions aligned!' : 'Drag objects into the target zones on the canvas.'}
+                    {progress.allSolved
+                        ? '✨ All spatial interactions aligned!'
+                        : 'Drag objects into the target zones, or press Enter on an object to pick it up.'}
+                    {state.attempts > 0 && <span className="ml-2 opacity-70">Misses: {state.attempts}</span>}
                 </span>
-                <button
-                    type="button"
-                    onClick={handleVerifyAndComplete}
-                    className={`px-7 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center gap-2 ${
-                        isVerified || ruleStatus.allComplete ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                    }`}
-                >
-                    {isVerified ? <><CheckCircle2 size={16} /> Completed</> : <><Sparkles size={16} /> Verify Canvas</>}
-                </button>
+                {data.completion !== 'auto' && (
+                    <button
+                        type="button"
+                        onClick={() => dispatch({ type: 'verify' })}
+                        disabled={state.verified}
+                        className={`px-7 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center gap-2 ${
+                            state.verified || progress.allSolved ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                        }`}
+                    >
+                        {state.verified ? <><CheckCircle2 size={16} /> Completed</> : <><Sparkles size={16} /> Verify Canvas</>}
+                    </button>
+                )}
             </div>
         </div>
     );
 };
+
 
 // ============================================================================
 //  8. KINETIC CANVAS BUILDER (Instructor WYSIWYG Studio for BuilderHub)
