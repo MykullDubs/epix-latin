@@ -1,8 +1,9 @@
 // src/components/LessonBlocks.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     Zap, HelpCircle, X, Check, Layers, ArrowLeft, ArrowRight, 
-    User, Brain, RotateCcw, Puzzle, CheckCircle2 
+    User, Brain, RotateCcw, Puzzle, CheckCircle2,
+    Move, RotateCw, Maximize2, Sparkles, Flag, Plus, Trash2, Eye
 } from 'lucide-react';
 
 // ============================================================================
@@ -196,7 +197,6 @@ export const QuizBlock = ({ block, onComplete, onStateChange }: any) => {
 export const FillBlankBlock = ({ block, onComplete, onStateChange }: any) => {
     const rawText = String(block?.text || "Missing text [here].");
     
-    // 🛡️ Safe Regex parsing (No .matchAll)
     const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
         const answers: string[] = [];
@@ -234,7 +234,6 @@ export const FillBlankBlock = ({ block, onComplete, onStateChange }: any) => {
 
     const handleBankClick = (item: {id: string, word: string}) => {
         if (submitted) return;
-        // 🛡️ MOBILE SAFE CHECK: Replaced .includes() with .indexOf() === -1
         const firstEmptyIdx = answers.indexOf(null); 
         if (firstEmptyIdx !== -1) {
             const newAnswers = [...answers];
@@ -271,7 +270,6 @@ export const FillBlankBlock = ({ block, onComplete, onStateChange }: any) => {
         setIsCorrect(false); 
     };
 
-    // 🛡️ MOBILE SAFE CHECK: No .includes() used here!
     const isComplete = answers.length > 0 && answers.indexOf(null) === -1;
 
     return (
@@ -368,6 +366,506 @@ export const ChatDialogueBlock = ({ lines }: any) => {
                     </div>
                 );
             })}
+        </div>
+    );
+};
+
+// ============================================================================
+//  7. KINETIC CANVAS BLOCK (2D Spatial Physics, Transform & Reaction Engine)
+// ============================================================================
+export interface KineticEntity {
+    id: string;
+    label: string;
+    sublabel?: string;
+    color?: 'indigo' | 'emerald' | 'rose' | 'amber' | 'cyan';
+    x: number;
+    y: number;
+    scale: number;
+    rotation: number;
+    allowResize?: boolean;
+    allowRotate?: boolean;
+    targetScale?: number;
+    targetRotation?: number;
+    variableName?: string;
+}
+
+export interface KineticZone {
+    id: string;
+    label: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface KineticRule {
+    id: string;
+    entityId: string;
+    zoneId: string;
+    reaction: 'bounce_glow' | 'chariot_march' | 'lever_tilt' | 'combine_flash';
+    message: string;
+}
+
+const KINETIC_COLORS: Record<string, string> = {
+    indigo: 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-500/30',
+    emerald: 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-500/30',
+    rose: 'bg-rose-600 text-white border-rose-400 shadow-rose-500/30',
+    amber: 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/30',
+    cyan: 'bg-cyan-600 text-white border-cyan-400 shadow-cyan-500/30'
+};
+
+const KINETIC_BACKGROUNDS: Record<string, string> = {
+    grid: 'bg-slate-900 bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:24px_24px]',
+    roman_road: 'bg-gradient-to-b from-amber-950 via-stone-900 to-slate-950',
+    physics_lab: 'bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900',
+    parchment: 'bg-gradient-to-br from-amber-50 via-orange-50/80 to-amber-100 text-slate-900'
+};
+
+export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) => {
+    const canvasRef = useRef<HTMLDivElement>(null);
+
+    const initialEntities: KineticEntity[] = useMemo(() => {
+        if (Array.isArray(block?.entities) && block.entities.length > 0) {
+            return JSON.parse(JSON.stringify(block.entities));
+        }
+        return [
+            { id: 'ent_1', label: 'Marcus', sublabel: 'Nominative (Subj)', color: 'indigo', x: 20, y: 78, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Subject' },
+            { id: 'ent_2', label: 'gladium', sublabel: 'Accusative (Obj)', color: 'amber', x: 50, y: 78, scale: 1, rotation: 0, allowResize: true, allowRotate: false, variableName: 'Direct Object' },
+            { id: 'ent_3', label: 'portat', sublabel: '3rd Sing. Verb', color: 'emerald', x: 80, y: 78, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Action Verb' }
+        ];
+    }, [block]);
+
+    const zones: KineticZone[] = useMemo(() => {
+        if (Array.isArray(block?.zones) && block.zones.length > 0) return block.zones;
+        return [
+            { id: 'zone_1', label: '1. Agent (Nominative)', x: 22, y: 32, width: 26, height: 24 },
+            { id: 'zone_2', label: '2. Target (Accusative)', x: 50, y: 32, width: 26, height: 24 },
+            { id: 'zone_3', label: '3. Action (Verb)', x: 78, y: 32, width: 26, height: 24 }
+        ];
+    }, [block]);
+
+    const rules: KineticRule[] = useMemo(() => {
+        if (Array.isArray(block?.rules) && block.rules.length > 0) return block.rules;
+        return [
+            { id: 'r1', entityId: 'ent_1', zoneId: 'zone_1', reaction: 'bounce_glow', message: 'Subject locked: Marcus!' },
+            { id: 'r2', entityId: 'ent_2', zoneId: 'zone_2', reaction: 'combine_flash', message: 'Accusative Object linked!' },
+            { id: 'r3', entityId: 'ent_3', zoneId: 'zone_3', reaction: 'chariot_march', message: 'Syntax Complete! The Legion advances!' }
+        ];
+    }, [block]);
+
+    const [entities, setEntities] = useState<KineticEntity[]>(initialEntities);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [snappedMap, setSnappedMap] = useState<Record<string, string>>({});
+    const [activeReaction, setActiveReaction] = useState<string | null>(null);
+    const [reactionBanner, setReactionBanner] = useState<string | null>(null);
+    const [isVerified, setIsVerified] = useState(false);
+
+    useEffect(() => {
+        if (onStateChange) onStateChange({ entities, snappedMap, isVerified });
+    }, [entities, snappedMap, isVerified, onStateChange]);
+
+    const selectedEntity = entities.find(e => e.id === selectedId) || null;
+    const bgThemeKey = block?.backgroundTheme || 'grid';
+    const isLightTheme = bgThemeKey === 'parchment';
+
+    const triggerCanvasReaction = (reactionType: string, message: string) => {
+        setActiveReaction(reactionType);
+        setReactionBanner(message);
+        setTimeout(() => setActiveReaction(null), 2200);
+    };
+
+    const handlePointerDown = (e: React.PointerEvent, entityId: string) => {
+        if (isVerified) return;
+        e.stopPropagation();
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        setSelectedId(entityId);
+        setDraggingId(entityId);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent, entityId: string) => {
+        if (draggingId !== entityId || !canvasRef.current || isVerified) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        const rawX = ((e.clientX - rect.left) / rect.width) * 100;
+        const rawY = ((e.clientY - rect.top) / rect.height) * 100;
+        const clampedX = Math.max(6, Math.min(94, rawX));
+        const clampedY = Math.max(8, Math.min(92, rawY));
+
+        setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: clampedX, y: clampedY } : ent));
+    };
+
+    const handlePointerUp = (e: React.PointerEvent, entityId: string) => {
+        if (draggingId !== entityId) return;
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        setDraggingId(null);
+
+        const movedEntity = entities.find(ent => ent.id === entityId);
+        if (!movedEntity) return;
+
+        let matchedZone: KineticZone | null = null;
+        for (const z of zones) {
+            const halfW = z.width / 2;
+            const halfH = z.height / 2;
+            if (movedEntity.x >= (z.x - halfW) && movedEntity.x <= (z.x + halfW) &&
+                movedEntity.y >= (z.y - halfH) && movedEntity.y <= (z.y + halfH)) {
+                matchedZone = z;
+                break;
+            }
+        }
+
+        if (matchedZone) {
+            setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: matchedZone!.x, y: matchedZone!.y } : ent));
+            const nextSnapped = { ...snappedMap, [entityId]: matchedZone.id };
+            setSnappedMap(nextSnapped);
+
+            const matchedRule = rules.find(r => r.entityId === entityId && r.zoneId === matchedZone!.id);
+            if (matchedRule) triggerCanvasReaction(matchedRule.reaction, matchedRule.message);
+        } else {
+            const nextSnapped = { ...snappedMap };
+            delete nextSnapped[entityId];
+            setSnappedMap(nextSnapped);
+        }
+    };
+
+    const updateEntityTransform = (id: string, field: 'scale' | 'rotation', value: number) => {
+        if (isVerified) return;
+        setEntities(prev => prev.map(ent => ent.id === id ? { ...ent, [field]: value } : ent));
+    };
+
+    const handleReset = () => {
+        setEntities(JSON.parse(JSON.stringify(initialEntities)));
+        setSnappedMap({});
+        setSelectedId(null);
+        setActiveReaction(null);
+        setReactionBanner(null);
+        setIsVerified(false);
+    };
+
+    const ruleStatus = useMemo(() => {
+        const results = rules.map(rule => {
+            const isZoneMatched = snappedMap[rule.entityId] === rule.zoneId;
+            const ent = entities.find(e => e.id === rule.entityId);
+            const scaleOk = (ent?.allowResize && ent.targetScale) ? Math.abs(ent.scale - ent.targetScale) <= 0.25 : true;
+            const rotateOk = (ent?.allowRotate && ent.targetRotation !== undefined) ? Math.abs(ent.rotation - ent.targetRotation) <= 15 : true;
+            return isZoneMatched && scaleOk && rotateOk;
+        });
+        const completedCount = results.filter(Boolean).length;
+        return { completedCount, total: rules.length, allComplete: rules.length > 0 && completedCount === rules.length };
+    }, [rules, snappedMap, entities]);
+
+    const handleVerifyAndComplete = () => {
+        if (ruleStatus.allComplete) {
+            setIsVerified(true);
+            triggerCanvasReaction(block?.successAnimation || 'chariot_march', 'All Canvas Objectives Verified!');
+            if (onComplete) setTimeout(() => onComplete(), 1200);
+        } else {
+            setReactionBanner(`Keep going! ${ruleStatus.completedCount} of ${ruleStatus.total} interactions aligned.`);
+        }
+    };
+
+    return (
+        <div className="my-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in duration-500">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 bg-slate-50/60 dark:bg-slate-950/50">
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                            <Sparkles size={12} /> Kinetic Canvas Lab
+                        </span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {ruleStatus.completedCount} / {ruleStatus.total} Aligned
+                        </span>
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                        {String(block?.title || 'Interactive Spatial Assembly')}
+                    </h3>
+                </div>
+                <button
+                    type="button"
+                    onClick={handleReset}
+                    className="px-4 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                    <RotateCcw size={14} /> Reset
+                </button>
+            </div>
+
+            {/* Live Variable Telemetry */}
+            <div className="px-6 py-2.5 bg-slate-100/70 dark:bg-slate-950 border-b border-slate-200/70 dark:border-slate-800 flex items-center gap-2.5 overflow-x-auto custom-scrollbar">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 shrink-0 flex items-center gap-1">
+                    <Zap size={12} className="text-amber-500" /> Variables:
+                </span>
+                {entities.map(ent => {
+                    const matchedZone = zones.find(z => z.id === snappedMap[ent.id]);
+                    return (
+                        <div key={ent.id} className={`px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1.5 shrink-0 border ${matchedZone ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-600'}`}>
+                            <span>{ent.variableName || ent.label}:</span>
+                            <span className="text-indigo-600">{matchedZone ? matchedZone.label : 'Unplaced'}</span>
+                            {ent.allowResize && <span className="opacity-70">({ent.scale.toFixed(1)}x)</span>}
+                            {ent.allowRotate && <span className="opacity-70">({ent.rotation}°)</span>}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* 2D Stage */}
+            <div className="p-4 sm:p-6 bg-slate-100 dark:bg-slate-950">
+                <div 
+                    ref={canvasRef}
+                    onPointerDown={() => setSelectedId(null)}
+                    className={`relative w-full aspect-[16/10] min-h-[320px] rounded-[2rem] overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
+                >
+                    {reactionBanner && (
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-5 py-2 rounded-full bg-slate-900/90 text-white backdrop-blur-md shadow-xl border border-white/20 text-xs font-black flex items-center gap-2 animate-in slide-in-from-top-4">
+                            <Sparkles size={14} className="text-amber-400 shrink-0" />
+                            <span>{reactionBanner}</span>
+                        </div>
+                    )}
+
+                    {activeReaction === 'chariot_march' && (
+                        <div className="absolute inset-x-0 bottom-5 z-30 pointer-events-none flex items-center justify-center animate-in slide-in-from-left-full duration-700">
+                            <div className="px-6 py-2.5 rounded-2xl bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2 border-2 border-amber-200">
+                                <Flag size={16} /> Legion & Chariot Advance Triggered!
+                            </div>
+                        </div>
+                    )}
+
+                    {activeReaction === 'lever_tilt' && (
+                        <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+                            <div className="w-56 h-2.5 bg-indigo-400 rounded-full shadow-[0_0_30px_rgba(99,102,241,0.9)] animate-spin" style={{ animationDuration: '1.4s' }} />
+                        </div>
+                    )}
+
+                    {activeReaction === 'combine_flash' && (
+                        <div className="absolute inset-0 z-30 pointer-events-none bg-indigo-500/20 animate-pulse flex items-center justify-center">
+                            <div className="w-28 h-28 rounded-full bg-emerald-400/30 blur-2xl animate-ping" />
+                        </div>
+                    )}
+
+                    {/* Target Snap Zones */}
+                    {zones.map((zone) => {
+                        const occupiedByEntityId = Object.keys(snappedMap).find(k => snappedMap[k] === zone.id);
+                        const isMatchedCorrectly = rules.some(r => r.zoneId === zone.id && r.entityId === occupiedByEntityId);
+
+                        return (
+                            <div
+                                key={zone.id}
+                                style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%`, transform: 'translate(-50%, -50%)' }}
+                                className={`absolute rounded-3xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center p-2 text-center pointer-events-none ${
+                                    isMatchedCorrectly ? 'border-emerald-400 bg-emerald-500/15 scale-105' :
+                                    occupiedByEntityId ? 'border-indigo-400 bg-indigo-500/15' :
+                                    isLightTheme ? 'border-slate-400/70 bg-white/50 text-slate-600' : 'border-slate-600/80 bg-slate-800/40 text-slate-300'
+                                }`}
+                            >
+                                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest opacity-80">{zone.label}</span>
+                            </div>
+                        );
+                    })}
+
+                    {/* Draggable Entities */}
+                    {entities.map((ent) => {
+                        const isSelected = selectedId === ent.id;
+                        const isDragging = draggingId === ent.id;
+                        const isSnapped = Boolean(snappedMap[ent.id]);
+                        const colorClasses = KINETIC_COLORS[ent.color || 'indigo'] || KINETIC_COLORS.indigo;
+
+                        return (
+                            <div
+                                key={ent.id}
+                                onPointerDown={(e) => handlePointerDown(e, ent.id)}
+                                onPointerMove={(e) => handlePointerMove(e, ent.id)}
+                                onPointerUp={(e) => handlePointerUp(e, ent.id)}
+                                style={{
+                                    left: `${ent.x}%`,
+                                    top: `${ent.y}%`,
+                                    transform: `translate(-50%, -50%) scale(${ent.scale}) rotate(${ent.rotation}deg)`,
+                                    touchAction: 'none'
+                                }}
+                                className={`absolute z-20 px-4 py-3 rounded-2xl border-2 shadow-xl cursor-grab active:cursor-grabbing select-none ${colorClasses} ${
+                                    isDragging ? 'z-30 shadow-2xl ring-4 ring-white/40 scale-105' : ''
+                                } ${isSelected ? 'ring-4 ring-indigo-300' : ''} ${
+                                    activeReaction === 'bounce_glow' && isSnapped ? 'animate-bounce' : ''
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 whitespace-nowrap">
+                                    <Move size={14} className="opacity-70 shrink-0" />
+                                    <div className="text-left">
+                                        <div className="font-black text-xs sm:text-sm leading-tight">{ent.label}</div>
+                                        {ent.sublabel && <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">{ent.sublabel}</div>}
+                                    </div>
+                                    {isSnapped && <CheckCircle2 size={14} className="text-white shrink-0 ml-1" />}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Transform Controls Dock */}
+                {selectedEntity && (selectedEntity.allowResize || selectedEntity.allowRotate) && (
+                    <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200 shadow-md flex flex-wrap items-center justify-between gap-6">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
+                            Transform: {selectedEntity.label}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-6 flex-1 justify-end">
+                            {selectedEntity.allowResize && (
+                                <div className="flex items-center gap-3 min-w-[170px]">
+                                    <Maximize2 size={14} className="text-slate-400" />
+                                    <input type="range" min="0.6" max="1.8" step="0.1" value={selectedEntity.scale} onChange={(e) => updateEntityTransform(selectedEntity.id, 'scale', parseFloat(e.target.value))} className="flex-1 accent-indigo-600 cursor-pointer" />
+                                    <span className="text-xs font-black text-slate-700 tabular-nums w-9">{selectedEntity.scale.toFixed(1)}x</span>
+                                </div>
+                            )}
+                            {selectedEntity.allowRotate && (
+                                <div className="flex items-center gap-3 min-w-[170px]">
+                                    <RotateCw size={14} className="text-slate-400" />
+                                    <input type="range" min="-90" max="90" step="5" value={selectedEntity.rotation} onChange={(e) => updateEntityTransform(selectedEntity.id, 'rotation', parseInt(e.target.value))} className="flex-1 accent-indigo-600 cursor-pointer" />
+                                    <span className="text-xs font-black text-slate-700 tabular-nums w-9">{selectedEntity.rotation}°</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                <span className="text-xs font-bold text-slate-500">
+                    {ruleStatus.allComplete ? '✨ All spatial interactions aligned!' : 'Drag objects into the target zones on the canvas.'}
+                </span>
+                <button
+                    type="button"
+                    onClick={handleVerifyAndComplete}
+                    className={`px-7 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center gap-2 ${
+                        isVerified || ruleStatus.allComplete ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                    }`}
+                >
+                    {isVerified ? <><CheckCircle2 size={16} /> Completed</> : <><Sparkles size={16} /> Verify Canvas</>}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================================
+//  8. KINETIC CANVAS BUILDER (Instructor WYSIWYG Studio for BuilderHub)
+// ============================================================================
+export const KineticCanvasBuilder = ({ block, onChange }: any) => {
+    const [activeTab, setActiveTab] = useState<'canvas' | 'rules' | 'preview'>('canvas');
+    const [draggingTarget, setDraggingTarget] = useState<{ type: 'entity' | 'zone', id: string } | null>(null);
+    const editorCanvasRef = useRef<HTMLDivElement>(null);
+
+    const entities: KineticEntity[] = Array.isArray(block?.entities) && block.entities.length > 0 ? block.entities : [
+        { id: 'ent_1', label: 'Legatus', sublabel: 'Nominative Subject', color: 'indigo', x: 20, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Subject' },
+        { id: 'ent_2', label: 'epistulam', sublabel: 'Accusative Object', color: 'amber', x: 50, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Object' },
+        { id: 'ent_3', label: 'mittit', sublabel: 'Transitive Verb', color: 'emerald', x: 80, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Verb' }
+    ];
+
+    const zones: KineticZone[] = Array.isArray(block?.zones) && block.zones.length > 0 ? block.zones : [
+        { id: 'zone_1', label: '1. Nominative (Who?)', x: 22, y: 30, width: 25, height: 24 },
+        { id: 'zone_2', label: '2. Accusative (What?)', x: 50, y: 30, width: 25, height: 24 },
+        { id: 'zone_3', label: '3. Verb (Action)', x: 78, y: 30, width: 25, height: 24 }
+    ];
+
+    const rules: KineticRule[] = Array.isArray(block?.rules) && block.rules.length > 0 ? block.rules : [
+        { id: 'r1', entityId: 'ent_1', zoneId: 'zone_1', reaction: 'bounce_glow', message: 'Nominative Subject locked!' },
+        { id: 'r2', entityId: 'ent_2', zoneId: 'zone_2', reaction: 'combine_flash', message: 'Direct Object connected!' },
+        { id: 'r3', entityId: 'ent_3', zoneId: 'zone_3', reaction: 'chariot_march', message: 'Legatus epistulam mittit! The Chariot Rides!' }
+    ];
+
+    const updateBlock = (patch: any) => {
+        onChange({ ...block, type: 'kinetic_canvas', entities, zones, rules, ...patch });
+    };
+
+    const handleEditorPointerDown = (e: React.PointerEvent, type: 'entity' | 'zone', id: string) => {
+        e.stopPropagation();
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        setDraggingTarget({ type, id });
+    };
+
+    const handleEditorPointerMove = (e: React.PointerEvent) => {
+        if (!draggingTarget || !editorCanvasRef.current) return;
+        const rect = editorCanvasRef.current.getBoundingClientRect();
+        const x = Math.round(Math.max(8, Math.min(92, ((e.clientX - rect.left) / rect.width) * 100)));
+        const y = Math.round(Math.max(10, Math.min(90, ((e.clientY - rect.top) / rect.height) * 100)));
+
+        if (draggingTarget.type === 'entity') {
+            updateBlock({ entities: entities.map(ent => ent.id === draggingTarget.id ? { ...ent, x, y } : ent) });
+        } else {
+            updateBlock({ zones: zones.map(z => z.id === draggingTarget.id ? { ...z, x, y } : z) });
+        }
+    };
+
+    const handleEditorPointerUp = (e: React.PointerEvent) => {
+        if (!draggingTarget) return;
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        setDraggingTarget(null);
+    };
+
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-100 dark:border-slate-800 p-6 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                        Kinetic Canvas Studio
+                    </span>
+                    <h4 className="text-lg font-black text-slate-800 dark:text-white mt-1">Interactive 2D Physics & Animation Builder</h4>
+                </div>
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button type="button" onClick={() => setActiveTab('canvas')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'canvas' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>1. Layout</button>
+                    <button type="button" onClick={() => setActiveTab('rules')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'rules' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>2. Triggers ({rules.length})</button>
+                    <button type="button" onClick={() => setActiveTab('preview')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'preview' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>3. Test</button>
+                </div>
+            </div>
+
+            {activeTab === 'canvas' && (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-500">Drag objects and snap zones on the canvas to position them:</span>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => updateBlock({ zones: [...zones, { id: `zone_${Date.now()}`, label: 'New Zone', x: 50, y: 35, width: 25, height: 24 }] })} className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-black uppercase flex items-center gap-1"><Plus size={12}/> Zone</button>
+                            <button type="button" onClick={() => updateBlock({ entities: [...entities, { id: `ent_${Date.now()}`, label: 'New Object', color: 'indigo', x: 50, y: 80, scale: 1, rotation: 0 }] })} className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase flex items-center gap-1"><Plus size={12}/> Object</button>
+                        </div>
+                    </div>
+
+                    <div ref={editorCanvasRef} onPointerMove={handleEditorPointerMove} onPointerUp={handleEditorPointerUp} className="relative w-full aspect-[16/9] bg-slate-900 rounded-3xl border-2 border-slate-300 overflow-hidden select-none touch-none">
+                        {zones.map(z => (
+                            <div key={z.id} onPointerDown={(e) => handleEditorPointerDown(e, 'zone', z.id)} style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.width}%`, height: `${z.height}%`, transform: 'translate(-50%, -50%)' }} className="absolute rounded-2xl border-2 border-dashed border-emerald-400 bg-emerald-500/10 text-emerald-300 flex flex-col items-center justify-center p-2 cursor-move">
+                                <span className="text-[10px] font-black uppercase">{z.label}</span>
+                            </div>
+                        ))}
+                        {entities.map(ent => (
+                            <div key={ent.id} onPointerDown={(e) => handleEditorPointerDown(e, 'entity', ent.id)} style={{ left: `${ent.x}%`, top: `${ent.y}%`, transform: 'translate(-50%, -50%)' }} className="absolute z-20 px-4 py-2 rounded-2xl bg-indigo-600 text-white border-2 border-indigo-300 shadow-lg cursor-move flex items-center gap-1.5">
+                                <Move size={12} /> <span className="text-xs font-black">{ent.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'rules' && (
+                <div className="space-y-3">
+                    <button type="button" onClick={() => updateBlock({ rules: [...rules, { id: `r_${Date.now()}`, entityId: entities[0]?.id || '', zoneId: zones[0]?.id || '', reaction: 'bounce_glow', message: 'Matched!' }] })} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase flex items-center gap-1"><Plus size={12}/> Add Trigger Rule</button>
+                    {rules.map((r, idx) => (
+                        <div key={r.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-black uppercase text-indigo-600">When</span>
+                            <select value={r.entityId} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, entityId: e.target.value }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-bold">
+                                {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
+                            </select>
+                            <span className="text-[10px] font-black uppercase text-slate-400">➔</span>
+                            <select value={r.zoneId} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, zoneId: e.target.value }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-bold">
+                                {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
+                            </select>
+                            <select value={r.reaction} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, reaction: e.target.value as any }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-bold">
+                                <option value="bounce_glow">✨ Bounce & Glow</option>
+                                <option value="chariot_march">🏛️ Chariot Advance</option>
+                                <option value="lever_tilt">⚖️ Lever Spin</option>
+                                <option value="combine_flash">⚡ Combine Flash</option>
+                            </select>
+                            <input type="text" value={r.message} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, message: e.target.value }; updateBlock({ rules: u }); }} className="flex-1 px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {activeTab === 'preview' && <KineticCanvasBlock block={{ ...block, entities, zones, rules }} />}
         </div>
     );
 };
