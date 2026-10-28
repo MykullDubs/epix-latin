@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Layers, BookOpen, FileText, Gamepad2, X, Edit3, Eye, Zap, Map, 
-  Wrench, Search, Loader2, Volume2, AlertCircle, ArrowLeft, PenTool
+  Wrench, Search, Loader2, Volume2, AlertCircle, ArrowLeft, PenTool,
+  Sparkles, Plus, Trash2
 } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 import CardBuilderView from './CardBuilderView';
@@ -11,6 +12,70 @@ import ExamBuilderView from './ExamBuilderView';
 import ArcadeBuilderView from './ArcadeBuilderView';
 import CurriculumBuilderView from './CurriculumBuilderView';
 import LivePreview from '../LivePreview';
+import { KineticCanvasBuilder } from '../LessonBlocks';
+
+// ============================================================================
+//  KINETIC CANVAS PRESET TEMPLATES
+// ============================================================================
+const KINETIC_PRESETS: Record<string, any> = {
+    grammar: {
+        title: 'Grammar & Syntax Assembly: The Roman Road',
+        subtitle: 'Drag the Latin words into their grammatical slots to launch the chariot.',
+        backgroundTheme: 'roman_road',
+        successAnimation: 'chariot_march',
+        entities: [
+            { id: 'ent_1', label: 'Legatus', sublabel: 'Nominative Subject', color: 'indigo', x: 20, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Subject' },
+            { id: 'ent_2', label: 'epistulam', sublabel: 'Accusative Object', color: 'amber', x: 50, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Object' },
+            { id: 'ent_3', label: 'mittit', sublabel: 'Transitive Verb', color: 'emerald', x: 80, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Verb' }
+        ],
+        zones: [
+            { id: 'zone_1', label: '1. Nominative (Who?)', x: 22, y: 30, width: 25, height: 24 },
+            { id: 'zone_2', label: '2. Accusative (What?)', x: 50, y: 30, width: 25, height: 24 },
+            { id: 'zone_3', label: '3. Verb (Action)', x: 78, y: 30, width: 25, height: 24 }
+        ],
+        rules: [
+            { id: 'r1', entityId: 'ent_1', zoneId: 'zone_1', reaction: 'bounce_glow', message: 'Nominative Subject locked!' },
+            { id: 'r2', entityId: 'ent_2', zoneId: 'zone_2', reaction: 'combine_flash', message: 'Direct Object connected!' },
+            { id: 'r3', entityId: 'ent_3', zoneId: 'zone_3', reaction: 'chariot_march', message: 'Legatus epistulam mittit! The Chariot Rides!' }
+        ]
+    },
+    map: {
+        title: 'Interactive Map: Provinces of the Empire',
+        subtitle: 'Place the historical legions onto their strategic territories.',
+        backgroundTheme: 'parchment',
+        successAnimation: 'combine_flash',
+        entities: [
+            { id: 'ent_1', label: 'Legio X Fretensis', sublabel: 'Eastern Frontier', color: 'rose', x: 25, y: 82, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Garrison A' },
+            { id: 'ent_2', label: 'Legio IX Hispana', sublabel: 'Northern Frontier', color: 'indigo', x: 75, y: 82, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Garrison B' }
+        ],
+        zones: [
+            { id: 'zone_1', label: 'Britannia (North)', x: 30, y: 28, width: 28, height: 25 },
+            { id: 'zone_2', label: 'Iudaea (East)', x: 72, y: 42, width: 28, height: 25 }
+        ],
+        rules: [
+            { id: 'r1', entityId: 'ent_2', zoneId: 'zone_1', reaction: 'bounce_glow', message: 'Northern border secured!' },
+            { id: 'r2', entityId: 'ent_1', zoneId: 'zone_2', reaction: 'combine_flash', message: 'Eastern trade routes active!' }
+        ]
+    },
+    physics: {
+        title: 'Physics & Forces Lab: Vector Equilibrium',
+        subtitle: 'Place the Force Vector on the fulcrum, resize to 1.5x, and tilt to 30°.',
+        backgroundTheme: 'physics_lab',
+        successAnimation: 'lever_tilt',
+        entities: [
+            { id: 'ent_1', label: 'Force Vector →', sublabel: 'Scale 1.5x • Tilt 30°', color: 'cyan', x: 30, y: 78, scale: 1, rotation: 0, allowResize: true, allowRotate: true, targetScale: 1.5, targetRotation: 30, variableName: 'Torque Vector' },
+            { id: 'ent_2', label: '50kg Counterweight', sublabel: 'Anchor Mass', color: 'amber', x: 70, y: 78, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Load Mass' }
+        ],
+        zones: [
+            { id: 'zone_1', label: 'Fulcrum Vector Node', x: 35, y: 35, width: 30, height: 26 },
+            { id: 'zone_2', label: 'Lever Load Plate', x: 70, y: 35, width: 28, height: 26 }
+        ],
+        rules: [
+            { id: 'r1', entityId: 'ent_1', zoneId: 'zone_1', reaction: 'lever_tilt', message: 'Vector engaged on Fulcrum!' },
+            { id: 'r2', entityId: 'ent_2', zoneId: 'zone_2', reaction: 'bounce_glow', message: 'Counterweight balanced!' }
+        ]
+    }
+};
 
 // ============================================================================
 //  SUB-COMPONENT: PHONETIC ENGINE DRAWER
@@ -193,9 +258,38 @@ export default function BuilderHub({
     { id: 'curriculum', label: 'Pathway Map', icon: <Map size={16}/> } 
   ];
 
+  // --- INJECT A KINETIC CANVAS LAB BLOCK INTO LESSON DATA ---
+  const handleAddKineticBlock = (presetKey: 'grammar' | 'map' | 'physics' = 'grammar') => {
+    const preset = JSON.parse(JSON.stringify(KINETIC_PRESETS[presetKey] || KINETIC_PRESETS.grammar));
+    const newBlock = {
+        id: `kinetic_${Date.now()}`,
+        type: 'kinetic_canvas',
+        ...preset
+    };
+    setLessonData((prev: any) => ({
+        ...prev,
+        blocks: [...(prev.blocks || []), newBlock]
+    }));
+    setToastMsg("Kinetic Canvas Lab added to Lesson! ✨");
+  };
+
+  const handleUpdateKineticBlock = (blockId: string, updatedBlock: any) => {
+    setLessonData((prev: any) => ({
+        ...prev,
+        blocks: (prev.blocks || []).map((b: any) => b.id === blockId ? updatedBlock : b)
+    }));
+  };
+
+  const handleRemoveKineticBlock = (blockId: string) => {
+    setLessonData((prev: any) => ({
+        ...prev,
+        blocks: (prev.blocks || []).filter((b: any) => b.id !== blockId)
+    }));
+  };
+
   const handleCommit = () => {
     const payload = mode === 'arcade' ? { ...lessonData, type: 'arcade_game' } : lessonData;
-    onSaveLesson(payload);
+    onSaveLesson(payload, lessonData.id || null);
     setToastMsg(mode === 'arcade' ? "Arcade Game Committed! 🎮" : "Unit Committed! 📚");
     if (mode === 'lesson') {
         setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
@@ -203,6 +297,8 @@ export default function BuilderHub({
         setLessonData({ title: '', description: '', gameTemplate: 'connect-three', targetScore: 3, mode: 'pvp', deckIds: [] });
     }
   };
+
+  const kineticBlocks = (lessonData?.blocks || []).filter((b: any) => b?.type === 'kinetic_canvas');
 
   return ( 
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 relative transition-colors">
@@ -258,7 +354,7 @@ export default function BuilderHub({
 
       {/* WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
-        <div className={`h-full flex flex-col w-full overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out`}>
+        <div className="h-full flex flex-col w-full overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out">
           
           {/* TAB SELECTOR */}
           <div className="w-full px-6 pt-6 pb-2 shrink-0 max-w-5xl mx-auto select-none">
@@ -288,12 +384,133 @@ export default function BuilderHub({
           </div>
 
           {/* BUILDER CONTENT */}
-          <div className="flex-1 p-6 md:p-8 pt-4 mx-auto w-full max-w-5xl animate-in fade-in duration-500">
-            {mode === 'card' && <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} onPublishDeck={onPublishDeck} instructorClasses={instructorClasses} />}
-            {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onTogglePreview={() => setIsPreviewActive(!isPreviewActive)} isPreviewActive={isPreviewActive} triggerAiModal={triggerAiModal} onAiModalHandled={() => setTriggerAiModal(false)} userData={userData} />}
-            {mode === 'exam' && <ExamBuilderView onSave={(examObj: any) => { onSaveLesson(examObj); setToastMsg("Assessment Successfully Built! 🎯"); }} />}
-            {mode === 'arcade' && <ArcadeBuilderView data={lessonData} setData={setLessonData} availableDecks={allDecks} />}
-            {mode === 'curriculum' && <CurriculumBuilderView availableLessons={lessons} onSaveCurriculum={onSaveCurriculum} classes={instructorClasses} curriculums={curriculums} />}
+          <div className="flex-1 p-6 md:p-8 pt-4 mx-auto w-full max-w-5xl animate-in fade-in duration-500 space-y-8">
+            {mode === 'card' && (
+                <CardBuilderView 
+                    onSaveCard={onSaveCard} 
+                    onUpdateCard={onUpdateCard} 
+                    onDeleteCard={onDeleteCard} 
+                    availableDecks={allDecks} 
+                    onPublishDeck={onPublishDeck} 
+                    instructorClasses={instructorClasses} 
+                />
+            )}
+
+            {mode === 'lesson' && (
+                <>
+                    {/* 🔥 KINETIC CANVAS LAB INJECTOR DOCK */}
+                    <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white p-5 sm:p-6 rounded-[2rem] border border-indigo-500/30 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-start sm:items-center gap-3.5">
+                            <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+                                <Sparkles size={20} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                                        New Interactive Block
+                                    </span>
+                                    {kineticBlocks.length > 0 && (
+                                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase">
+                                            {kineticBlocks.length} Active in Lesson
+                                        </span>
+                                    )}
+                                </div>
+                                <h3 className="text-base sm:text-lg font-black tracking-tight">
+                                    Insert a Kinetic 2D Canvas Lab
+                                </h3>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleAddKineticBlock('grammar')}
+                                className="px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 shadow-md"
+                            >
+                                <Plus size={12} /> 🏛️ Grammar Chariot
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleAddKineticBlock('map')}
+                                className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 border border-white/10"
+                            >
+                                <Plus size={12} /> 🗺️ Empire Map
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleAddKineticBlock('physics')}
+                                className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 border border-white/10"
+                            >
+                                <Plus size={12} /> ⚖️ Physics Lab
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* EXISTING LESSON BUILDER VIEW */}
+                    <LessonBuilderView 
+                        data={lessonData} 
+                        setData={setLessonData} 
+                        onTogglePreview={() => setIsPreviewActive(!isPreviewActive)} 
+                        isPreviewActive={isPreviewActive} 
+                        triggerAiModal={triggerAiModal} 
+                        onAiModalHandled={() => setTriggerAiModal(false)} 
+                        userData={userData} 
+                    />
+
+                    {/* 🔥 RENDER KINETIC CANVAS EDITORS FOR ANY KINETIC BLOCKS IN THIS LESSON */}
+                    {kineticBlocks.length > 0 && (
+                        <div className="space-y-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                                    <Sparkles size={16} /> Active Kinetic Canvas Labs ({kineticBlocks.length})
+                                </h3>
+                            </div>
+                            {kineticBlocks.map((kb: any) => (
+                                <div key={kb.id} className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveKineticBlock(kb.id)}
+                                        className="absolute top-6 right-6 z-20 p-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 transition-colors"
+                                        title="Remove Kinetic Canvas Block"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                    <KineticCanvasBuilder
+                                        block={kb}
+                                        onChange={(updated: any) => handleUpdateKineticBlock(kb.id, updated)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+
+            {mode === 'exam' && (
+                <ExamBuilderView 
+                    onSave={(examObj: any) => { 
+                        onSaveLesson(examObj); 
+                        setToastMsg("Assessment Successfully Built! 🎯"); 
+                    }} 
+                />
+            )}
+
+            {mode === 'arcade' && (
+                <ArcadeBuilderView 
+                    data={lessonData} 
+                    setData={setLessonData} 
+                    availableDecks={allDecks} 
+                />
+            )}
+
+            {mode === 'curriculum' && (
+                <CurriculumBuilderView 
+                    availableLessons={lessons} 
+                    onSaveCurriculum={onSaveCurriculum} 
+                    classes={instructorClasses} 
+                    curriculums={curriculums} 
+                />
+            )}
           </div>
         </div>
 
