@@ -21,6 +21,7 @@ import StudentSlipstreamView from './StudentSlipstreamView';
 import HoloAvatar from './HoloAvatar';
 import AvatarForge from './AvatarForge';
 import MarbleScrabble from './MarbleScrabble';
+import TutorialOverlay from './TutorialOverlay';
 
 // --- THEME HELPER (Original Aesthetic) ---
 const getSubjectTheme = (subject: string) => {
@@ -42,6 +43,12 @@ const ExamBreakdownModal = ({ log, onClose }: any) => {
     const isPending = scoreDetail?.status === 'pending_review';
 
     return (
+        {/* 🔥 NEW STUDENT ONBOARDING TUTORIAL OVERLAY */}
+      <TutorialOverlay
+          user={user}
+          userData={userData}
+          onSelectTab={(tabId: string) => setActiveSubTab(tabId as any)}
+      />
         <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-950 w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800 overflow-hidden">
                 
@@ -1564,6 +1571,7 @@ export default function StudentClassView({
               return (
                 <button 
                     key={tab.id} 
+                    data-tutorial={tab.id}
                     onClick={() => setActiveSubTab(tab.id as any)} 
                     className={`relative flex flex-col flex-1 items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.6)] ring-2 ring-indigo-400/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >
