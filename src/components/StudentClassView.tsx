@@ -13,7 +13,7 @@ import {
     Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2,
     Triangle, Circle, XCircle, X, ArrowDownCircle, Settings, Sparkles,
     Layers, HelpCircle, PlayCircle, BookText, Highlighter, PenTool,
-    AlignLeft, Save, Clock, AlertTriangle
+    AlignLeft, Save, Clock, AlertTriangle, MessageCircle
 } from 'lucide-react';
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
@@ -30,6 +30,158 @@ const getSubjectTheme = (subject: string) => {
     if (sub.includes('social') || sub.includes('history')) return { color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500 dark:bg-amber-600', light: 'bg-amber-100 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20', glow: 'shadow-amber-500/30' };
     if (sub.includes('read') || sub.includes('english')) return { color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-500 dark:bg-cyan-600', light: 'bg-cyan-100 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20', glow: 'shadow-cyan-500/30' };
     return { color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-500 dark:bg-indigo-600', light: 'bg-indigo-100 dark:bg-indigo-500/10', border: 'border-indigo-200 dark:border-indigo-500/20', glow: 'shadow-indigo-500/30' };
+};
+
+// ============================================================================
+//  EXAM BREAKDOWN & FEEDBACK MODAL (Triggered by clicking completed ExamCard)
+// ============================================================================
+const ExamBreakdownModal = ({ log, onClose }: any) => {
+    if (!log) return null;
+    const { scoreDetail, itemTitle, xp } = log;
+    const isExam = scoreDetail && Array.isArray(scoreDetail.details);
+    const isPending = scoreDetail?.status === 'pending_review';
+
+    return (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-950 w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800 overflow-hidden">
+                
+                {/* Header */}
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800 dark:text-white">{itemTitle}</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mt-1">
+                            {log.timestamp ? new Date(log.timestamp).toLocaleDateString() : 'Completed'} • +{xp || 0} XP
+                        </p>
+                    </div>
+                    <button 
+                        type="button"
+                        onClick={onClose} 
+                        className="p-2.5 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shadow-sm"
+                    >
+                        <X size={20}/>
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-white dark:bg-slate-950">
+                    {/* Score Hero */}
+                    <div className="flex flex-col items-center justify-center mb-8">
+                        {isPending ? (
+                            <div className="px-5 py-2.5 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 font-black text-sm uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <Clock size={16} /> Pending Instructor Review
+                            </div>
+                        ) : (
+                            <div className={`text-5xl font-black mb-2 ${scoreDetail?.finalScorePct >= 70 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
+                                {scoreDetail?.finalScorePct ?? 100}%
+                            </div>
+                        )}
+                        <div className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                            {scoreDetail ? `${scoreDetail.score} / ${scoreDetail.total} Points Earned` : 'Final Score'}
+                        </div>
+                    </div>
+
+                    {/* Progressive Phase Summary Pills (if applicable) */}
+                    {Array.isArray(scoreDetail?.phaseHistory) && scoreDetail.phaseHistory.length > 1 && (
+                        <div className="mb-6 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2.5">
+                                Adaptive Pathway Unlocked
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                                {scoreDetail.phaseHistory.map((p: any, pIdx: number) => (
+                                    <span 
+                                        key={p.phaseId || pIdx} 
+                                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-black text-slate-700 dark:text-slate-300 shadow-sm"
+                                    >
+                                        {p.phaseTitle}: <span className="text-indigo-600 dark:text-indigo-400">{p.scorePct}%</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Question Breakdown */}
+                    {isExam ? (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                                Question Breakdown
+                            </h3>
+                            {scoreDetail.details.map((q: any, idx: number) => {
+                                const isEssay = q.type === 'essay';
+                                const hasPoints = q.awardedPoints > 0;
+                                const isConsideredCorrect = isEssay ? hasPoints : q.isCorrect;
+                                
+                                const boxColor = isEssay && isPending
+                                    ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5'
+                                    : isConsideredCorrect 
+                                        ? 'border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-500/5' 
+                                        : 'border-rose-100 dark:border-rose-500/20 bg-rose-50/30 dark:bg-rose-500/5';
+                                const badgeColor = isEssay && isPending
+                                    ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                                    : isConsideredCorrect 
+                                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' 
+                                        : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400';
+                                const badgeLabel = isEssay 
+                                    ? (isPending ? 'Needs Review' : 'Graded') 
+                                    : (q.isCorrect ? 'Correct' : 'Incorrect');
+
+                                return (
+                                    <div key={idx} className={`p-5 rounded-2xl border-2 ${boxColor}`}>
+                                        <div className="flex justify-between items-start mb-3">
+                                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest ${badgeColor}`}>
+                                                Q{idx + 1} • {badgeLabel}
+                                            </span>
+                                            <span className="text-xs font-black text-slate-400">
+                                                {q.awardedPoints || 0} / {q.maxPoints} pts
+                                            </span>
+                                        </div>
+                                        <p className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4 leading-relaxed">{q.prompt}</p>
+                                        
+                                        <div className="text-sm text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/70 p-4 rounded-xl border border-slate-200/50 dark:border-slate-700/50 mb-3 whitespace-pre-wrap font-serif">
+                                            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-2 font-sans">Your Answer</span>
+                                            {q.studentVal}
+                                        </div>
+
+                                        {!isConsideredCorrect && q.correctVal && !isEssay && (
+                                            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 mt-3 bg-emerald-50 dark:bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
+                                                <CheckCircle2 size={14}/> Correct Answer: {q.correctVal}
+                                            </div>
+                                        )}
+
+                                        {/* PER-QUESTION FEEDBACK INJECTION */}
+                                        {q.teacherFeedback && (
+                                            <div className="mt-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 p-4 rounded-xl">
+                                                <span className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-1.5 mb-2">
+                                                    <MessageCircle size={12} /> Instructor Feedback
+                                                </span>
+                                                <p className="text-indigo-900 dark:text-indigo-200 font-medium italic leading-relaxed text-sm">
+                                                    "{q.teacherFeedback}"
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="p-8 text-center text-slate-400 font-bold text-sm bg-slate-50 dark:bg-slate-900 rounded-2xl">
+                            This assessment was completed, but itemized question logs were not recorded for this run.
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+                    <button 
+                        type="button"
+                        onClick={onClose} 
+                        className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.01] active:scale-95 transition-all"
+                    >
+                        Close Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // ============================================================================
@@ -973,6 +1125,7 @@ export default function StudentClassView({
   
   const [activeDeck, setActiveDeck] = useState<any>(null);
   const [activeReading, setActiveReading] = useState<any>(null);
+  const [selectedExamLog, setSelectedExamLog] = useState<any>(null);
   
   const initialCurrId = classData?.assignedCurriculums?.[0];
   const initialExpandedId = typeof initialCurrId === 'object' ? (initialCurrId.curriculumId || initialCurrId.id) : initialCurrId;
@@ -988,7 +1141,7 @@ export default function StudentClassView({
   // COHORT LOGIC: Extract cohort ID from user
   const studentCohortId = userData?.cohortId;
 
-  // 🔥 FIXED: Listen to completion logs using the resolved studentEmail (including user?.email and auth?.currentUser?.email)
+  // Listen to completion logs using the resolved studentEmail
   useEffect(() => {
     if (!classData || !studentEmail) return;
     const q = query(
@@ -1038,7 +1191,7 @@ export default function StudentClassView({
 
   const toggleRoadmap = (currId: string) => setExpandedRoadmaps(prev => ({ ...prev, [currId]: !prev[currId] }));
 
-  // 🔥 ADVANCED MAPPING LOGIC (Supports cohorts AND string/object payloads)
+  // ADVANCED MAPPING LOGIC (Supports cohorts AND string/object payloads)
   const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
   const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
 
@@ -1105,7 +1258,7 @@ export default function StudentClassView({
       return itemIds.some(id => completedItems.includes(id) || userCompleted.includes(id));
   };
 
-  // 🔥 CALCULATE AVAILABLE (UNCOMPLETED) EXAMS FOR BADGES
+  // CALCULATE AVAILABLE (UNCOMPLETED) EXAMS FOR BADGES
   const availableExamsCount = useMemo(() => {
       return examList.filter((exam: any) => !isExamCompleted(exam)).length;
   }, [examList, completionLogs, completedItems, userData?.completedAssignments]);
@@ -1182,6 +1335,14 @@ export default function StudentClassView({
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
       
+      {/* 🔥 POP-UP EXAM BREAKDOWN & FEEDBACK MODAL */}
+      {selectedExamLog && (
+          <ExamBreakdownModal 
+              log={selectedExamLog} 
+              onClose={() => setSelectedExamLog(null)} 
+          />
+      )}
+
       {/* THE COMPACT FROSTED HEADER */}
       <header className={`shrink-0 z-30 relative shadow-md ${theme.bg} rounded-b-[2rem] p-4 md:p-5 border-b border-white/10`}>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
@@ -1199,7 +1360,7 @@ export default function StudentClassView({
                         <span className="px-2 py-0.5 bg-white/20 text-white rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm truncate max-w-[100px]">
                             {classData?.subject || 'Subject'}
                         </span>
-                        {/* 🔥 NEW: HEADER EXAM AVAILABLE BADGE */}
+                        {/* HEADER EXAM AVAILABLE BADGE */}
                         {availableExamsCount > 0 && (
                             <button
                                 type="button"
@@ -1237,7 +1398,7 @@ export default function StudentClassView({
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20 pt-6">
 
-        {/* OPTIONAL BANNER IF EXAM IS AVAILABLE AND STUDENT IS ON LESSONS TAB */}
+        {/* BANNER IF EXAM IS AVAILABLE AND STUDENT IS ON LESSONS TAB */}
         {availableExamsCount > 0 && activeSubTab === 'lessons' && (
             <div className="px-4 max-w-xl mx-auto mb-6 animate-in slide-in-from-top-2 duration-300">
                 <button
@@ -1357,7 +1518,7 @@ export default function StudentClassView({
 
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={studentEmail} />}
         
-        {/* 🔥 UPDATED EXAMS TAB: Passes isCompleted and examLog to ExamCard */}
+        {/* 🔥 UPDATED EXAMS TAB: Passes isCompleted, examLog, and onReviewLog to ExamCard */}
         {activeSubTab === 'exams' && (
           <section className="space-y-4 px-4 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4">
             {examList.length === 0 ? (
@@ -1376,6 +1537,7 @@ export default function StudentClassView({
                             onSelectLesson={onSelectLesson} 
                             isCompleted={completed}
                             examLog={log}
+                            onReviewLog={(targetLog: any) => setSelectedExamLog(targetLog)}
                         />
                     );
                 })
@@ -1427,7 +1589,7 @@ export default function StudentClassView({
   );
 }
 
-// 🔥 UPDATED CURRICULUM PATHWAY (Original Aesthetic)
+// UPDATED CURRICULUM PATHWAY (Original Aesthetic)
 const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
     const currLessons = (curr.lessonIds || []).map((id: string) => {
         let node = lessons.find((l: any) => l.id === id);
@@ -1558,56 +1720,75 @@ const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: 
 );
 
 // ============================================================================
-//  EXAM CARD (Greyed-Out When Completed + Live Score Badge)
+//  EXAM CARD (Greyed-Out When Completed + Clickable to Open Feedback Modal)
 // ============================================================================
-const ExamCard = ({ item, onSelectLesson, isCompleted, examLog }: any) => {
+const ExamCard = ({ item, onSelectLesson, isCompleted, examLog, onReviewLog }: any) => {
     const scoreDetail = examLog?.scoreDetail;
     const isPending = scoreDetail?.status === 'pending_review';
     const score = scoreDetail?.score ?? examLog?.xp ?? 0;
     const total = scoreDetail?.total ?? 100;
     const pct = scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score / total) * 100) : 100);
+    const hasFeedback = scoreDetail?.details?.some((q: any) => q.teacherFeedback && q.teacherFeedback.trim() !== '');
+
+    const handleCardClick = () => {
+        if (isCompleted) {
+            if (onReviewLog) {
+                onReviewLog(examLog || { itemTitle: item.title, xp: 0, timestamp: Date.now(), scoreDetail: null });
+            }
+        } else {
+            onSelectLesson(item);
+        }
+    };
 
     return (
         <button 
             type="button"
-            disabled={isCompleted}
-            onClick={() => !isCompleted && onSelectLesson(item)}
-            className={`w-full text-left p-6 border-2 transition-all group duration-300 relative overflow-hidden flex items-center justify-between gap-5 rounded-[3rem] ${
+            onClick={handleCardClick}
+            className={`w-full text-left p-6 border-2 transition-all group duration-300 relative overflow-hidden flex items-center justify-between gap-5 rounded-[3rem] cursor-pointer active:scale-[0.99] ${
                 isCompleted 
-                    ? 'border-slate-200 dark:border-slate-800 bg-slate-100/90 dark:bg-slate-900/50 cursor-not-allowed opacity-80 shadow-none' 
-                    : 'border-rose-200 dark:border-rose-500/20 bg-rose-50/80 dark:bg-rose-900/20 backdrop-blur-xl shadow-xl hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.02] cursor-pointer'
+                    ? 'border-slate-200 dark:border-slate-800 bg-slate-100/90 dark:bg-slate-900/60 hover:bg-slate-200/70 dark:hover:bg-slate-800/60 hover:border-indigo-300 dark:hover:border-indigo-500/40 opacity-85 shadow-sm' 
+                    : 'border-rose-200 dark:border-rose-500/20 bg-rose-50/80 dark:bg-rose-900/20 backdrop-blur-xl shadow-xl hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.02]'
             }`} 
         >
-            <div className={`absolute top-0 left-0 w-2 h-full ${isCompleted ? 'bg-slate-400 dark:bg-slate-700' : 'bg-rose-500'}`} />
+            <div className={`absolute top-0 left-0 w-2 h-full transition-colors ${isCompleted ? 'bg-slate-400 dark:bg-slate-700 group-hover:bg-indigo-500' : 'bg-rose-500'}`} />
             
             <div className="flex items-center gap-5 min-w-0 flex-1">
                 <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shrink-0 transition-colors duration-300 relative z-10 shadow-lg border ${
                     isCompleted 
-                        ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 grayscale' 
+                        ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 group-hover:text-indigo-600 dark:group-hover:text-indigo-400' 
                         : 'bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 border-rose-100 dark:border-rose-500/20'
                 }`}>
                     {isCompleted ? <CheckCircle2 size={28} strokeWidth={2.5} /> : <Trophy size={28} fill="currentColor" />}
                 </div>
                 
                 <div className="relative z-10 min-w-0 flex-1">
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-2 inline-block transition-colors duration-300 border ${
-                        isCompleted 
-                            ? 'text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700' 
-                            : 'text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/20 border-rose-200 dark:border-rose-500/30'
-                    }`}>
-                        {isCompleted ? 'Completed' : 'High-Stakes Assessment'}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full inline-block transition-colors duration-300 border ${
+                            isCompleted 
+                                ? 'text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700' 
+                                : 'text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/20 border-rose-200 dark:border-rose-500/30'
+                        }`}>
+                            {isCompleted ? 'Completed • Tap to Review' : 'High-Stakes Assessment'}
+                        </span>
+
+                        {isCompleted && hasFeedback && (
+                            <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 flex items-center gap-1">
+                                <MessageSquare size={10} /> Feedback Ready
+                            </span>
+                        )}
+                    </div>
+
                     <h4 className={`font-black text-xl md:text-2xl leading-tight transition-colors tracking-tight truncate ${
-                        isCompleted ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'
+                        isCompleted ? 'text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white' : 'text-slate-900 dark:text-white'
                     }`}>
                         {item.title}
                     </h4>
                 </div>
             </div>
 
-            {/* Score Pill when completed */}
+            {/* Right-Side Score Pill when completed */}
             {isCompleted && (
-                <div className="relative z-10 shrink-0 pl-2">
+                <div className="relative z-10 shrink-0 pl-2 flex items-center gap-2">
                     {isPending ? (
                         <div className="px-4 py-2.5 rounded-2xl bg-amber-100 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
                             <Clock size={14} /> In Review
@@ -1626,6 +1807,7 @@ const ExamCard = ({ item, onSelectLesson, isCompleted, examLog }: any) => {
                             )}
                         </div>
                     )}
+                    <ChevronRight size={20} className="text-slate-400 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all" />
                 </div>
             )}
         </button>
