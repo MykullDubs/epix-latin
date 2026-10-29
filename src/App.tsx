@@ -1559,16 +1559,16 @@ function App() {
     [user]
   );
 
-  const handleRemoveStudent = useCallback(
+const handleRemoveStudent = useCallback(
     async (classId: string, email: string) => {
       if (!user) return;
       try {
         const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
         const classDoc = await getDoc(classRef);
         if (classDoc.exists()) {
-          const data = classDoc.data();
-          const nextStudents = (data.students || []).filter((s: any) => s.email !== email);
-          const nextEmails = (data.studentEmails || []).filter((e: string) => e !== email);
+          const data = classDoc.data() as any; // 🔥 Cast as any to satisfy TypeScript
+          const nextStudents = (data?.students || []).filter((s: any) => s.email !== email);
+          const nextEmails = (data?.studentEmails || []).filter((e: string) => e !== email);
           await updateDoc(classRef, { students: nextStudents, studentEmails: nextEmails });
           await setDoc(doc(db, 'artifacts', appId, 'classes', classId), { students: nextStudents, studentEmails: nextEmails }, { merge: true });
         }
