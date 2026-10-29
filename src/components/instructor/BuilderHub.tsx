@@ -15,9 +15,163 @@ import LivePreview from '../LivePreview';
 import { KineticCanvasBuilder } from '../LessonBlocks';
 
 // ============================================================================
-//  KINETIC CANVAS PRESET TEMPLATES
+//  KINETIC CANVAS PRESET TEMPLATES (CLASSIC + 7-MODE STORYLINE 360 PRESETS)
 // ============================================================================
 const KINETIC_PRESETS: Record<string, any> = {
+    blank: {
+        title: 'Custom Blank Canvas',
+        subtitle: 'Drag objects or click interactive elements on the slide.',
+        backgroundTheme: 'light_grid',
+        backgroundUrl: '',
+        entities: [],
+        zones: [],
+        layers: [],
+        rules: [],
+        timelineKeyframes: []
+    },
+    sorting: {
+        title: 'Category Sorting & Chronological Sequencing',
+        subtitle: '1. Sort the vocabulary cards into the Noun & Verb buckets (2/2 capacity each) ➔ 2. Order the 3 steps into Slots #1, #2, and #3.',
+        backgroundTheme: 'light_grid',
+        backgroundUrl: '',
+        successAnimation: 'bounce_glow',
+        entities: [
+            { id: 'ent_sort_n1', entityType: 'draggable', label: 'senatus (Senate)', sublabel: 'Noun', color: 'indigo', x: 16, y: 82, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'noun' },
+            { id: 'ent_sort_n2', entityType: 'draggable', label: 'gladius (Sword)', sublabel: 'Noun', color: 'indigo', x: 34, y: 82, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'noun' },
+            { id: 'ent_sort_v1', entityType: 'draggable', label: 'scribit (Writes)', sublabel: 'Verb', color: 'emerald', x: 16, y: 92, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'verb' },
+            { id: 'ent_sort_v2', entityType: 'draggable', label: 'currit (Runs)', sublabel: 'Verb', color: 'emerald', x: 34, y: 92, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'verb' },
+            { id: 'ent_seq_2', entityType: 'draggable', label: 'Phase B: Republic', sublabel: 'Step #2', color: 'amber', x: 58, y: 86, scale: 1, rotation: 0, draggable: true, initialState: 'normal', sequenceIndex: 2 },
+            { id: 'ent_seq_3', entityType: 'draggable', label: 'Phase C: Empire', sublabel: 'Step #3', color: 'amber', x: 74, y: 86, scale: 1, rotation: 0, draggable: true, initialState: 'normal', sequenceIndex: 3 },
+            { id: 'ent_seq_1', entityType: 'draggable', label: 'Phase A: Monarchy', sublabel: 'Step #1', color: 'amber', x: 90, y: 86, scale: 1, rotation: 0, draggable: true, initialState: 'normal', sequenceIndex: 1 }
+        ],
+        zones: [
+            { id: 'zone_bucket_nouns', label: 'Nouns Bucket', sublabel: 'Capacity: 2 Nouns', x: 25, y: 26, width: 38, height: 32, capacity: 2, acceptedCategory: 'noun' },
+            { id: 'zone_bucket_verbs', label: 'Verbs Bucket', sublabel: 'Capacity: 2 Verbs', x: 25, y: 58, width: 38, height: 26, capacity: 2, acceptedCategory: 'verb' },
+            { id: 'zone_seq_1', label: '1st Era', sublabel: 'Slot #1', x: 74, y: 20, width: 36, height: 18, capacity: 1, sequenceOrder: 1 },
+            { id: 'zone_seq_2', label: '2nd Era', sublabel: 'Slot #2', x: 74, y: 42, width: 36, height: 18, capacity: 1, sequenceOrder: 2 },
+            { id: 'zone_seq_3', label: '3rd Era', sublabel: 'Slot #3', x: 74, y: 64, width: 36, height: 18, capacity: 1, sequenceOrder: 3 }
+        ],
+        layers: [],
+        rules: [],
+        timelineKeyframes: []
+    },
+    connectors: {
+        title: 'SVG Connector-Line Matching & Hotspot Pin Labeling',
+        subtitle: '1. Tap a Left Node and tap its matching Right Node to draw an SVG connector line ➔ 2. Drag the labels onto the pulsing 📍 Hotspot Pins.',
+        backgroundTheme: 'grid',
+        backgroundUrl: '',
+        successAnimation: 'combine_flash',
+        entities: [
+            { id: 'node_l1', entityType: 'connector_node', label: "Idiom: 'Break the ice'", sublabel: 'Tap to connect', color: 'cyan', x: 20, y: 24, scale: 1, rotation: 0, draggable: false, connectTargetId: 'node_r1' },
+            { id: 'node_l2', entityType: 'connector_node', label: "Idiom: 'Spill the beans'", sublabel: 'Tap to connect', color: 'cyan', x: 20, y: 46, scale: 1, rotation: 0, draggable: false, connectTargetId: 'node_r2' },
+            { id: 'node_r2', entityType: 'connector_node', label: 'Reveal a secret prematurely', sublabel: 'Target Node', color: 'slate', x: 56, y: 24, scale: 1, rotation: 0, draggable: false },
+            { id: 'node_r1', entityType: 'connector_node', label: 'Start a friendly conversation', sublabel: 'Target Node', color: 'slate', x: 56, y: 46, scale: 1, rotation: 0, draggable: false },
+            { id: 'lbl_pin_1', entityType: 'hotspot_label', label: '🏷️ Apex Core', sublabel: 'Drag to Pin #1', color: 'rose', x: 30, y: 82, scale: 1, rotation: 0, draggable: true, sequenceIndex: 1 },
+            { id: 'lbl_pin_2', entityType: 'hotspot_label', label: '🏷️ Basal Valve', sublabel: 'Drag to Pin #2', color: 'amber', x: 65, y: 82, scale: 1, rotation: 0, draggable: true, sequenceIndex: 2 }
+        ],
+        zones: [
+            { id: 'pin_1', label: 'Upper Chamber', x: 85, y: 26, width: 16, height: 16, capacity: 1, sequenceOrder: 1, isHotspotPin: true },
+            { id: 'pin_2', label: 'Lower Conduit', x: 85, y: 56, width: 16, height: 16, capacity: 1, sequenceOrder: 2, isHotspotPin: true }
+        ],
+        layers: [],
+        rules: [],
+        timelineKeyframes: []
+    },
+    sliders: {
+        title: 'Number-Line Sliders, Text-Entry & Multi-Select Cards',
+        subtitle: "1. Set the Thruster Slider to 75 N ➔ 2. Type 'equilibrium' into the Text Box ➔ 3. Select ONLY the 2 true statements on the right.",
+        backgroundTheme: 'physics_lab',
+        backgroundUrl: '',
+        successAnimation: 'lever_tilt',
+        entities: [
+            { id: 'ent_slider_1', entityType: 'slider', label: 'Thruster Output (Target: 75 N)', x: 26, y: 28, scale: 1, rotation: 0, sliderMin: 0, sliderMax: 100, sliderStep: 5, sliderTarget: 75, sliderTolerance: 0, sliderUnit: ' N' },
+            { id: 'ent_text_1', entityType: 'text_input', label: "State when Net Force = 0 (Type 'equilibrium'):", placeholder: 'equilibrium...', expectedText: 'equilibrium, balance, static equilibrium', x: 26, y: 68, scale: 1, rotation: 0 },
+            { id: 'ent_ms_1', entityType: 'multi_select', label: 'Force is a vector (magnitude + direction)', sublabel: 'Tap to toggle', color: 'indigo', x: 72, y: 25, scale: 1, rotation: 0, draggable: false, isCorrectSelect: true },
+            { id: 'ent_ms_2', entityType: 'multi_select', label: 'Mass and Weight are identical in space', sublabel: 'Tap to toggle', color: 'slate', x: 72, y: 50, scale: 1, rotation: 0, draggable: false, isCorrectSelect: false },
+            { id: 'ent_ms_3', entityType: 'multi_select', label: 'Equal opposite torques produce balance', sublabel: 'Tap to toggle', color: 'indigo', x: 72, y: 75, scale: 1, rotation: 0, draggable: false, isCorrectSelect: true }
+        ],
+        zones: [],
+        layers: [],
+        rules: [],
+        timelineKeyframes: []
+    },
+    timeline: {
+        title: 'Cause-and-Effect Timeline Scrubber & Gated Slide Layer',
+        subtitle: '1. Drag the bottom Timeline Scrubber from 0% to 100% to watch the Core expand and reveal the Release Valve ➔ 2. Click the Valve to open the Checkpoint Layer!',
+        backgroundTheme: 'roman_road',
+        backgroundUrl: '',
+        enableTimeline: true,
+        successAnimation: 'chariot_march',
+        entities: [
+            { id: 'ent_tl_core', entityType: 'draggable', label: 'Stage 1: Cold Core (300 K)', sublabel: 'Scrub timeline below', color: 'cyan', x: 25, y: 48, scale: 1, rotation: 0, draggable: false, initialState: 'normal' },
+            { id: 'ent_tl_valve', entityType: 'draggable', label: '🔓 Engage Release Valve', sublabel: 'Revealed at 100% — Click to Open Layer', color: 'emerald', x: 75, y: 48, scale: 1, rotation: 0, draggable: false, initialState: 'hidden' }
+        ],
+        zones: [],
+        timelineKeyframes: [
+            {
+                id: 'kf_0',
+                progress: 0,
+                title: '0% — Baseline Equilibrium (300 K)',
+                description: 'At 0% on the timeline, the thermal core is at rest on the left and the emergency release valve remains hidden.',
+                entityOverrides: [
+                    { entityId: 'ent_tl_core', x: 25, y: 48, scale: 1, rotation: 0, labelOverride: 'Stage 1: Cold Core (300 K)' },
+                    { entityId: 'ent_tl_valve', state: 'hidden' }
+                ]
+            },
+            {
+                id: 'kf_50',
+                progress: 50,
+                title: '50% — Thermal Compression (650 K)',
+                description: 'As energy enters the system, the core moves toward the center, expands to 1.3x scale, and tilts 15°.',
+                entityOverrides: [
+                    { entityId: 'ent_tl_core', x: 48, y: 48, scale: 1.3, rotation: 15, labelOverride: 'Stage 2: Compressing (650 K)' },
+                    { entityId: 'ent_tl_valve', state: 'hidden' }
+                ]
+            },
+            {
+                id: 'kf_90',
+                progress: 90,
+                title: '100% — Critical Threshold Reached (1,200 K)',
+                description: 'At peak pressure, the core reaches 1.5x scale and reveals the green Release Valve button on the right! Click it now.',
+                entityOverrides: [
+                    { entityId: 'ent_tl_core', x: 42, y: 48, scale: 1.5, rotation: 30, labelOverride: 'Stage 3: Peak Pressure (1200 K)' },
+                    { entityId: 'ent_tl_valve', state: 'normal' }
+                ]
+            }
+        ],
+        layers: [
+            {
+                id: 'layer_tl_quiz',
+                name: 'Layer 1: Cause-and-Effect Mastery Gate',
+                theme: 'quiz',
+                title: 'Thermal Process Verification',
+                body: 'You scrubbed the timeline to observe the cause-and-effect sequence and revealed the hidden Release Valve. Answer this check to complete the lab:',
+                buttonLabel: 'Complete Lab',
+                hasQuiz: true,
+                quizQuestion: 'What happened when you scrubbed the timeline past 90%?',
+                quizOptions: [
+                    { id: 'opt_1', text: 'The core expanded to 1.5x scale and revealed the hidden Release Valve' },
+                    { id: 'opt_2', text: 'The core froze at 0 K' }
+                ],
+                correctOptionId: 'opt_1',
+                gateUntilCorrect: true,
+                onCloseAction: 'complete_block'
+            }
+        ],
+        rules: [
+            {
+                id: 'rule_tl_click',
+                event: 'on_click',
+                entityId: 'ent_tl_valve',
+                zoneId: '',
+                action: 'show_layer',
+                targetLayerId: 'layer_tl_quiz',
+                reaction: 'chariot_march',
+                message: 'Opening Thermal Verification Layer...',
+                isRequired: true
+            }
+        ]
+    },
     grammar: {
         title: 'Grammar & Syntax Assembly: The Roman Road',
         subtitle: 'Drag the Latin words into their grammatical slots to launch the chariot.',
@@ -259,18 +413,21 @@ export default function BuilderHub({
   ];
 
   // --- INJECT A KINETIC CANVAS LAB BLOCK INTO LESSON DATA ---
-  const handleAddKineticBlock = (presetKey: 'grammar' | 'map' | 'physics' = 'grammar') => {
-    const preset = JSON.parse(JSON.stringify(KINETIC_PRESETS[presetKey] || KINETIC_PRESETS.grammar));
+  const handleAddKineticBlock = (
+    presetKey: 'blank' | 'sorting' | 'connectors' | 'sliders' | 'timeline' | 'grammar' | 'map' | 'physics' = 'blank'
+  ) => {
+    const preset = KINETIC_PRESETS[presetKey] || KINETIC_PRESETS.blank;
+    const clonedPreset = JSON.parse(JSON.stringify(preset));
     const newBlock = {
         id: `kinetic_${Date.now()}`,
         type: 'kinetic_canvas',
-        ...preset
+        ...clonedPreset
     };
     setLessonData((prev: any) => ({
         ...prev,
         blocks: [...(prev.blocks || []), newBlock]
     }));
-    setToastMsg("Kinetic Canvas Lab added to Lesson! ✨");
+    setToastMsg(`Added "${clonedPreset.title}" to Lesson! ✨`);
   };
 
   const handleUpdateKineticBlock = (blockId: string, updatedBlock: any) => {
@@ -398,50 +555,119 @@ export default function BuilderHub({
 
             {mode === 'lesson' && (
                 <>
-                    {/* 🔥 KINETIC CANVAS LAB INJECTOR DOCK */}
-                    <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white p-5 sm:p-6 rounded-[2rem] border border-indigo-500/30 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-start sm:items-center gap-3.5">
-                            <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
-                                <Sparkles size={20} />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
-                                        New Interactive Block
-                                    </span>
-                                    {kineticBlocks.length > 0 && (
-                                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase">
-                                            {kineticBlocks.length} Active in Lesson
-                                        </span>
-                                    )}
+                    {/* 🔥 KINETIC CANVAS 2.0: 1-CLICK MULTI-MODAL PRESET DOCK */}
+                    <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-950 text-white p-5 sm:p-6 rounded-[2.2rem] border border-indigo-500/30 shadow-xl space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+                                    <Sparkles size={20} />
                                 </div>
-                                <h3 className="text-base sm:text-lg font-black tracking-tight">
-                                    Insert a Kinetic 2D Canvas Lab
-                                </h3>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                                            Storyline 360 Engine • 1-Click Templates
+                                        </span>
+                                        {kineticBlocks.length > 0 && (
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase">
+                                                {kineticBlocks.length} Active in Lesson
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h3 className="text-base sm:text-lg font-black tracking-tight">
+                                        Insert a Multi-Modal Kinetic Canvas Slide
+                                    </h3>
+                                </div>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={() => handleAddKineticBlock('blank')}
+                                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 border border-white/15"
+                            >
+                                <Plus size={12} /> 📄 Blank Slide
+                            </button>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                        {/* Row 1: The 4 New Multi-Modal Storyline 360 Templates */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-white/10">
+                            <button
+                                type="button"
+                                onClick={() => handleAddKineticBlock('sorting')}
+                                className="p-3 rounded-2xl bg-indigo-600/90 hover:bg-indigo-500 text-left transition-all active:scale-95 border border-indigo-400/40 shadow-md"
+                            >
+                                <div className="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                                    <Plus size={12} /> 🗂️ Sorting & Order
+                                </div>
+                                <p className="text-[9px] text-indigo-200 font-bold mt-1 leading-tight">
+                                    Capacity buckets + numbered sequence slots
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleAddKineticBlock('connectors')}
+                                className="p-3 rounded-2xl bg-cyan-600/90 hover:bg-cyan-500 text-left transition-all active:scale-95 border border-cyan-400/40 shadow-md"
+                            >
+                                <div className="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                                    <Plus size={12} /> 🔗 Connectors & Pins
+                                </div>
+                                <p className="text-[9px] text-cyan-100 font-bold mt-1 leading-tight">
+                                    SVG connector lines + 📍 hotspot pins
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleAddKineticBlock('sliders')}
+                                className="p-3 rounded-2xl bg-emerald-600/90 hover:bg-emerald-500 text-left transition-all active:scale-95 border border-emerald-400/40 shadow-md"
+                            >
+                                <div className="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                                    <Plus size={12} /> 🎛️ Sliders & Inputs
+                                </div>
+                                <p className="text-[9px] text-emerald-100 font-bold mt-1 leading-tight">
+                                    Number-line sliders, text box & multi-select
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleAddKineticBlock('timeline')}
+                                className="p-3 rounded-2xl bg-purple-600/90 hover:bg-purple-500 text-left transition-all active:scale-95 border border-purple-400/40 shadow-md"
+                            >
+                                <div className="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                                    <Plus size={12} /> ⏱️ Timeline & Layer
+                                </div>
+                                <p className="text-[9px] text-purple-100 font-bold mt-1 leading-tight">
+                                    Cause-effect scrubber + gated quiz layer
+                                </p>
+                            </button>
+                        </div>
+
+                        {/* Row 2: Classic Spatial Presets */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mr-1">
+                                Classic Presets:
+                            </span>
                             <button
                                 type="button"
                                 onClick={() => handleAddKineticBlock('grammar')}
-                                className="px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 shadow-md"
+                                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1 border border-white/10"
                             >
-                                <Plus size={12} /> 🏛️ Grammar Chariot
+                                <Plus size={11} /> 🏛️ Grammar Chariot
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleAddKineticBlock('map')}
-                                className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 border border-white/10"
+                                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1 border border-white/10"
                             >
-                                <Plus size={12} /> 🗺️ Empire Map
+                                <Plus size={11} /> 🗺️ Empire Map
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleAddKineticBlock('physics')}
-                                className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 border border-white/10"
+                                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1 border border-white/10"
                             >
-                                <Plus size={12} /> ⚖️ Physics Lab
+                                <Plus size={11} /> ⚖️ Physics Lab
                             </button>
                         </div>
                     </div>
@@ -456,33 +682,6 @@ export default function BuilderHub({
                         onAiModalHandled={() => setTriggerAiModal(false)} 
                         userData={userData} 
                     />
-
-                    {/* 🔥 RENDER KINETIC CANVAS EDITORS FOR ANY KINETIC BLOCKS IN THIS LESSON */}
-                    {kineticBlocks.length > 0 && (
-                        <div className="space-y-6 pt-4 border-t border-slate-200 dark:border-slate-800">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-sm font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
-                                    <Sparkles size={16} /> Active Kinetic Canvas Labs ({kineticBlocks.length})
-                                </h3>
-                            </div>
-                            {kineticBlocks.map((kb: any) => (
-                                <div key={kb.id} className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveKineticBlock(kb.id)}
-                                        className="absolute top-6 right-6 z-20 p-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 transition-colors"
-                                        title="Remove Kinetic Canvas Block"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                    <KineticCanvasBuilder
-                                        block={kb}
-                                        onChange={(updated: any) => handleUpdateKineticBlock(kb.id, updated)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    )}
                 </>
             )}
 
