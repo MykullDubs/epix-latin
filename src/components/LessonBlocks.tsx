@@ -371,16 +371,14 @@ export const ChatDialogueBlock = ({ lines }: any) => {
 };
 
 // ============================================================================
-//  7. KINETIC CANVAS BLOCK (Multi-Modal Storyline 360 Engine)
-//     Supports: Sorting/Capacity, Sequencing, Hotspot Labeling, SVG Connector
-//     Lines, Sliders/Number-Lines, Text-Entry, Multi-Select & Timeline Scrubber
+//  7. KINETIC CANVAS BLOCK (Multi-Modal Storyline 360 Engine + Motion Paths)
 // ============================================================================
 export type KineticObjectState = 'normal' | 'selected' | 'drop_correct' | 'drop_incorrect' | 'hidden' | 'disabled';
 export type KineticEntityType = 'draggable' | 'hotspot_label' | 'connector_node' | 'slider' | 'text_input' | 'multi_select';
 
 export interface KineticEntity {
     id: string;
-    entityType?: KineticEntityType; // Defaults to 'draggable'
+    entityType?: KineticEntityType;
     label: string;
     sublabel?: string;
     imageUrl?: string;
@@ -400,11 +398,11 @@ export interface KineticEntity {
     variableName?: string;
 
     // 1. Sorting & Categorizing
-    category?: string; // Matches zone.acceptedCategory (e.g. "noun", "verb")
+    category?: string;
     // 2. Sequencing & Ordering
-    sequenceIndex?: number; // e.g., 1, 2, 3
+    sequenceIndex?: number;
     // 4. Matching with Connector Lines
-    connectTargetId?: string; // ID of the target entity this node should connect to
+    connectTargetId?: string;
     // 5. Slider / Number-Line
     sliderMin?: number;
     sliderMax?: number;
@@ -413,9 +411,9 @@ export interface KineticEntity {
     sliderTolerance?: number;
     sliderUnit?: string;
     // 6. Text-Entry & Multi-Select
-    expectedText?: string; // Comma-separated acceptable answers
+    expectedText?: string;
     placeholder?: string;
-    isCorrectSelect?: boolean; // For multi_select mode
+    isCorrectSelect?: boolean;
 }
 
 export interface KineticZone {
@@ -427,21 +425,17 @@ export interface KineticZone {
     width: number;
     height: number;
     invisible?: boolean;
-    // 1. Sorting & Capacity
-    capacity?: number; // Max objects allowed in this zone (default: 1, or 6 for category buckets)
-    acceptedCategory?: string; // If set, any entity with matching category is valid here
-    // 2. Sequencing
-    sequenceOrder?: number; // e.g. Slot #1, Slot #2, Slot #3
-    // 3. Image Hotspot Pin Mode
-    isHotspotPin?: boolean; // Renders a pulsing target pin for labeling diagrams
+    capacity?: number;
+    acceptedCategory?: string;
+    sequenceOrder?: number;
+    isHotspotPin?: boolean;
 }
 
 export interface KineticTimelineKeyframe {
     id: string;
-    progress: number; // 0 to 100
+    progress: number;
     title: string;
     description: string;
-    // Optional overrides at this point in time:
     entityOverrides?: Array<{
         entityId: string;
         x?: number;
@@ -482,10 +476,17 @@ export interface KineticRule {
     event?: 'on_drop' | 'on_click' | 'on_connect' | 'on_slider_match' | 'on_text_match';
     entityId: string;
     zoneId: string;
-    action?: 'reaction' | 'change_state' | 'show_layer' | 'hide_layer' | 'move_to_zone' | 'complete_block';
+    action?: 'reaction' | 'change_state' | 'show_layer' | 'hide_layer' | 'move_to_zone' | 'animate_motion' | 'complete_block';
     targetEntityId?: string;
     targetState?: KineticObjectState;
     targetLayerId?: string;
+    // 🔥 Storyline 360 Motion Path Animation Parameters
+    motionX?: number;          // Destination X% (0-100) for 'animate_motion'
+    motionY?: number;          // Destination Y% (0-100) for 'animate_motion'
+    motionScale?: number;      // Optional target scale at end of motion path
+    motionRotation?: number;   // Optional target rotation (deg) at end of motion path
+    motionDuration?: number;   // Duration in ms (default: 900)
+    motionCurve?: 'ease_in_out' | 'spring_bounce' | 'linear';
     reaction: 'bounce_glow' | 'chariot_march' | 'lever_tilt' | 'combine_flash' | 'shake_error';
     message: string;
     isRequired?: boolean;
@@ -507,6 +508,12 @@ const KINETIC_BACKGROUNDS: Record<string, string> = {
     roman_road: 'bg-gradient-to-b from-amber-950 via-stone-900 to-slate-950',
     physics_lab: 'bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900',
     parchment: 'bg-gradient-to-br from-amber-50 via-orange-50/80 to-amber-100 text-slate-900'
+};
+
+const MOTION_CURVES: Record<string, string> = {
+    ease_in_out: 'cubic-bezier(0.22, 1, 0.36, 1)',
+    spring_bounce: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+    linear: 'linear'
 };
 
 const LAYER_THEME_STYLES: Record<string, { border: string; badge: string; headerBg: string; btn: string }> = {
@@ -581,24 +588,24 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const buildInitialSliderMap = (ents: KineticEntity[]) => {
         const map: Record<string, number> = {};
         ents.forEach(e => {
-            if (e.entityType === 'slider') {
-                map[e.id] = e.sliderMin ?? 0;
-            }
+            if (e.entityType === 'slider') map[e.id] = e.sliderMin ?? 0;
         });
         return map;
     };
 
     const [entities, setEntities] = useState<KineticEntity[]>(initialEntities);
     const [objectStates, setObjectStates] = useState<Record<string, KineticObjectState>>(() => buildInitialStateMap(initialEntities));
+    const [animatingEntities, setAnimatingEntities] = useState<Record<string, { duration: number; curve: string }>>({});
+    const [activeMotionTrail, setActiveMotionTrail] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
     const [firedRuleIds, setFiredRuleIds] = useState<string[]>([]);
     const [completedLayerIds, setCompletedLayerIds] = useState<string[]>([]);
     const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
     const [layerQuizSelected, setLayerQuizSelected] = useState<string | null>(null);
     const [layerQuizSubmitted, setLayerQuizSubmitted] = useState(false);
 
-    // Multi-Modal Interaction States
-    const [snappedMap, setSnappedMap] = useState<Record<string, string>>({}); // entityId -> zoneId
-    const [connections, setConnections] = useState<Record<string, string>>({}); // sourceEntityId -> targetEntityId
+    const [snappedMap, setSnappedMap] = useState<Record<string, string>>({});
+    const [connections, setConnections] = useState<Record<string, string>>({});
     const [activeConnectorStart, setActiveConnectorStart] = useState<string | null>(null);
     const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
     const [sliderValues, setSliderValues] = useState<Record<string, number>>(() => buildInitialSliderMap(initialEntities));
@@ -634,7 +641,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const customBgUrl = block?.backgroundUrl || '';
     const isLightTheme = bgThemeKey === 'parchment' || bgThemeKey === 'blank' || bgThemeKey === 'light_grid';
 
-    // Determine active timeline keyframe and interpolated object overrides
     const activeKeyframe = useMemo(() => {
         if (timelineKeyframes.length === 0) return null;
         let current = timelineKeyframes[0];
@@ -666,6 +672,65 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         if (reactionType) setActiveReaction(reactionType);
         if (message) setReactionBanner(message);
         setTimeout(() => setActiveReaction(null), 2200);
+    };
+
+    // 🔥 ANIMATE AN ENTITY ALONG A MOTION PATH
+    const animateEntity alongPath = (
+        targetId: string,
+        destX: number,
+        destY: number,
+        options?: {
+            scale?: number;
+            rotation?: number;
+            duration?: number;
+            curve?: string;
+            snapToZoneId?: string;
+            nextState?: KineticObjectState;
+        }
+    ) => {
+        const duration = options?.duration || 900;
+        const curve = MOTION_CURVES[options?.curve || 'ease_in_out'] || MOTION_CURVES.ease_in_out;
+
+        const sourceObj = entities.find(e => e.id === targetId);
+        if (sourceObj) {
+            setActiveMotionTrail({ x1: sourceObj.x, y1: sourceObj.y, x2: destX, y2: destY });
+        }
+
+        // Enable CSS transition on this specific object for the duration of the motion path
+        setAnimatingEntities(prev => ({ ...prev, [targetId]: { duration, curve } }));
+
+        // Ensure hidden/disabled object becomes visible if animated
+        setObjectStates(prev => ({
+            ...prev,
+            [targetId]: options?.nextState || (prev[targetId] === 'hidden' ? 'normal' : prev[targetId])
+        }));
+
+        // Trigger the coordinate/scale/rotation interpolation on the next frame
+        requestAnimationFrame(() => {
+            setEntities(prev => prev.map(ent => {
+                if (ent.id !== targetId) return ent;
+                return {
+                    ...ent,
+                    x: destX,
+                    y: destY,
+                    scale: options?.scale !== undefined ? options.scale : ent.scale,
+                    rotation: options?.rotation !== undefined ? options.rotation : ent.rotation
+                };
+            }));
+
+            if (options?.snapToZoneId) {
+                setSnappedMap(prev => ({ ...prev, [targetId]: options.snapToZoneId! }));
+            }
+        });
+
+        setTimeout(() => {
+            setAnimatingEntities(prev => {
+                const copy = { ...prev };
+                delete copy[targetId];
+                return copy;
+            });
+            setActiveMotionTrail(null);
+        }, duration + 80);
     };
 
     const openSlideLayer = (layerId: string) => {
@@ -734,14 +799,37 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                     ...prev,
                     [sourceEntityId]: rule.reaction === 'shake_error' ? 'drop_incorrect' : 'drop_correct'
                 }));
-            } else if (actionType === 'move_to_zone' && rule.targetEntityId && rule.zoneId) {
+            } else if (actionType === 'move_to_zone') {
+                const targetId = rule.targetEntityId || sourceEntityId;
                 const destZone = zones.find(z => z.id === rule.zoneId);
                 if (destZone) {
-                    setEntities(prev => prev.map(ent =>
-                        ent.id === rule.targetEntityId ? { ...ent, x: destZone.x, y: destZone.y } : ent
-                    ));
-                    setSnappedMap(prev => ({ ...prev, [rule.targetEntityId!]: destZone.id }));
+                    animateEntityAlongPath(targetId, destZone.x, destZone.y, {
+                        scale: rule.motionScale,
+                        rotation: rule.motionRotation,
+                        duration: rule.motionDuration || 900,
+                        curve: rule.motionCurve || 'spring_bounce',
+                        snapToZoneId: destZone.id,
+                        nextState: rule.targetState || 'drop_correct'
+                    });
                 }
+            } else if (actionType === 'animate_motion') {
+                const targetId = rule.targetEntityId || sourceEntityId;
+                const destX = rule.motionX ?? 50;
+                const destY = rule.motionY ?? 40;
+                // Check if destination lands inside a zone so it also registers as snapped
+                const landingZone = zones.find(z => {
+                    const halfW = z.width / 2;
+                    const halfH = z.height / 2;
+                    return destX >= z.x - halfW && destX <= z.x + halfW && destY >= z.y - halfH && destY <= z.y + halfH;
+                });
+                animateEntityAlongPath(targetId, destX, destY, {
+                    scale: rule.motionScale,
+                    rotation: rule.motionRotation,
+                    duration: rule.motionDuration || 900,
+                    curve: rule.motionCurve || 'ease_in_out',
+                    snapToZoneId: landingZone?.id,
+                    nextState: rule.targetState
+                });
             } else if (actionType === 'complete_block') {
                 setIsVerified(true);
                 if (onComplete) setTimeout(() => onComplete(), 1200);
@@ -749,7 +837,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         });
     };
 
-    // --- CONNECTOR NODE MATCHING HANDLER ---
     const handleConnectorNodeTap = (entityId: string) => {
         if (!activeConnectorStart) {
             setActiveConnectorStart(entityId);
@@ -766,7 +853,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         const targetEnt = entities.find(e => e.id === entityId);
         if (!sourceEnt || !targetEnt) return;
 
-        // Record bidirectional or directed connection
         const nextConnections = { ...connections, [sourceEnt.id]: targetEnt.id };
         setConnections(nextConnections);
         setActiveConnectorStart(null);
@@ -793,7 +879,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         }
     };
 
-    // --- MULTI-SELECT TOGGLE HANDLER ---
     const handleMultiSelectToggle = (entityId: string) => {
         setMultiSelectedIds(prev => {
             const exists = prev.includes(entityId);
@@ -819,13 +904,11 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
 
         const eType = ent.entityType || 'draggable';
 
-        // Connector Node Mode
         if (eType === 'connector_node') {
             handleConnectorNodeTap(entityId);
             return;
         }
 
-        // Multi-Select Mode
         if (eType === 'multi_select') {
             handleMultiSelectToggle(entityId);
             const clickRules = rules.filter(r => r.event === 'on_click' && r.entityId === entityId);
@@ -833,12 +916,8 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             return;
         }
 
-        // Slider or Text Input handle their own internal inputs unless dragged in builder
-        if (eType === 'slider' || eType === 'text_input') {
-            return;
-        }
+        if (eType === 'slider' || eType === 'text_input') return;
 
-        // Fire any "on_click" triggers
         const clickRules = rules.filter(r => r.event === 'on_click' && r.entityId === entityId);
         if (clickRules.length > 0) {
             executeTriggers(clickRules, entityId);
@@ -866,7 +945,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: clampedX, y: clampedY } : ent));
     };
 
-    // Track mouse/touch position when drawing an active connector line
     const handleCanvasPointerMove = (e: React.PointerEvent) => {
         if (!activeConnectorStart || !canvasRef.current) return;
         const rect = canvasRef.current.getBoundingClientRect();
@@ -896,7 +974,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         }
 
         if (matchedZone) {
-            // Check Zone Capacity (Sorting/Categorizing support)
             const maxCap = matchedZone.capacity || (matchedZone.acceptedCategory ? 6 : 1);
             const currentOccupants = Object.keys(snappedMap).filter(
                 k => snappedMap[k] === matchedZone!.id && k !== entityId
@@ -907,7 +984,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 return;
             }
 
-            // Compute tiled position inside zone so multi-capacity items stack neatly
             const slotIdx = currentOccupants.length;
             let snapX = matchedZone.x;
             let snapY = matchedZone.y;
@@ -922,18 +998,19 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 snapY = Math.max(8, Math.min(92, matchedZone.y + offsetY));
             }
 
-            setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: snapX, y: snapY } : ent));
-            const nextSnapped = { ...snappedMap, [entityId]: matchedZone.id };
-            setSnappedMap(nextSnapped);
+            // Smooth snap animation into the zone
+            animateEntityAlongPath(entityId, snapX, snapY, {
+                duration: 260,
+                curve: 'spring_bounce',
+                snapToZoneId: matchedZone.id
+            });
 
-            // Check explicit Trigger Rules first
             const dropRules = rules.filter(r => (r.event || 'on_drop') === 'on_drop' && r.entityId === entityId && r.zoneId === matchedZone!.id);
             if (dropRules.length > 0) {
                 executeTriggers(dropRules, entityId);
                 return;
             }
 
-            // Check Category Sorting match
             if (matchedZone.acceptedCategory && movedEntity.category) {
                 if (matchedZone.acceptedCategory.trim().toLowerCase() === movedEntity.category.trim().toLowerCase()) {
                     setObjectStates(prev => ({ ...prev, [entityId]: 'drop_correct' }));
@@ -945,7 +1022,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 return;
             }
 
-            // Check Sequence / Ordering match
             if (matchedZone.sequenceOrder !== undefined && movedEntity.sequenceIndex !== undefined) {
                 if (matchedZone.sequenceOrder === movedEntity.sequenceIndex) {
                     setObjectStates(prev => ({ ...prev, [entityId]: 'drop_correct' }));
@@ -978,6 +1054,8 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const handleReset = () => {
         setEntities(JSON.parse(JSON.stringify(initialEntities)));
         setObjectStates(buildInitialStateMap(initialEntities));
+        setAnimatingEntities({});
+        setActiveMotionTrail(null);
         setSliderValues(buildInitialSliderMap(initialEntities));
         setTextValues({});
         setMultiSelectedIds([]);
@@ -997,16 +1075,14 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setIsVerified(false);
     };
 
-    // --- UNIFIED MULTI-MODAL VALIDATION ENGINE ---
     const ruleStatus = useMemo(() => {
         const checks: boolean[] = [];
 
-        // 1. Explicit Trigger Rules
         const requiredRules = rules.filter(r => r.isRequired !== false);
         requiredRules.forEach(rule => {
             if (rule.action === 'show_layer' && rule.targetLayerId) {
                 checks.push(completedLayerIds.includes(rule.targetLayerId));
-            } else if (rule.event === 'on_click' || rule.event === 'on_connect') {
+            } else if (rule.event === 'on_click' || rule.event === 'on_connect' || rule.action === 'animate_motion' || rule.action === 'move_to_zone') {
                 checks.push(firedRuleIds.includes(rule.id));
             } else {
                 const isZoneMatched = snappedMap[rule.entityId] === rule.zoneId;
@@ -1017,42 +1093,36 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             }
         });
 
-        // 2. Category Sorting Checks
         entities.filter(e => e.category).forEach(ent => {
             const zId = snappedMap[ent.id];
             const z = zones.find(zone => zone.id === zId);
             checks.push(Boolean(z?.acceptedCategory && z.acceptedCategory.trim().toLowerCase() === ent.category!.trim().toLowerCase()));
         });
 
-        // 3. Sequence Ordering Checks
         entities.filter(e => e.sequenceIndex !== undefined).forEach(ent => {
             const zId = snappedMap[ent.id];
             const z = zones.find(zone => zone.id === zId);
             checks.push(Boolean(z && z.sequenceOrder === ent.sequenceIndex));
         });
 
-        // 4. Connector Line Matching Checks
         entities.filter(e => e.entityType === 'connector_node' && e.connectTargetId).forEach(ent => {
             const connectedTo = connections[ent.id];
             const reverseConnected = Object.keys(connections).find(k => connections[k] === ent.id);
             checks.push(connectedTo === ent.connectTargetId || reverseConnected === ent.connectTargetId);
         });
 
-        // 5. Slider / Number-Line Checks
         entities.filter(e => e.entityType === 'slider' && e.sliderTarget !== undefined).forEach(ent => {
             const val = sliderValues[ent.id] ?? (ent.sliderMin ?? 0);
             const tol = ent.sliderTolerance ?? 0;
             checks.push(Math.abs(val - ent.sliderTarget!) <= tol);
         });
 
-        // 6. Text-Entry Checks
         entities.filter(e => e.entityType === 'text_input' && e.expectedText).forEach(ent => {
             const userTxt = (textValues[ent.id] || '').trim().toLowerCase();
             const validOptions = ent.expectedText!.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
             checks.push(validOptions.includes(userTxt));
         });
 
-        // 7. Multi-Select Checks
         const multiSelectEnts = entities.filter(e => e.entityType === 'multi_select');
         if (multiSelectEnts.length > 0) {
             multiSelectEnts.forEach(ent => {
@@ -1061,7 +1131,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             });
         }
 
-        // Fallback if no specific rules or modal checks exist
         if (checks.length === 0) {
             const draggableEnts = entities.filter(e => (e.entityType || 'draggable') === 'draggable' && e.draggable !== false);
             const placedCount = Object.keys(snappedMap).length;
@@ -1129,8 +1198,23 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                     className={`relative w-full aspect-[16/10] min-h-[380px] rounded-[2rem] overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
                     style={customBgUrl ? { backgroundImage: `url(${customBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                 >
-                    {/* SVG OVERLAY FOR CONNECTOR LINES */}
+                    {/* SVG OVERLAY FOR CONNECTOR LINES & ACTIVE MOTION PATH TRAILS */}
                     <svg className="absolute inset-0 w-full h-full pointer-events-none z-15">
+                        {activeMotionTrail && (
+                            <g>
+                                <line
+                                    x1={`${activeMotionTrail.x1}%`}
+                                    y1={`${activeMotionTrail.y1}%`}
+                                    x2={`${activeMotionTrail.x2}%`}
+                                    y2={`${activeMotionTrail.y2}%`}
+                                    stroke="#38bdf8"
+                                    strokeWidth="3.5"
+                                    strokeDasharray="8 6"
+                                    className="animate-pulse"
+                                />
+                                <circle cx={`${activeMotionTrail.x2}%`} cy={`${activeMotionTrail.y2}%`} r="7" fill="#38bdf8" />
+                            </g>
+                        )}
                         {Object.entries(connections).map(([sourceId, targetId]) => {
                             const sEnt = entities.find(e => e.id === sourceId);
                             const tEnt = entities.find(e => e.id === targetId);
@@ -1177,7 +1261,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                         </div>
                     )}
 
-                    {/* Target Snap Zones (Supports Category Buckets, Sequence Slots & Hotspot Pins) */}
+                    {/* Target Snap Zones */}
                     {zones.map((zone) => {
                         const occupants = Object.keys(snappedMap).filter(k => snappedMap[k] === zone.id);
                         const maxCap = zone.capacity || (zone.acceptedCategory ? 6 : 1);
@@ -1243,7 +1327,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                         );
                     })}
 
-                    {/* Interactive Entities (Draggable, Connector Nodes, Sliders, Text Inputs, Multi-Select) */}
+                    {/* Interactive Entities */}
                     {entities.map((rawEnt) => {
                         const ent = getEntityWithTimeline(rawEnt);
                         const st = ent.effectiveState;
@@ -1254,12 +1338,12 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                         const isDragging = draggingId === ent.id;
                         const isSnapped = Boolean(snappedMap[ent.id]);
                         const isDisabled = st === 'disabled';
+                        const animConfig = animatingEntities[ent.id];
 
                         let colorClasses = KINETIC_COLORS[ent.color || 'indigo'] || KINETIC_COLORS.indigo;
                         if (st === 'drop_correct') colorClasses = KINETIC_COLORS.emerald;
                         if (st === 'drop_incorrect') colorClasses = KINETIC_COLORS.rose;
 
-                        // 5. SLIDER / NUMBER-LINE ENTITY
                         if (eType === 'slider') {
                             const min = ent.sliderMin ?? 0;
                             const max = ent.sliderMax ?? 100;
@@ -1288,10 +1372,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                                         max={max}
                                         step={step}
                                         value={val}
-                                        onChange={(e) => {
-                                            const nextVal = parseFloat(e.target.value);
-                                            setSliderValues(prev => ({ ...prev, [ent.id]: nextVal }));
-                                        }}
+                                        onChange={(e) => setSliderValues(prev => ({ ...prev, [ent.id]: parseFloat(e.target.value) }))}
                                         className="w-full accent-indigo-600 cursor-pointer"
                                     />
                                     <div className="flex justify-between text-[8px] font-bold text-slate-400 mt-0.5">
@@ -1302,7 +1383,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                             );
                         }
 
-                        // 6A. TEXT-ENTRY ENTITY
                         if (eType === 'text_input') {
                             const currentTxt = textValues[ent.id] || '';
                             const validList = (ent.expectedText || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -1336,7 +1416,6 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                             );
                         }
 
-                        // STANDARD DRAGGABLE, CONNECTOR NODE, HOTSPOT LABEL & MULTI-SELECT
                         return (
                             <div
                                 key={ent.id}
@@ -1348,15 +1427,25 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                                     top: `${ent.y}%`,
                                     width: ent.width ? `${ent.width}px` : undefined,
                                     transform: `translate(-50%, -50%) scale(${ent.scale || 1}) rotate(${ent.rotation || 0}deg)`,
+                                    // 🔥 Smooth Motion Path interpolation when triggered or timeline-scrubbed, zero-lag when dragged!
+                                    transition: isDragging
+                                        ? 'none'
+                                        : animConfig
+                                            ? `left ${animConfig.duration}ms ${animConfig.curve}, top ${animConfig.duration}ms ${animConfig.curve}, transform ${animConfig.duration}ms ${animConfig.curve}`
+                                            : showTimeline
+                                                ? 'left 320ms ease-out, top 320ms ease-out, transform 320ms ease-out'
+                                                : 'transform 180ms ease-out, box-shadow 180ms ease-out',
                                     touchAction: 'none'
                                 }}
-                                className={`absolute z-20 transition-all select-none ${
+                                className={`absolute z-20 select-none ${
                                     ent.imageUrl
                                         ? 'p-2 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-2 border-slate-200 dark:border-slate-700 shadow-xl'
                                         : `px-4 py-2.5 rounded-2xl border-2 shadow-xl ${colorClasses}`
-                                } ${isDisabled ? 'opacity-45 grayscale cursor-not-allowed' : 'cursor-pointer active:scale-95'} ${
+                                } ${isDisabled ? 'opacity-45 grayscale cursor-not-allowed' : 'cursor-pointer'} ${
                                     isDragging ? 'z-30 shadow-2xl ring-4 ring-white/50 scale-105' : ''
-                                } ${isSelected ? 'ring-4 ring-amber-300 dark:ring-indigo-400 scale-105' : ''}`}
+                                } ${animConfig ? 'z-30 ring-4 ring-cyan-300 shadow-2xl' : ''} ${
+                                    isSelected ? 'ring-4 ring-amber-300 dark:ring-indigo-400 scale-105' : ''
+                                }`}
                             >
                                 <div className="flex items-center gap-2 whitespace-nowrap">
                                     {eType === 'connector_node' ? (
@@ -1444,7 +1533,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                     )}
                 </div>
 
-                {/* 7. CAUSE-AND-EFFECT TIMELINE SCRUBBER BAR */}
+                {/* CAUSE-AND-EFFECT TIMELINE SCRUBBER BAR */}
                 {showTimeline && (
                     <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md space-y-2.5">
                         <div className="flex items-center justify-between gap-4">
@@ -1520,7 +1609,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
 };
 
 // ============================================================================
-//  8. KINETIC CANVAS BUILDER (Multi-Modal Storyline 360 Studio)
+//  8. KINETIC CANVAS BUILDER (Multi-Modal Studio + Motion Path Vector Editor)
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     const [activeTab, setActiveTab] = useState<'canvas' | 'timeline' | 'layers' | 'rules' | 'preview'>('canvas');
@@ -1628,7 +1717,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         Multi-Modal Kinetic Studio
                     </span>
                     <h4 className="text-lg font-black text-slate-800 dark:text-white mt-1">
-                        Sorting, Sequencing, Connectors, Sliders & Timeline
+                        Sorting, Sequencing, Motion Paths, Sliders & Timeline
                     </h4>
                 </div>
 
@@ -1643,7 +1732,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         3. Layers ({layers.length})
                     </button>
                     <button type="button" onClick={() => setActiveTab('rules')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'rules' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                        4. Triggers ({rules.length})
+                        4. Triggers & Motion ({rules.length})
                     </button>
                     <button type="button" onClick={() => setActiveTab('preview')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'preview' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>
                         5. Play
@@ -1668,7 +1757,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         <button type="button" onClick={() => addEntityByType('multi_select')} className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 text-[10px] font-black uppercase">+ Multi-Select</button>
                     </div>
 
-                    {/* WYSIWYG STAGE */}
+                    {/* WYSIWYG STAGE WITH MOTION PATH VECTOR PREVIEW */}
                     <div
                         ref={editorCanvasRef}
                         onPointerDown={() => setSelectedItem(null)}
@@ -1677,6 +1766,31 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         className={`relative w-full aspect-[16/10] min-h-[340px] rounded-[2rem] border-2 border-slate-300 dark:border-slate-700 overflow-hidden select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
                         style={block?.backgroundUrl ? { backgroundImage: `url(${block.backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                     >
+                        {/* Render Dashed Motion Path Vectors on the Builder Canvas */}
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+                            {rules.filter(r => r.action === 'animate_motion' || r.action === 'move_to_zone').map(r => {
+                                const targetObj = entities.find(e => e.id === (r.targetEntityId || r.entityId));
+                                if (!targetObj) return null;
+                                const destZone = r.action === 'move_to_zone' ? zones.find(z => z.id === r.zoneId) : null;
+                                const endX = destZone ? destZone.x : (r.motionX ?? 50);
+                                const endY = destZone ? destZone.y : (r.motionY ?? 40);
+                                return (
+                                    <g key={`mp_${r.id}`}>
+                                        <line
+                                            x1={`${targetObj.x}%`}
+                                            y1={`${targetObj.y}%`}
+                                            x2={`${endX}%`}
+                                            y2={`${endY}%`}
+                                            stroke="#f59e0b"
+                                            strokeWidth="2.5"
+                                            strokeDasharray="6 4"
+                                        />
+                                        <circle cx={`${endX}%`} cy={`${endY}%`} r="5" fill="#f59e0b" />
+                                    </g>
+                                );
+                            })}
+                        </svg>
+
                         {zones.map(z => (
                             <div
                                 key={z.id}
@@ -1723,7 +1837,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 <div>
                                     <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Interaction Mode</label>
                                     <select value={activeEntity.entityType || 'draggable'} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, entityType: e.target.value as any } : i) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold">
-                                        <option value="draggable">Draggable Object</option>
+                                        <option value="draggable">Draggable / Button Object</option>
                                         <option value="connector_node">Connector Line Node</option>
                                         <option value="slider">Slider / Number-Line</option>
                                         <option value="text_input">Text-Entry Field</option>
@@ -1740,51 +1854,16 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 </div>
                             </div>
 
-                            {/* Mode-Specific Fields */}
-                            {activeEntity.entityType === 'connector_node' && (
-                                <div className="pt-2">
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Target Node to Connect With</label>
-                                    <select value={activeEntity.connectTargetId || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, connectTargetId: e.target.value } : i) })} className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold">
-                                        <option value="">-- Select Matching Node --</option>
-                                        {entities.filter(e => e.id !== activeEntity.id).map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
-                                    </select>
-                                </div>
-                            )}
-
-                            {activeEntity.entityType === 'slider' && (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                                    <div>
-                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Min</label>
-                                        <input type="number" value={activeEntity.sliderMin ?? 0} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sliderMin: parseFloat(e.target.value) } : i) })} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Max</label>
-                                        <input type="number" value={activeEntity.sliderMax ?? 100} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sliderMax: parseFloat(e.target.value) } : i) })} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Target Answer</label>
-                                        <input type="number" value={activeEntity.sliderTarget ?? 50} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sliderTarget: parseFloat(e.target.value) } : i) })} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Unit (e.g. N, °C)</label>
-                                        <input type="text" value={activeEntity.sliderUnit || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sliderUnit: e.target.value } : i) })} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeEntity.entityType === 'text_input' && (
-                                <div className="pt-2">
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Expected Answer(s) (Comma-separated)</label>
-                                    <input type="text" value={activeEntity.expectedText || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, expectedText: e.target.value } : i) })} placeholder="e.g., mitochondria, powerhouse" className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
-                                </div>
-                            )}
-
-                            {activeEntity.entityType === 'multi_select' && (
-                                <label className="flex items-center gap-2 text-xs font-black text-indigo-600 pt-2 cursor-pointer">
-                                    <input type="checkbox" checked={Boolean(activeEntity.isCorrectSelect)} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, isCorrectSelect: e.target.checked } : i) })} />
-                                    Should Learner Select This Card? (Correct Multi-Select Item)
+                            <div className="flex flex-wrap items-center gap-6 pt-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={activeEntity.draggable !== false}
+                                        onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, draggable: e.target.checked } : i) })}
+                                    />
+                                    Learner Can Drag (Uncheck to make it a Clickable Trigger Button)
                                 </label>
-                            )}
+                            </div>
                         </div>
                     )}
 
@@ -1815,10 +1894,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                     <input type="number" value={activeZone.sequenceOrder ?? ''} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, sequenceOrder: e.target.value ? parseInt(e.target.value) : undefined } : z) })} placeholder="e.g., 1" className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
                                 </div>
                             </div>
-                            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-                                <input type="checkbox" checked={Boolean(activeZone.isHotspotPin)} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, isHotspotPin: e.target.checked } : z) })} />
-                                Render as Image Hotspot Pin (📍)
-                            </label>
                         </div>
                     )}
                 </div>
@@ -1877,26 +1952,257 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 </div>
             )}
 
-            {/* TAB 4: TRIGGERS */}
+            {/* ========================================================= */}
+            {/* TAB 4: TRIGGERS & MOTION PATH ANIMATION WIZARD            */}
+            {/* ========================================================= */}
             {activeTab === 'rules' && (
-                <div className="space-y-3">
-                    <button type="button" onClick={() => updateBlock({ rules: [...rules, { id: `r_${Date.now()}`, event: 'on_drop', entityId: entities[0]?.id || '', zoneId: zones[0]?.id || '', action: 'reaction', reaction: 'bounce_glow', message: 'Great job!' }] })} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase">+ Add Trigger</button>
+                <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-slate-500">
+                            Configure triggers to animate objects along a Motion Path (`animate_motion` or `move_to_zone`), change states, or pop open Slide Layers:
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                updateBlock({
+                                    rules: [
+                                        ...rules,
+                                        {
+                                            id: `r_${Date.now()}`,
+                                            event: 'on_click',
+                                            entityId: entities[0]?.id || '',
+                                            zoneId: zones[0]?.id || '',
+                                            action: 'animate_motion',
+                                            targetEntityId: entities[1]?.id || entities[0]?.id || '',
+                                            motionX: 50,
+                                            motionY: 35,
+                                            motionScale: 1.2,
+                                            motionRotation: 0,
+                                            motionDuration: 900,
+                                            motionCurve: 'spring_bounce',
+                                            reaction: 'bounce_glow',
+                                            message: 'Motion Path Triggered!'
+                                        }
+                                    ]
+                                })
+                            }
+                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"
+                        >
+                            <Plus size={12} /> Add Motion / Event Trigger
+                        </button>
+                    </div>
+
                     {rules.map((r, idx) => (
-                        <div key={r.id} className="p-4 rounded-2xl bg-slate-50 border flex flex-wrap items-center gap-2">
-                            <select value={r.event || 'on_drop'} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, event: e.target.value as any }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-black">
-                                <option value="on_drop">When Dropped</option>
-                                <option value="on_click">When Clicked</option>
-                                <option value="on_connect">When Connected</option>
-                            </select>
-                            <select value={r.entityId} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, entityId: e.target.value }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-bold">
-                                {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
-                            </select>
-                            <select value={r.zoneId} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, zoneId: e.target.value }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-bold">
-                                <option value="">(Any / None)</option>
-                                {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
-                            </select>
-                            <input type="text" value={r.message} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, message: e.target.value }; updateBlock({ rules: u }); }} className="flex-1 px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
-                            <button type="button" onClick={() => updateBlock({ rules: rules.filter(i => i.id !== r.id) })} className="text-rose-500"><Trash2 size={14} /></button>
+                        <div key={r.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
+                            {/* Primary Row: WHEN [Event] [Source Object] -> THEN [Action] */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">WHEN</span>
+                                <select
+                                    value={r.event || 'on_drop'}
+                                    onChange={(e) => {
+                                        const u = [...rules];
+                                        u[idx] = { ...r, event: e.target.value as any };
+                                        updateBlock({ rules: u });
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
+                                >
+                                    <option value="on_click">User Clicks Object</option>
+                                    <option value="on_drop">Object Dropped On Zone</option>
+                                    <option value="on_connect">Connector Linked</option>
+                                </select>
+
+                                <select
+                                    value={r.entityId}
+                                    onChange={(e) => {
+                                        const u = [...rules];
+                                        u[idx] = { ...r, entityId: e.target.value };
+                                        updateBlock({ rules: u });
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                >
+                                    {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
+                                </select>
+
+                                {(r.event || 'on_drop') === 'on_drop' && (
+                                    <>
+                                        <span className="text-[10px] font-black uppercase text-slate-400">ON</span>
+                                        <select
+                                            value={r.zoneId}
+                                            onChange={(e) => {
+                                                const u = [...rules];
+                                                u[idx] = { ...r, zoneId: e.target.value };
+                                                updateBlock({ rules: u });
+                                            }}
+                                            className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                        >
+                                            {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
+                                        </select>
+                                    </>
+                                )}
+
+                                <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">THEN</span>
+                                <select
+                                    value={r.action || 'reaction'}
+                                    onChange={(e) => {
+                                        const u = [...rules];
+                                        u[idx] = { ...r, action: e.target.value as any };
+                                        updateBlock({ rules: u });
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black text-indigo-600"
+                                >
+                                    <option value="animate_motion">🚀 Animate Object Along Motion Path (X%, Y%)</option>
+                                    <option value="move_to_zone">🎯 Glide Object Into Target Zone</option>
+                                    <option value="change_state">🔄 Change State of Object</option>
+                                    <option value="show_layer">📑 Pop Open Slide Layer</option>
+                                    <option value="reaction">✨ Play Reaction & Banner</option>
+                                    <option value="complete_block">🏁 Complete Interaction</option>
+                                </select>
+
+                                <button
+                                    type="button"
+                                    onClick={() => updateBlock({ rules: rules.filter(i => i.id !== r.id) })}
+                                    className="ml-auto p-1.5 text-slate-400 hover:text-rose-500"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+
+                            {/* Secondary Row: Motion Path & Target Parameters */}
+                            {(r.action === 'animate_motion' || r.action === 'move_to_zone') && (
+                                <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-slate-900 border border-indigo-200/70 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Object to Move</label>
+                                        <select
+                                            value={r.targetEntityId || r.entityId}
+                                            onChange={(e) => {
+                                                const u = [...rules];
+                                                u[idx] = { ...r, targetEntityId: e.target.value };
+                                                updateBlock({ rules: u });
+                                            }}
+                                            className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-black"
+                                        >
+                                            {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
+                                        </select>
+                                    </div>
+
+                                    {r.action === 'move_to_zone' ? (
+                                        <div>
+                                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Destination Zone</label>
+                                            <select
+                                                value={r.zoneId}
+                                                onChange={(e) => {
+                                                    const u = [...rules];
+                                                    u[idx] = { ...r, zoneId: e.target.value };
+                                                    updateBlock({ rules: u });
+                                                }}
+                                                className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-bold"
+                                            >
+                                                {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">End X% ({r.motionX ?? 50}%)</label>
+                                                <input
+                                                    type="number"
+                                                    min="5"
+                                                    max="95"
+                                                    value={r.motionX ?? 50}
+                                                    onChange={(e) => {
+                                                        const u = [...rules];
+                                                        u[idx] = { ...r, motionX: parseInt(e.target.value) || 50 };
+                                                        updateBlock({ rules: u });
+                                                    }}
+                                                    className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-bold"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">End Y% ({r.motionY ?? 40}%)</label>
+                                                <input
+                                                    type="number"
+                                                    min="5"
+                                                    max="95"
+                                                    value={r.motionY ?? 40}
+                                                    onChange={(e) => {
+                                                        const u = [...rules];
+                                                        u[idx] = { ...r, motionY: parseInt(e.target.value) || 40 };
+                                                        updateBlock({ rules: u });
+                                                    }}
+                                                    className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-bold"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">End Scale</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0.5"
+                                            max="2.5"
+                                            value={r.motionScale ?? 1}
+                                            onChange={(e) => {
+                                                const u = [...rules];
+                                                u[idx] = { ...r, motionScale: parseFloat(e.target.value) || 1 };
+                                                updateBlock({ rules: u });
+                                            }}
+                                            className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-bold"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Duration (ms)</label>
+                                        <input
+                                            type="number"
+                                            step="100"
+                                            min="200"
+                                            max="4000"
+                                            value={r.motionDuration ?? 900}
+                                            onChange={(e) => {
+                                                const u = [...rules];
+                                                u[idx] = { ...r, motionDuration: parseInt(e.target.value) || 900 };
+                                                updateBlock({ rules: u });
+                                            }}
+                                            className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-bold"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Easing Curve</label>
+                                        <select
+                                            value={r.motionCurve || 'spring_bounce'}
+                                            onChange={(e) => {
+                                                const u = [...rules];
+                                                u[idx] = { ...r, motionCurve: e.target.value as any };
+                                                updateBlock({ rules: u });
+                                            }}
+                                            className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-bold"
+                                        >
+                                            <option value="spring_bounce">Spring Bounce</option>
+                                            <option value="ease_in_out">Smooth Ease</option>
+                                            <option value="linear">Linear Constant</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Banner Message Row */}
+                            <div className="flex items-center gap-2 pt-1">
+                                <span className="text-[10px] font-black uppercase text-slate-400">Banner:</span>
+                                <input
+                                    type="text"
+                                    value={r.message}
+                                    onChange={(e) => {
+                                        const u = [...rules];
+                                        u[idx] = { ...r, message: e.target.value };
+                                        updateBlock({ rules: u });
+                                    }}
+                                    placeholder="Feedback message when trigger fires..."
+                                    className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                />
+                            </div>
                         </div>
                     ))}
                 </div>
