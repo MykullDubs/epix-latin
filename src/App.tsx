@@ -1566,7 +1566,7 @@ const handleRemoveStudent = useCallback(
         const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
         const classDoc = await getDoc(classRef);
         if (classDoc.exists()) {
-          const data: any = classDoc.data(); // 🔥 Explicitly type as any here
+          const data = classDoc.data() as Record<string, any>; // 🔥 Explicit record cast
           const nextStudents = (data?.students || []).filter((s: any) => s.email !== email);
           const nextEmails = (data?.studentEmails || []).filter((e: string) => e !== email);
           await updateDoc(classRef, { students: nextStudents, studentEmails: nextEmails });
