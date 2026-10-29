@@ -371,12 +371,16 @@ export const ChatDialogueBlock = ({ lines }: any) => {
 };
 
 // ============================================================================
-//  7. KINETIC CANVAS BLOCK (Storyline 360: States, Slide Layers, Mini-Quizzes & Triggers)
+//  7. KINETIC CANVAS BLOCK (Multi-Modal Storyline 360 Engine)
+//     Supports: Sorting/Capacity, Sequencing, Hotspot Labeling, SVG Connector
+//     Lines, Sliders/Number-Lines, Text-Entry, Multi-Select & Timeline Scrubber
 // ============================================================================
 export type KineticObjectState = 'normal' | 'selected' | 'drop_correct' | 'drop_incorrect' | 'hidden' | 'disabled';
+export type KineticEntityType = 'draggable' | 'hotspot_label' | 'connector_node' | 'slider' | 'text_input' | 'multi_select';
 
 export interface KineticEntity {
     id: string;
+    entityType?: KineticEntityType; // Defaults to 'draggable'
     label: string;
     sublabel?: string;
     imageUrl?: string;
@@ -394,6 +398,24 @@ export interface KineticEntity {
     targetScale?: number;
     targetRotation?: number;
     variableName?: string;
+
+    // 1. Sorting & Categorizing
+    category?: string; // Matches zone.acceptedCategory (e.g. "noun", "verb")
+    // 2. Sequencing & Ordering
+    sequenceIndex?: number; // e.g., 1, 2, 3
+    // 4. Matching with Connector Lines
+    connectTargetId?: string; // ID of the target entity this node should connect to
+    // 5. Slider / Number-Line
+    sliderMin?: number;
+    sliderMax?: number;
+    sliderStep?: number;
+    sliderTarget?: number;
+    sliderTolerance?: number;
+    sliderUnit?: string;
+    // 6. Text-Entry & Multi-Select
+    expectedText?: string; // Comma-separated acceptable answers
+    placeholder?: string;
+    isCorrectSelect?: boolean; // For multi_select mode
 }
 
 export interface KineticZone {
@@ -405,6 +427,30 @@ export interface KineticZone {
     width: number;
     height: number;
     invisible?: boolean;
+    // 1. Sorting & Capacity
+    capacity?: number; // Max objects allowed in this zone (default: 1, or 6 for category buckets)
+    acceptedCategory?: string; // If set, any entity with matching category is valid here
+    // 2. Sequencing
+    sequenceOrder?: number; // e.g. Slot #1, Slot #2, Slot #3
+    // 3. Image Hotspot Pin Mode
+    isHotspotPin?: boolean; // Renders a pulsing target pin for labeling diagrams
+}
+
+export interface KineticTimelineKeyframe {
+    id: string;
+    progress: number; // 0 to 100
+    title: string;
+    description: string;
+    // Optional overrides at this point in time:
+    entityOverrides?: Array<{
+        entityId: string;
+        x?: number;
+        y?: number;
+        scale?: number;
+        rotation?: number;
+        state?: KineticObjectState;
+        labelOverride?: string;
+    }>;
 }
 
 export interface KineticSlideLayerOption {
@@ -414,20 +460,18 @@ export interface KineticSlideLayerOption {
 
 export interface KineticSlideLayer {
     id: string;
-    name: string; // Internal layer name for Trigger Wizard (e.g., "Layer 1: Vault Inspection")
+    name: string;
     theme?: 'info' | 'success' | 'warning' | 'error' | 'quiz';
     title: string;
     body: string;
     imageUrl?: string;
     audioUrl?: string;
     buttonLabel?: string;
-    // Optional embedded mini-quiz inside the Slide Layer
     hasQuiz?: boolean;
     quizQuestion?: string;
     quizOptions?: KineticSlideLayerOption[];
     correctOptionId?: string;
     gateUntilCorrect?: boolean;
-    // Optional chained state change when the user closes this layer
     onCloseAction?: 'hide_layer' | 'change_state' | 'complete_block';
     onCloseTargetEntityId?: string;
     onCloseTargetState?: KineticObjectState;
@@ -435,13 +479,13 @@ export interface KineticSlideLayer {
 
 export interface KineticRule {
     id: string;
-    event?: 'on_drop' | 'on_click';
+    event?: 'on_drop' | 'on_click' | 'on_connect' | 'on_slider_match' | 'on_text_match';
     entityId: string;
     zoneId: string;
     action?: 'reaction' | 'change_state' | 'show_layer' | 'hide_layer' | 'move_to_zone' | 'complete_block';
     targetEntityId?: string;
     targetState?: KineticObjectState;
-    targetLayerId?: string; // Target Slide Layer to pop open
+    targetLayerId?: string;
     reaction: 'bounce_glow' | 'chariot_march' | 'lever_tilt' | 'combine_flash' | 'shake_error';
     message: string;
     isRequired?: boolean;
@@ -502,9 +546,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const canvasRef = useRef<HTMLDivElement>(null);
 
     const initialEntities: KineticEntity[] = useMemo(() => {
-        if (Array.isArray(block?.entities)) {
-            return JSON.parse(JSON.stringify(block.entities));
-        }
+        if (Array.isArray(block?.entities)) return JSON.parse(JSON.stringify(block.entities));
         return [];
     }, [block?.entities]);
 
@@ -523,10 +565,25 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         return [];
     }, [block?.layers]);
 
+    const timelineKeyframes: KineticTimelineKeyframe[] = useMemo(() => {
+        if (Array.isArray(block?.timelineKeyframes)) {
+            return [...block.timelineKeyframes].sort((a, b) => a.progress - b.progress);
+        }
+        return [];
+    }, [block?.timelineKeyframes]);
+
     const buildInitialStateMap = (ents: KineticEntity[]) => {
         const map: Record<string, KineticObjectState> = {};
+        ents.forEach(e => { map[e.id] = e.initialState || 'normal'; });
+        return map;
+    };
+
+    const buildInitialSliderMap = (ents: KineticEntity[]) => {
+        const map: Record<string, number> = {};
         ents.forEach(e => {
-            map[e.id] = e.initialState || 'normal';
+            if (e.entityType === 'slider') {
+                map[e.id] = e.sliderMin ?? 0;
+            }
         });
         return map;
     };
@@ -539,9 +596,18 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const [layerQuizSelected, setLayerQuizSelected] = useState<string | null>(null);
     const [layerQuizSubmitted, setLayerQuizSubmitted] = useState(false);
 
+    // Multi-Modal Interaction States
+    const [snappedMap, setSnappedMap] = useState<Record<string, string>>({}); // entityId -> zoneId
+    const [connections, setConnections] = useState<Record<string, string>>({}); // sourceEntityId -> targetEntityId
+    const [activeConnectorStart, setActiveConnectorStart] = useState<string | null>(null);
+    const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
+    const [sliderValues, setSliderValues] = useState<Record<string, number>>(() => buildInitialSliderMap(initialEntities));
+    const [textValues, setTextValues] = useState<Record<string, string>>({});
+    const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
+    const [timelineProgress, setTimelineProgress] = useState<number>(0);
+
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
-    const [snappedMap, setSnappedMap] = useState<Record<string, string>>({});
     const [activeReaction, setActiveReaction] = useState<string | null>(null);
     const [reactionBanner, setReactionBanner] = useState<string | null>(null);
     const [isVerified, setIsVerified] = useState(false);
@@ -549,17 +615,58 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     useEffect(() => {
         setEntities(initialEntities);
         setObjectStates(buildInitialStateMap(initialEntities));
+        setSliderValues(buildInitialSliderMap(initialEntities));
     }, [initialEntities]);
 
     useEffect(() => {
-        if (onStateChange) onStateChange({ entities, snappedMap, objectStates, activeLayerId, isVerified });
-    }, [entities, snappedMap, objectStates, activeLayerId, isVerified, onStateChange]);
+        if (onStateChange) {
+            onStateChange({
+                entities, snappedMap, objectStates, connections,
+                sliderValues, textValues, multiSelectedIds, timelineProgress,
+                activeLayerId, isVerified
+            });
+        }
+    }, [entities, snappedMap, objectStates, connections, sliderValues, textValues, multiSelectedIds, timelineProgress, activeLayerId, isVerified, onStateChange]);
 
     const selectedEntity = entities.find(e => e.id === selectedId) || null;
     const activeLayer = layers.find(l => l.id === activeLayerId) || null;
     const bgThemeKey = block?.backgroundTheme || 'grid';
     const customBgUrl = block?.backgroundUrl || '';
     const isLightTheme = bgThemeKey === 'parchment' || bgThemeKey === 'blank' || bgThemeKey === 'light_grid';
+
+    // Determine active timeline keyframe and interpolated object overrides
+    const activeKeyframe = useMemo(() => {
+        if (timelineKeyframes.length === 0) return null;
+        let current = timelineKeyframes[0];
+        for (const kf of timelineKeyframes) {
+            if (timelineProgress >= kf.progress) current = kf;
+        }
+        return current;
+    }, [timelineKeyframes, timelineProgress]);
+
+    const getEntityWithTimeline = (ent: KineticEntity): KineticEntity & { effectiveState: KineticObjectState } => {
+        const baseState = objectStates[ent.id] || 'normal';
+        if (!activeKeyframe || !Array.isArray(activeKeyframe.entityOverrides)) {
+            return { ...ent, effectiveState: baseState };
+        }
+        const ov = activeKeyframe.entityOverrides.find(o => o.entityId === ent.id);
+        if (!ov) return { ...ent, effectiveState: baseState };
+        return {
+            ...ent,
+            x: ov.x !== undefined ? ov.x : ent.x,
+            y: ov.y !== undefined ? ov.y : ent.y,
+            scale: ov.scale !== undefined ? ov.scale : ent.scale,
+            rotation: ov.rotation !== undefined ? ov.rotation : ent.rotation,
+            label: ov.labelOverride || ent.label,
+            effectiveState: ov.state || baseState
+        };
+    };
+
+    const triggerCanvasReaction = (reactionType: string, message: string) => {
+        if (reactionType) setActiveReaction(reactionType);
+        if (message) setReactionBanner(message);
+        setTimeout(() => setActiveReaction(null), 2200);
+    };
 
     const openSlideLayer = (layerId: string) => {
         setLayerQuizSelected(null);
@@ -572,15 +679,11 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             setActiveLayerId(null);
             return;
         }
-
-        // If layer has a gated mini-quiz, verify answer first
         if (activeLayer.hasQuiz && (activeLayer.quizOptions?.length || 0) > 0) {
             if (!layerQuizSubmitted) {
                 setLayerQuizSubmitted(true);
                 const isCorrect = layerQuizSelected === activeLayer.correctOptionId;
-                if (!isCorrect && activeLayer.gateUntilCorrect !== false) {
-                    return; // Keep layer open so student can try again
-                }
+                if (!isCorrect && activeLayer.gateUntilCorrect !== false) return;
             } else {
                 const isCorrect = layerQuizSelected === activeLayer.correctOptionId;
                 if (!isCorrect && activeLayer.gateUntilCorrect !== false) {
@@ -591,10 +694,8 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             }
         }
 
-        // Mark layer completed
         setCompletedLayerIds(prev => Array.from(new Set([...prev, activeLayer.id])));
 
-        // Execute any chained onCloseAction configured on this Slide Layer
         if (activeLayer.onCloseAction === 'change_state' && activeLayer.onCloseTargetEntityId) {
             setObjectStates(prev => ({
                 ...prev,
@@ -610,25 +711,16 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setLayerQuizSubmitted(false);
     };
 
-    const triggerCanvasReaction = (reactionType: string, message: string) => {
-        if (reactionType) setActiveReaction(reactionType);
-        if (message) setReactionBanner(message);
-        setTimeout(() => setActiveReaction(null), 2200);
-    };
-
     const executeTriggers = (matchingRules: KineticRule[], sourceEntityId: string) => {
         if (matchingRules.length === 0) return;
-
         const newlyFiredIds = matchingRules.map(r => r.id);
         setFiredRuleIds(prev => Array.from(new Set([...prev, ...newlyFiredIds])));
 
         matchingRules.forEach(rule => {
             const actionType = rule.action || 'reaction';
-
             if (rule.message || rule.reaction) {
                 triggerCanvasReaction(rule.reaction || 'bounce_glow', rule.message);
             }
-
             if (actionType === 'show_layer' && rule.targetLayerId) {
                 openSlideLayer(rule.targetLayerId);
             } else if (actionType === 'hide_layer') {
@@ -657,27 +749,107 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         });
     };
 
+    // --- CONNECTOR NODE MATCHING HANDLER ---
+    const handleConnectorNodeTap = (entityId: string) => {
+        if (!activeConnectorStart) {
+            setActiveConnectorStart(entityId);
+            setReactionBanner('Tap another node to link a connector line...');
+            return;
+        }
+        if (activeConnectorStart === entityId) {
+            setActiveConnectorStart(null);
+            setPointerPos(null);
+            return;
+        }
+
+        const sourceEnt = entities.find(e => e.id === activeConnectorStart);
+        const targetEnt = entities.find(e => e.id === entityId);
+        if (!sourceEnt || !targetEnt) return;
+
+        // Record bidirectional or directed connection
+        const nextConnections = { ...connections, [sourceEnt.id]: targetEnt.id };
+        setConnections(nextConnections);
+        setActiveConnectorStart(null);
+        setPointerPos(null);
+
+        const isCorrectPair =
+            sourceEnt.connectTargetId === targetEnt.id ||
+            targetEnt.connectTargetId === sourceEnt.id;
+
+        const connectRules = rules.filter(
+            r => r.event === 'on_connect' && (r.entityId === sourceEnt.id || r.entityId === targetEnt.id)
+        );
+
+        if (connectRules.length > 0) {
+            executeTriggers(connectRules, sourceEnt.id);
+        } else if (sourceEnt.connectTargetId || targetEnt.connectTargetId) {
+            if (isCorrectPair) {
+                setObjectStates(prev => ({ ...prev, [sourceEnt.id]: 'drop_correct', [targetEnt.id]: 'drop_correct' }));
+                triggerCanvasReaction('bounce_glow', `Connected: ${sourceEnt.label} ➔ ${targetEnt.label}!`);
+            } else {
+                setObjectStates(prev => ({ ...prev, [sourceEnt.id]: 'drop_incorrect' }));
+                triggerCanvasReaction('shake_error', 'Those nodes do not match—tap again to re-link.');
+            }
+        }
+    };
+
+    // --- MULTI-SELECT TOGGLE HANDLER ---
+    const handleMultiSelectToggle = (entityId: string) => {
+        setMultiSelectedIds(prev => {
+            const exists = prev.includes(entityId);
+            const next = exists ? prev.filter(id => id !== entityId) : [...prev, entityId];
+            setObjectStates(st => ({
+                ...st,
+                [entityId]: exists ? 'normal' : 'selected'
+            }));
+            return next;
+        });
+    };
+
     const handlePointerDown = (e: React.PointerEvent, entityId: string) => {
         if (isVerified || activeLayerId) return;
+        const ent = entities.find(item => item.id === entityId);
+        if (!ent) return;
+
         const currentState = objectStates[entityId] || 'normal';
         if (currentState === 'disabled' || currentState === 'hidden') return;
 
         e.stopPropagation();
         setSelectedId(entityId);
 
-        const ent = entities.find(item => item.id === entityId);
+        const eType = ent.entityType || 'draggable';
 
+        // Connector Node Mode
+        if (eType === 'connector_node') {
+            handleConnectorNodeTap(entityId);
+            return;
+        }
+
+        // Multi-Select Mode
+        if (eType === 'multi_select') {
+            handleMultiSelectToggle(entityId);
+            const clickRules = rules.filter(r => r.event === 'on_click' && r.entityId === entityId);
+            if (clickRules.length > 0) executeTriggers(clickRules, entityId);
+            return;
+        }
+
+        // Slider or Text Input handle their own internal inputs unless dragged in builder
+        if (eType === 'slider' || eType === 'text_input') {
+            return;
+        }
+
+        // Fire any "on_click" triggers
         const clickRules = rules.filter(r => r.event === 'on_click' && r.entityId === entityId);
         if (clickRules.length > 0) {
             executeTriggers(clickRules, entityId);
-        } else if (ent?.draggable === false) {
+        } else if (ent.draggable === false) {
             setObjectStates(prev => ({
                 ...prev,
                 [entityId]: prev[entityId] === 'selected' ? 'normal' : 'selected'
             }));
         }
 
-        if (ent?.draggable !== false) {
+        if (ent.draggable !== false) {
             (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
             setDraggingId(entityId);
         }
@@ -694,6 +866,16 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: clampedX, y: clampedY } : ent));
     };
 
+    // Track mouse/touch position when drawing an active connector line
+    const handleCanvasPointerMove = (e: React.PointerEvent) => {
+        if (!activeConnectorStart || !canvasRef.current) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        setPointerPos({
+            x: ((e.clientX - rect.left) / rect.width) * 100,
+            y: ((e.clientY - rect.top) / rect.height) * 100
+        });
+    };
+
     const handlePointerUp = (e: React.PointerEvent, entityId: string) => {
         if (draggingId !== entityId) return;
         (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
@@ -704,8 +886,8 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
 
         let matchedZone: KineticZone | null = null;
         for (const z of zones) {
-            const halfW = z.width / 2;
-            const halfH = z.height / 2;
+            const halfW = (z.isHotspotPin ? Math.max(z.width, 16) : z.width) / 2;
+            const halfH = (z.isHotspotPin ? Math.max(z.height, 16) : z.height) / 2;
             if (movedEntity.x >= (z.x - halfW) && movedEntity.x <= (z.x + halfW) &&
                 movedEntity.y >= (z.y - halfH) && movedEntity.y <= (z.y + halfH)) {
                 matchedZone = z;
@@ -714,19 +896,71 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         }
 
         if (matchedZone) {
-            setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: matchedZone!.x, y: matchedZone!.y } : ent));
+            // Check Zone Capacity (Sorting/Categorizing support)
+            const maxCap = matchedZone.capacity || (matchedZone.acceptedCategory ? 6 : 1);
+            const currentOccupants = Object.keys(snappedMap).filter(
+                k => snappedMap[k] === matchedZone!.id && k !== entityId
+            );
+
+            if (currentOccupants.length >= maxCap) {
+                triggerCanvasReaction('shake_error', `${matchedZone.label} is at full capacity (${maxCap}/${maxCap})!`);
+                return;
+            }
+
+            // Compute tiled position inside zone so multi-capacity items stack neatly
+            const slotIdx = currentOccupants.length;
+            let snapX = matchedZone.x;
+            let snapY = matchedZone.y;
+
+            if (maxCap > 1) {
+                const cols = 2;
+                const col = slotIdx % cols;
+                const row = Math.floor(slotIdx / cols);
+                const offsetX = (col === 0 ? -1 : 1) * Math.min(matchedZone.width * 0.22, 9);
+                const offsetY = (row - 0.5) * Math.min(matchedZone.height * 0.28, 9);
+                snapX = Math.max(6, Math.min(94, matchedZone.x + offsetX));
+                snapY = Math.max(8, Math.min(92, matchedZone.y + offsetY));
+            }
+
+            setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: snapX, y: snapY } : ent));
             const nextSnapped = { ...snappedMap, [entityId]: matchedZone.id };
             setSnappedMap(nextSnapped);
 
+            // Check explicit Trigger Rules first
             const dropRules = rules.filter(r => (r.event || 'on_drop') === 'on_drop' && r.entityId === entityId && r.zoneId === matchedZone!.id);
             if (dropRules.length > 0) {
                 executeTriggers(dropRules, entityId);
-            } else {
-                const zoneHasOtherRules = rules.some(r => (r.event || 'on_drop') === 'on_drop' && r.zoneId === matchedZone!.id);
-                if (zoneHasOtherRules) {
+                return;
+            }
+
+            // Check Category Sorting match
+            if (matchedZone.acceptedCategory && movedEntity.category) {
+                if (matchedZone.acceptedCategory.trim().toLowerCase() === movedEntity.category.trim().toLowerCase()) {
+                    setObjectStates(prev => ({ ...prev, [entityId]: 'drop_correct' }));
+                    triggerCanvasReaction('bounce_glow', `Sorted into ${matchedZone.label}!`);
+                } else {
                     setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
-                    triggerCanvasReaction('shake_error', 'Try a different placement!');
+                    triggerCanvasReaction('shake_error', `Wrong category for ${movedEntity.label}!`);
                 }
+                return;
+            }
+
+            // Check Sequence / Ordering match
+            if (matchedZone.sequenceOrder !== undefined && movedEntity.sequenceIndex !== undefined) {
+                if (matchedZone.sequenceOrder === movedEntity.sequenceIndex) {
+                    setObjectStates(prev => ({ ...prev, [entityId]: 'drop_correct' }));
+                    triggerCanvasReaction('bounce_glow', `Sequence #${matchedZone.sequenceOrder} locked!`);
+                } else {
+                    setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
+                    triggerCanvasReaction('shake_error', `Sequence mismatch for slot #${matchedZone.sequenceOrder}!`);
+                }
+                return;
+            }
+
+            const zoneHasOtherRules = rules.some(r => (r.event || 'on_drop') === 'on_drop' && r.zoneId === matchedZone!.id);
+            if (zoneHasOtherRules) {
+                setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
+                triggerCanvasReaction('shake_error', 'Try a different placement!');
             }
         } else {
             const nextSnapped = { ...snappedMap };
@@ -744,6 +978,13 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const handleReset = () => {
         setEntities(JSON.parse(JSON.stringify(initialEntities)));
         setObjectStates(buildInitialStateMap(initialEntities));
+        setSliderValues(buildInitialSliderMap(initialEntities));
+        setTextValues({});
+        setMultiSelectedIds([]);
+        setConnections({});
+        setActiveConnectorStart(null);
+        setPointerPos(null);
+        setTimelineProgress(0);
         setFiredRuleIds([]);
         setCompletedLayerIds([]);
         setActiveLayerId(null);
@@ -756,32 +997,81 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setIsVerified(false);
     };
 
+    // --- UNIFIED MULTI-MODAL VALIDATION ENGINE ---
     const ruleStatus = useMemo(() => {
+        const checks: boolean[] = [];
+
+        // 1. Explicit Trigger Rules
         const requiredRules = rules.filter(r => r.isRequired !== false);
-        if (requiredRules.length === 0) {
-            const draggableEnts = entities.filter(e => e.draggable !== false);
+        requiredRules.forEach(rule => {
+            if (rule.action === 'show_layer' && rule.targetLayerId) {
+                checks.push(completedLayerIds.includes(rule.targetLayerId));
+            } else if (rule.event === 'on_click' || rule.event === 'on_connect') {
+                checks.push(firedRuleIds.includes(rule.id));
+            } else {
+                const isZoneMatched = snappedMap[rule.entityId] === rule.zoneId;
+                const ent = entities.find(e => e.id === rule.entityId);
+                const scaleOk = (ent?.allowResize && ent.targetScale) ? Math.abs(ent.scale - ent.targetScale) <= 0.25 : true;
+                const rotateOk = (ent?.allowRotate && ent.targetRotation !== undefined) ? Math.abs(ent.rotation - ent.targetRotation) <= 15 : true;
+                checks.push(isZoneMatched && scaleOk && rotateOk);
+            }
+        });
+
+        // 2. Category Sorting Checks
+        entities.filter(e => e.category).forEach(ent => {
+            const zId = snappedMap[ent.id];
+            const z = zones.find(zone => zone.id === zId);
+            checks.push(Boolean(z?.acceptedCategory && z.acceptedCategory.trim().toLowerCase() === ent.category!.trim().toLowerCase()));
+        });
+
+        // 3. Sequence Ordering Checks
+        entities.filter(e => e.sequenceIndex !== undefined).forEach(ent => {
+            const zId = snappedMap[ent.id];
+            const z = zones.find(zone => zone.id === zId);
+            checks.push(Boolean(z && z.sequenceOrder === ent.sequenceIndex));
+        });
+
+        // 4. Connector Line Matching Checks
+        entities.filter(e => e.entityType === 'connector_node' && e.connectTargetId).forEach(ent => {
+            const connectedTo = connections[ent.id];
+            const reverseConnected = Object.keys(connections).find(k => connections[k] === ent.id);
+            checks.push(connectedTo === ent.connectTargetId || reverseConnected === ent.connectTargetId);
+        });
+
+        // 5. Slider / Number-Line Checks
+        entities.filter(e => e.entityType === 'slider' && e.sliderTarget !== undefined).forEach(ent => {
+            const val = sliderValues[ent.id] ?? (ent.sliderMin ?? 0);
+            const tol = ent.sliderTolerance ?? 0;
+            checks.push(Math.abs(val - ent.sliderTarget!) <= tol);
+        });
+
+        // 6. Text-Entry Checks
+        entities.filter(e => e.entityType === 'text_input' && e.expectedText).forEach(ent => {
+            const userTxt = (textValues[ent.id] || '').trim().toLowerCase();
+            const validOptions = ent.expectedText!.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            checks.push(validOptions.includes(userTxt));
+        });
+
+        // 7. Multi-Select Checks
+        const multiSelectEnts = entities.filter(e => e.entityType === 'multi_select');
+        if (multiSelectEnts.length > 0) {
+            multiSelectEnts.forEach(ent => {
+                const isSelected = multiSelectedIds.includes(ent.id);
+                checks.push(ent.isCorrectSelect ? isSelected : !isSelected);
+            });
+        }
+
+        // Fallback if no specific rules or modal checks exist
+        if (checks.length === 0) {
+            const draggableEnts = entities.filter(e => (e.entityType || 'draggable') === 'draggable' && e.draggable !== false);
             const placedCount = Object.keys(snappedMap).length;
             const total = Math.max(1, draggableEnts.length);
             return { completedCount: placedCount, total, allComplete: placedCount >= draggableEnts.length };
         }
 
-        const results = requiredRules.map(rule => {
-            if (rule.action === 'show_layer' && rule.targetLayerId) {
-                return completedLayerIds.includes(rule.targetLayerId);
-            }
-            if (rule.event === 'on_click') {
-                return firedRuleIds.includes(rule.id);
-            }
-            const isZoneMatched = snappedMap[rule.entityId] === rule.zoneId;
-            const ent = entities.find(e => e.id === rule.entityId);
-            const scaleOk = (ent?.allowResize && ent.targetScale) ? Math.abs(ent.scale - ent.targetScale) <= 0.25 : true;
-            const rotateOk = (ent?.allowRotate && ent.targetRotation !== undefined) ? Math.abs(ent.rotation - ent.targetRotation) <= 15 : true;
-            return isZoneMatched && scaleOk && rotateOk;
-        });
-
-        const completedCount = results.filter(Boolean).length;
-        return { completedCount, total: requiredRules.length, allComplete: completedCount === requiredRules.length };
-    }, [rules, snappedMap, entities, firedRuleIds, completedLayerIds]);
+        const completedCount = checks.filter(Boolean).length;
+        return { completedCount, total: checks.length, allComplete: completedCount === checks.length };
+    }, [rules, snappedMap, entities, zones, firedRuleIds, completedLayerIds, connections, sliderValues, textValues, multiSelectedIds]);
 
     const handleVerifyAndComplete = () => {
         if (ruleStatus.allComplete) {
@@ -789,12 +1079,13 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             triggerCanvasReaction(block?.successAnimation || 'chariot_march', 'All Canvas Objectives Verified!');
             if (onComplete) setTimeout(() => onComplete(), 1200);
         } else {
-            setReactionBanner(`Keep going! ${ruleStatus.completedCount} of ${ruleStatus.total} interactions completed.`);
+            setReactionBanner(`Keep going! ${ruleStatus.completedCount} of ${ruleStatus.total} interactions aligned.`);
         }
     };
 
     const activeLayerStyle = LAYER_THEME_STYLES[activeLayer?.theme || (activeLayer?.hasQuiz ? 'quiz' : 'info')] || LAYER_THEME_STYLES.info;
     const isLayerQuizCorrect = activeLayer?.hasQuiz ? layerQuizSelected === activeLayer.correctOptionId : true;
+    const showTimeline = Boolean(block?.enableTimeline || timelineKeyframes.length > 0);
 
     return (
         <div className="my-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in duration-500">
@@ -806,7 +1097,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                             <Sparkles size={12} /> Kinetic Canvas Lab
                         </span>
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {ruleStatus.completedCount} / {ruleStatus.total} Triggers Complete
+                            {ruleStatus.completedCount} / {ruleStatus.total} Objectives Aligned
                         </span>
                     </div>
                     <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
@@ -825,46 +1116,60 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 </button>
             </div>
 
-            {/* Live Variable & State Telemetry */}
-            {entities.length > 0 && (
-                <div className="px-6 py-2.5 bg-slate-100/70 dark:bg-slate-950 border-b border-slate-200/70 dark:border-slate-800 flex items-center gap-2.5 overflow-x-auto custom-scrollbar">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 shrink-0 flex items-center gap-1">
-                        <Zap size={12} className="text-amber-500" /> States:
-                    </span>
-                    {entities.map(ent => {
-                        const st = objectStates[ent.id] || 'normal';
-                        const matchedZone = zones.find(z => z.id === snappedMap[ent.id]);
-                        return (
-                            <div
-                                key={ent.id}
-                                className={`px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1.5 shrink-0 border ${
-                                    st === 'drop_correct' || matchedZone
-                                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                                        : st === 'drop_incorrect'
-                                            ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 text-rose-600'
-                                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                                }`}
-                            >
-                                <span>{ent.variableName || ent.label}:</span>
-                                <span className="text-indigo-600 dark:text-indigo-400 uppercase">
-                                    {matchedZone ? matchedZone.label : st}
-                                </span>
-                                {ent.allowResize && <span className="opacity-70">({ent.scale.toFixed(1)}x)</span>}
-                                {ent.allowRotate && <span className="opacity-70">({ent.rotation}°)</span>}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
             {/* 2D Stage */}
             <div className="p-4 sm:p-6 bg-slate-100 dark:bg-slate-950">
                 <div 
                     ref={canvasRef}
-                    onPointerDown={() => setSelectedId(null)}
-                    className={`relative w-full aspect-[16/10] min-h-[360px] rounded-[2rem] overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
+                    onPointerDown={() => {
+                        setSelectedId(null);
+                        setActiveConnectorStart(null);
+                        setPointerPos(null);
+                    }}
+                    onPointerMove={handleCanvasPointerMove}
+                    className={`relative w-full aspect-[16/10] min-h-[380px] rounded-[2rem] overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
                     style={customBgUrl ? { backgroundImage: `url(${customBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                 >
+                    {/* SVG OVERLAY FOR CONNECTOR LINES */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-15">
+                        {Object.entries(connections).map(([sourceId, targetId]) => {
+                            const sEnt = entities.find(e => e.id === sourceId);
+                            const tEnt = entities.find(e => e.id === targetId);
+                            if (!sEnt || !tEnt) return null;
+                            const isMatch = sEnt.connectTargetId === tEnt.id || tEnt.connectTargetId === sEnt.id;
+                            return (
+                                <g key={`${sourceId}_${targetId}`}>
+                                    <line
+                                        x1={`${sEnt.x}%`}
+                                        y1={`${sEnt.y}%`}
+                                        x2={`${tEnt.x}%`}
+                                        y2={`${tEnt.y}%`}
+                                        stroke={isMatch ? '#10b981' : '#6366f1'}
+                                        strokeWidth="4"
+                                        strokeDasharray={isMatch ? undefined : '6 4'}
+                                        strokeLinecap="round"
+                                    />
+                                    <circle cx={`${sEnt.x}%`} cy={`${sEnt.y}%`} r="6" fill="#10b981" />
+                                    <circle cx={`${tEnt.x}%`} cy={`${tEnt.y}%`} r="6" fill="#10b981" />
+                                </g>
+                            );
+                        })}
+                        {activeConnectorStart && pointerPos && (() => {
+                            const sEnt = entities.find(e => e.id === activeConnectorStart);
+                            if (!sEnt) return null;
+                            return (
+                                <line
+                                    x1={`${sEnt.x}%`}
+                                    y1={`${sEnt.y}%`}
+                                    x2={`${pointerPos.x}%`}
+                                    y2={`${pointerPos.y}%`}
+                                    stroke="#f59e0b"
+                                    strokeWidth="3.5"
+                                    strokeDasharray="6 6"
+                                />
+                            );
+                        })()}
+                    </svg>
+
                     {reactionBanner && !activeLayer && (
                         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-5 py-2.5 rounded-full bg-slate-900/95 text-white backdrop-blur-md shadow-xl border border-white/20 text-xs font-black flex items-center gap-2 animate-in slide-in-from-top-4">
                             <Sparkles size={14} className="text-amber-400 shrink-0" />
@@ -872,63 +1177,80 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                         </div>
                     )}
 
-                    {activeReaction === 'chariot_march' && (
-                        <div className="absolute inset-x-0 bottom-5 z-30 pointer-events-none flex items-center justify-center animate-in slide-in-from-left-full duration-700">
-                            <div className="px-6 py-2.5 rounded-2xl bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2 border-2 border-amber-200">
-                                <Flag size={16} /> Milestone Reaction Triggered!
-                            </div>
-                        </div>
-                    )}
-
-                    {activeReaction === 'lever_tilt' && (
-                        <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
-                            <div className="w-56 h-2.5 bg-indigo-400 rounded-full shadow-[0_0_30px_rgba(99,102,241,0.9)] animate-spin" style={{ animationDuration: '1.4s' }} />
-                        </div>
-                    )}
-
-                    {activeReaction === 'combine_flash' && (
-                        <div className="absolute inset-0 z-30 pointer-events-none bg-indigo-500/20 animate-pulse flex items-center justify-center">
-                            <div className="w-28 h-28 rounded-full bg-emerald-400/30 blur-2xl animate-ping" />
-                        </div>
-                    )}
-
-                    {/* Target Snap Zones */}
+                    {/* Target Snap Zones (Supports Category Buckets, Sequence Slots & Hotspot Pins) */}
                     {zones.map((zone) => {
-                        const occupiedByEntityId = Object.keys(snappedMap).find(k => snappedMap[k] === zone.id);
-                        const isMatchedCorrectly = rules.some(r => r.zoneId === zone.id && r.entityId === occupiedByEntityId);
+                        const occupants = Object.keys(snappedMap).filter(k => snappedMap[k] === zone.id);
+                        const maxCap = zone.capacity || (zone.acceptedCategory ? 6 : 1);
+
+                        if (zone.isHotspotPin) {
+                            return (
+                                <div
+                                    key={zone.id}
+                                    style={{ left: `${zone.x}%`, top: `${zone.y}%`, transform: 'translate(-50%, -50%)' }}
+                                    className="absolute z-10 pointer-events-none flex flex-col items-center"
+                                >
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 shadow-lg transition-all ${
+                                        occupants.length > 0
+                                            ? 'bg-emerald-500 border-white text-white scale-110'
+                                            : 'bg-amber-500/90 border-white text-slate-950 animate-pulse'
+                                    }`}>
+                                        <span className="text-[10px] font-black">{zone.sequenceOrder ?? '📍'}</span>
+                                    </div>
+                                    {!zone.invisible && (
+                                        <span className="mt-1 px-2 py-0.5 rounded-md bg-slate-900/85 text-white text-[9px] font-black uppercase tracking-wider whitespace-nowrap">
+                                            {zone.label}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        }
 
                         return (
                             <div
                                 key={zone.id}
                                 style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%`, transform: 'translate(-50%, -50%)' }}
-                                className={`absolute rounded-3xl transition-all duration-300 flex flex-col items-center justify-center p-2 text-center pointer-events-none ${
+                                className={`absolute rounded-3xl transition-all duration-300 flex flex-col items-center justify-between p-2.5 text-center pointer-events-none ${
                                     zone.invisible
-                                        ? occupiedByEntityId ? 'border-2 border-emerald-400/60 bg-emerald-500/10' : 'border border-transparent'
-                                        : isMatchedCorrectly
-                                            ? 'border-2 border-dashed border-emerald-400 bg-emerald-500/15 scale-105'
-                                            : occupiedByEntityId
-                                                ? 'border-2 border-dashed border-indigo-400 bg-indigo-500/15'
-                                                : isLightTheme
-                                                    ? 'border-2 border-dashed border-slate-400/80 bg-white/60 text-slate-700 backdrop-blur-[2px]'
-                                                    : 'border-2 border-dashed border-slate-600/80 bg-slate-800/40 text-slate-300 backdrop-blur-[2px]'
+                                        ? occupants.length > 0 ? 'border-2 border-emerald-400/60 bg-emerald-500/10' : 'border border-transparent'
+                                        : occupants.length > 0
+                                            ? 'border-2 border-dashed border-emerald-400 bg-emerald-500/15'
+                                            : isLightTheme
+                                                ? 'border-2 border-dashed border-slate-400/80 bg-white/60 text-slate-700 backdrop-blur-[2px]'
+                                                : 'border-2 border-dashed border-slate-600/80 bg-slate-800/40 text-slate-300 backdrop-blur-[2px]'
                                 }`}
                             >
                                 {!zone.invisible && (
-                                    <>
-                                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest opacity-90">{zone.label}</span>
-                                        {zone.sublabel && <span className="text-[8px] font-bold opacity-60 mt-0.5">{zone.sublabel}</span>}
-                                    </>
+                                    <div className="w-full flex items-center justify-between gap-1 px-1">
+                                        {zone.sequenceOrder !== undefined && (
+                                            <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center shrink-0">
+                                                #{zone.sequenceOrder}
+                                            </span>
+                                        )}
+                                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest opacity-90 truncate flex-1">
+                                            {zone.label}
+                                        </span>
+                                        {maxCap > 1 && (
+                                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-900/40 text-white shrink-0">
+                                                {occupants.length}/{maxCap}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                                {zone.sublabel && !zone.invisible && (
+                                    <span className="text-[8px] font-bold opacity-60 mt-auto">{zone.sublabel}</span>
                                 )}
                             </div>
                         );
                     })}
 
-                    {/* Interactive Entities */}
-                    {entities.map((ent) => {
-                        const st = objectStates[ent.id] || 'normal';
+                    {/* Interactive Entities (Draggable, Connector Nodes, Sliders, Text Inputs, Multi-Select) */}
+                    {entities.map((rawEnt) => {
+                        const ent = getEntityWithTimeline(rawEnt);
+                        const st = ent.effectiveState;
                         if (st === 'hidden') return null;
 
-                        const isSelected = selectedId === ent.id || st === 'selected';
+                        const eType = ent.entityType || 'draggable';
+                        const isSelected = selectedId === ent.id || st === 'selected' || multiSelectedIds.includes(ent.id) || activeConnectorStart === ent.id;
                         const isDragging = draggingId === ent.id;
                         const isSnapped = Boolean(snappedMap[ent.id]);
                         const isDisabled = st === 'disabled';
@@ -937,6 +1259,84 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                         if (st === 'drop_correct') colorClasses = KINETIC_COLORS.emerald;
                         if (st === 'drop_incorrect') colorClasses = KINETIC_COLORS.rose;
 
+                        // 5. SLIDER / NUMBER-LINE ENTITY
+                        if (eType === 'slider') {
+                            const min = ent.sliderMin ?? 0;
+                            const max = ent.sliderMax ?? 100;
+                            const step = ent.sliderStep ?? 1;
+                            const val = sliderValues[ent.id] ?? min;
+                            const isTargetMet = ent.sliderTarget !== undefined && Math.abs(val - ent.sliderTarget) <= (ent.sliderTolerance ?? 0);
+
+                            return (
+                                <div
+                                    key={ent.id}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    style={{ left: `${ent.x}%`, top: `${ent.y}%`, transform: 'translate(-50%, -50%)' }}
+                                    className={`absolute z-20 p-3.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-2 shadow-xl min-w-[210px] ${
+                                        isTargetMet ? 'border-emerald-400' : 'border-slate-200 dark:border-slate-700'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">{ent.label}</span>
+                                        <span className={`text-xs font-black tabular-nums px-2 py-0.5 rounded-lg ${isTargetMet ? 'bg-emerald-500 text-white' : 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300'}`}>
+                                            {val}{ent.sliderUnit || ''}
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={min}
+                                        max={max}
+                                        step={step}
+                                        value={val}
+                                        onChange={(e) => {
+                                            const nextVal = parseFloat(e.target.value);
+                                            setSliderValues(prev => ({ ...prev, [ent.id]: nextVal }));
+                                        }}
+                                        className="w-full accent-indigo-600 cursor-pointer"
+                                    />
+                                    <div className="flex justify-between text-[8px] font-bold text-slate-400 mt-0.5">
+                                        <span>{min}{ent.sliderUnit || ''}</span>
+                                        <span>{max}{ent.sliderUnit || ''}</span>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // 6A. TEXT-ENTRY ENTITY
+                        if (eType === 'text_input') {
+                            const currentTxt = textValues[ent.id] || '';
+                            const validList = (ent.expectedText || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                            const isTxtMatched = validList.length > 0 && validList.includes(currentTxt.trim().toLowerCase());
+
+                            return (
+                                <div
+                                    key={ent.id}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    style={{ left: `${ent.x}%`, top: `${ent.y}%`, transform: 'translate(-50%, -50%)' }}
+                                    className={`absolute z-20 p-2.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-2 shadow-xl min-w-[170px] ${
+                                        isTxtMatched ? 'border-emerald-400 ring-2 ring-emerald-400/30' : 'border-slate-300 dark:border-slate-700'
+                                    }`}
+                                >
+                                    {ent.label && (
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                                            {ent.label}
+                                        </label>
+                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                        <input
+                                            type="text"
+                                            value={currentTxt}
+                                            onChange={(e) => setTextValues(prev => ({ ...prev, [ent.id]: e.target.value }))}
+                                            placeholder={ent.placeholder || 'Type answer...'}
+                                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-black text-slate-800 dark:text-white outline-none focus:border-indigo-500"
+                                        />
+                                        {isTxtMatched && <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />}
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // STANDARD DRAGGABLE, CONNECTOR NODE, HOTSPOT LABEL & MULTI-SELECT
                         return (
                             <div
                                 key={ent.id}
@@ -950,145 +1350,84 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                                     transform: `translate(-50%, -50%) scale(${ent.scale || 1}) rotate(${ent.rotation || 0}deg)`,
                                     touchAction: 'none'
                                 }}
-                                className={`absolute z-20 transition-shadow select-none ${
+                                className={`absolute z-20 transition-all select-none ${
                                     ent.imageUrl
                                         ? 'p-2 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-2 border-slate-200 dark:border-slate-700 shadow-xl'
-                                        : `px-4 py-3 rounded-2xl border-2 shadow-xl ${colorClasses}`
-                                } ${isDisabled ? 'opacity-45 grayscale cursor-not-allowed' : ent.draggable === false ? 'cursor-pointer hover:scale-105' : 'cursor-grab active:cursor-grabbing'} ${
+                                        : `px-4 py-2.5 rounded-2xl border-2 shadow-xl ${colorClasses}`
+                                } ${isDisabled ? 'opacity-45 grayscale cursor-not-allowed' : 'cursor-pointer active:scale-95'} ${
                                     isDragging ? 'z-30 shadow-2xl ring-4 ring-white/50 scale-105' : ''
-                                } ${isSelected ? 'ring-4 ring-indigo-400' : ''} ${
-                                    activeReaction === 'bounce_glow' && isSnapped ? 'animate-bounce' : ''
-                                }`}
+                                } ${isSelected ? 'ring-4 ring-amber-300 dark:ring-indigo-400 scale-105' : ''}`}
                             >
-                                {ent.imageUrl ? (
-                                    <div className="flex flex-col items-center text-center gap-1.5">
-                                        <img
-                                            src={ent.imageUrl}
-                                            alt={ent.label}
-                                            draggable={false}
-                                            className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-xl pointer-events-none select-none"
-                                        />
-                                        {ent.label && (
-                                            <span className="text-[11px] font-black text-slate-800 dark:text-white px-1.5 leading-tight">
-                                                {ent.label}
-                                            </span>
-                                        )}
-                                        {ent.sublabel && (
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                                {ent.sublabel}
-                                            </span>
-                                        )}
+                                <div className="flex items-center gap-2 whitespace-nowrap">
+                                    {eType === 'connector_node' ? (
+                                        <span className="w-3.5 h-3.5 rounded-full bg-white border-2 border-indigo-600 shrink-0" />
+                                    ) : eType === 'multi_select' ? (
+                                        <span className={`w-4 h-4 rounded-md border-2 flex items-center justify-center ${
+                                            multiSelectedIds.includes(ent.id) ? 'bg-white text-indigo-600 border-white' : 'border-white/60'
+                                        }`}>
+                                            {multiSelectedIds.includes(ent.id) && <Check size={11} strokeWidth={3} />}
+                                        </span>
+                                    ) : ent.draggable !== false ? (
+                                        <Move size={13} className="opacity-70 shrink-0" />
+                                    ) : null}
+
+                                    <div className="text-left">
+                                        <div className="font-black text-xs sm:text-sm leading-tight">{ent.label}</div>
+                                        {ent.sublabel && <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">{ent.sublabel}</div>}
                                     </div>
-                                ) : (
-                                    <div className="flex items-center gap-2 whitespace-nowrap">
-                                        {ent.draggable !== false && <Move size={14} className="opacity-70 shrink-0" />}
-                                        <div className="text-left">
-                                            <div className="font-black text-xs sm:text-sm leading-tight">{ent.label}</div>
-                                            {ent.sublabel && <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">{ent.sublabel}</div>}
-                                        </div>
-                                        {(isSnapped || st === 'drop_correct') && <CheckCircle2 size={14} className="text-white shrink-0 ml-1" />}
-                                    </div>
-                                )}
+                                    {(isSnapped || st === 'drop_correct') && <CheckCircle2 size={14} className="text-white shrink-0 ml-1" />}
+                                </div>
                             </div>
                         );
                     })}
 
-                    {/* ========================================================= */}
-                    {/* STORYLINE 360 SLIDE LAYER OVERLAY (Renders Over Canvas)   */}
-                    {/* ========================================================= */}
+                    {/* STORYLINE 360 SLIDE LAYER OVERLAY */}
                     {activeLayer && (
                         <div
                             onPointerDown={(e) => e.stopPropagation()}
                             className="absolute inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200"
                         >
                             <div className={`relative w-full max-w-lg max-h-[92%] overflow-y-auto custom-scrollbar bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-[2rem] border-2 ${activeLayerStyle.border} shadow-2xl p-6 sm:p-7 text-left animate-in zoom-in-95 duration-200`}>
-                                {/* Top Gradient Accent */}
                                 <div className={`absolute top-0 left-0 right-0 h-2 bg-gradient-to-r ${activeLayerStyle.headerBg}`} />
-
                                 <div className="flex items-center justify-between gap-3 mb-4">
                                     <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${activeLayerStyle.badge}`}>
                                         <Layers size={11} /> {activeLayer.name || 'Slide Layer'}
                                     </span>
-
                                     {(!activeLayer.hasQuiz || activeLayer.gateUntilCorrect === false) && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveLayerId(null)}
-                                            className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-colors"
-                                        >
+                                        <button type="button" onClick={() => setActiveLayerId(null)} className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500">
                                             <X size={16} />
                                         </button>
                                     )}
                                 </div>
+                                <h4 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{activeLayer.title}</h4>
+                                {activeLayer.body && <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed mb-5 whitespace-pre-wrap">{activeLayer.body}</p>}
 
-                                {activeLayer.imageUrl && (
-                                    <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-40 bg-slate-100 dark:bg-slate-950 flex items-center justify-center">
-                                        <img src={activeLayer.imageUrl} alt={activeLayer.title} className="w-full h-full object-contain max-h-40" />
-                                    </div>
-                                )}
-
-                                <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
-                                    {activeLayer.title}
-                                </h4>
-
-                                {activeLayer.body && (
-                                    <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed mb-5 whitespace-pre-wrap">
-                                        {activeLayer.body}
-                                    </p>
-                                )}
-
-                                {/* EMBEDDED MINI-QUIZ INSIDE SLIDE LAYER */}
                                 {activeLayer.hasQuiz && Array.isArray(activeLayer.quizOptions) && activeLayer.quizOptions.length > 0 && (
                                     <div className="mb-5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-                                            <HelpCircle size={13} /> Layer Checkpoint
-                                        </div>
-                                        {activeLayer.quizQuestion && (
-                                            <p className="text-xs sm:text-sm font-black text-slate-800 dark:text-white mb-2">
-                                                {activeLayer.quizQuestion}
-                                            </p>
-                                        )}
+                                        {activeLayer.quizQuestion && <p className="text-xs sm:text-sm font-black text-slate-800 dark:text-white mb-2">{activeLayer.quizQuestion}</p>}
                                         <div className="space-y-2">
                                             {activeLayer.quizOptions.map((opt) => {
                                                 const isPicked = layerQuizSelected === opt.id;
                                                 const isRight = opt.id === activeLayer.correctOptionId;
-                                                let btnStyle = 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-indigo-400';
-
+                                                let btnStyle = 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200';
                                                 if (layerQuizSubmitted) {
                                                     if (isRight) btnStyle = 'bg-emerald-50 dark:bg-emerald-500/20 border-emerald-500 text-emerald-800 dark:text-emerald-200';
                                                     else if (isPicked) btnStyle = 'bg-rose-50 dark:bg-rose-500/20 border-rose-500 text-rose-700 dark:text-rose-200';
                                                 } else if (isPicked) {
-                                                    btnStyle = 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-500 text-indigo-700 dark:text-indigo-200 ring-1 ring-indigo-500';
+                                                    btnStyle = 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-500 text-indigo-700 dark:text-indigo-200';
                                                 }
-
                                                 return (
                                                     <button
                                                         key={opt.id}
                                                         type="button"
-                                                        disabled={layerQuizSubmitted && isLayerQuizCorrect}
-                                                        onClick={() => {
-                                                            setLayerQuizSelected(opt.id);
-                                                            setLayerQuizSubmitted(false);
-                                                        }}
+                                                        onClick={() => { setLayerQuizSelected(opt.id); setLayerQuizSubmitted(false); }}
                                                         className={`w-full p-3 rounded-xl border-2 text-left text-xs font-bold transition-all flex items-center justify-between gap-2 ${btnStyle}`}
                                                     >
                                                         <span>{opt.text}</span>
-                                                        {layerQuizSubmitted && isRight && <Check size={15} className="text-emerald-500 shrink-0" />}
-                                                        {layerQuizSubmitted && isPicked && !isRight && <X size={15} className="text-rose-500 shrink-0" />}
                                                     </button>
                                                 );
                                             })}
                                         </div>
-
-                                        {layerQuizSubmitted && (
-                                            <div className={`text-xs font-black pt-1 flex items-center gap-1.5 ${isLayerQuizCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
-                                                {isLayerQuizCorrect ? (
-                                                    <><CheckCircle2 size={14} /> Correct! Click below to continue.</>
-                                                ) : (
-                                                    <><X size={14} /> Not quite right—select another option to unlock.</>
-                                                )}
-                                            </div>
-                                        )}
                                     </div>
                                 )}
 
@@ -1098,18 +1437,42 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                                     onClick={handleCloseActiveLayer}
                                     className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 ${activeLayerStyle.btn}`}
                                 >
-                                    {activeLayer.hasQuiz && !layerQuizSubmitted ? (
-                                        <>Check Answer <Check size={15} /></>
-                                    ) : activeLayer.hasQuiz && layerQuizSubmitted && !isLayerQuizCorrect && activeLayer.gateUntilCorrect !== false ? (
-                                        <>Try Again <RotateCcw size={14} /></>
-                                    ) : (
-                                        <>{activeLayer.buttonLabel || 'Continue'} <ArrowRight size={15} /></>
-                                    )}
+                                    {activeLayer.buttonLabel || 'Continue'} <ArrowRight size={15} />
                                 </button>
                             </div>
                         </div>
                     )}
                 </div>
+
+                {/* 7. CAUSE-AND-EFFECT TIMELINE SCRUBBER BAR */}
+                {showTimeline && (
+                    <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md space-y-2.5">
+                        <div className="flex items-center justify-between gap-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <Zap size={13} /> Process & Cause-Effect Timeline Scrubber ({timelineProgress}%)
+                            </span>
+                            {activeKeyframe && (
+                                <span className="text-xs font-black text-slate-800 dark:text-white">
+                                    {activeKeyframe.title}
+                                </span>
+                            )}
+                        </div>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={timelineProgress}
+                            onChange={(e) => setTimelineProgress(parseInt(e.target.value))}
+                            className="w-full accent-indigo-600 cursor-pointer"
+                        />
+                        {activeKeyframe?.description && (
+                            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                                {activeKeyframe.description}
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 {/* Transform Controls Dock */}
                 {selectedEntity && !activeLayer && (selectedEntity.allowResize || selectedEntity.allowRotate) && (
@@ -1140,7 +1503,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             {/* Footer */}
             <div className="p-5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
                 <span className="text-xs font-bold text-slate-500">
-                    {ruleStatus.allComplete ? '✨ All spatial interactions & slide layers completed!' : 'Interact with the objects and drop zones on the canvas.'}
+                    {ruleStatus.allComplete ? '✨ All spatial interactions & checks completed!' : 'Complete the canvas interactions above, then click Verify.'}
                 </span>
                 <button
                     type="button"
@@ -1157,47 +1520,22 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
 };
 
 // ============================================================================
-//  8. KINETIC CANVAS BUILDER (Storyline 360 Studio with Slide Layers Manager)
+//  8. KINETIC CANVAS BUILDER (Multi-Modal Storyline 360 Studio)
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
-    const [activeTab, setActiveTab] = useState<'canvas' | 'layers' | 'rules' | 'preview'>('canvas');
+    const [activeTab, setActiveTab] = useState<'canvas' | 'timeline' | 'layers' | 'rules' | 'preview'>('canvas');
     const [selectedItem, setSelectedItem] = useState<{ type: 'entity' | 'zone', id: string } | null>(null);
     const [draggingTarget, setDraggingTarget] = useState<{ type: 'entity' | 'zone', id: string } | null>(null);
     const editorCanvasRef = useRef<HTMLDivElement>(null);
-    const bgFileInputRef = useRef<HTMLInputElement>(null);
-    const objFileInputRef = useRef<HTMLInputElement>(null);
 
     const entities: KineticEntity[] = Array.isArray(block?.entities) ? block.entities : [];
     const zones: KineticZone[] = Array.isArray(block?.zones) ? block.zones : [];
     const rules: KineticRule[] = Array.isArray(block?.rules) ? block.rules : [];
     const layers: KineticSlideLayer[] = Array.isArray(block?.layers) ? block.layers : [];
+    const timelineKeyframes: KineticTimelineKeyframe[] = Array.isArray(block?.timelineKeyframes) ? block.timelineKeyframes : [];
 
     const updateBlock = (patch: any) => {
-        onChange({ ...block, type: 'kinetic_canvas', entities, zones, rules, layers, ...patch });
-    };
-
-    const handleImageFileUpload = (file: File, onResult: (dataUrl: string) => void) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const maxDim = 900;
-                let w = img.width;
-                let h = img.height;
-                if (w > maxDim || h > maxDim) {
-                    if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-                    else { w = Math.round((w * maxDim) / h); h = maxDim; }
-                }
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                ctx?.drawImage(img, 0, 0, w, h);
-                onResult(canvas.toDataURL('image/webp', 0.82));
-            };
-            img.src = String(ev.target?.result || '');
-        };
-        reader.readAsDataURL(file);
+        onChange({ ...block, type: 'kinetic_canvas', entities, zones, rules, layers, timelineKeyframes, ...patch });
     };
 
     const handleEditorPointerDown = (e: React.PointerEvent, type: 'entity' | 'zone', id: string) => {
@@ -1226,85 +1564,55 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         setDraggingTarget(null);
     };
 
-    const addNewEntity = (withImageUrl?: string) => {
+    const addEntityByType = (entityType: KineticEntityType) => {
         const newId = `ent_${Date.now()}`;
-        const newEnt: KineticEntity = {
+        const base: KineticEntity = {
             id: newId,
-            label: withImageUrl ? 'Sprite Object' : `Object ${entities.length + 1}`,
-            sublabel: '',
-            imageUrl: withImageUrl || '',
-            color: 'indigo',
+            entityType,
+            label:
+                entityType === 'connector_node' ? `Node ${entities.length + 1}` :
+                entityType === 'slider' ? 'Force Slider' :
+                entityType === 'text_input' ? 'Label Prompt' :
+                entityType === 'multi_select' ? 'Selectable Option' :
+                `Object ${entities.length + 1}`,
+            color: entityType === 'connector_node' ? 'cyan' : entityType === 'multi_select' ? 'amber' : 'indigo',
             x: 50,
             y: 78,
             scale: 1,
             rotation: 0,
-            draggable: true,
+            draggable: entityType === 'draggable' || entityType === 'hotspot_label',
             initialState: 'normal',
-            allowResize: true,
-            allowRotate: false,
-            variableName: `Var_${entities.length + 1}`
+            sliderMin: 0,
+            sliderMax: 100,
+            sliderStep: 5,
+            sliderTarget: 50,
+            expectedText: 'answer',
+            isCorrectSelect: true
         };
-        updateBlock({ entities: [...entities, newEnt] });
+        updateBlock({ entities: [...entities, base] });
         setSelectedItem({ type: 'entity', id: newId });
     };
 
-    const addNewZone = (invisible = false) => {
+    const addZoneByType = (mode: 'bucket' | 'sequence' | 'hotspot') => {
         const newId = `zone_${Date.now()}`;
+        const nextOrder = zones.filter(z => z.sequenceOrder !== undefined).length + 1;
         const newZone: KineticZone = {
             id: newId,
-            label: invisible ? `Hotspot ${zones.length + 1}` : `Drop Zone ${zones.length + 1}`,
-            sublabel: '',
+            label:
+                mode === 'bucket' ? 'Category Bucket' :
+                mode === 'sequence' ? `Step ${nextOrder}` :
+                `Pin ${zones.length + 1}`,
             x: 50,
             y: 35,
-            width: 26,
-            height: 24,
-            invisible
+            width: mode === 'hotspot' ? 14 : 28,
+            height: mode === 'hotspot' ? 14 : 26,
+            capacity: mode === 'bucket' ? 4 : 1,
+            acceptedCategory: mode === 'bucket' ? 'group_a' : undefined,
+            sequenceOrder: mode === 'sequence' ? nextOrder : undefined,
+            isHotspotPin: mode === 'hotspot'
         };
         updateBlock({ zones: [...zones, newZone] });
         setSelectedItem({ type: 'zone', id: newId });
-    };
-
-    const addNewSlideLayer = (withQuiz = false) => {
-        const newId = `layer_${Date.now()}`;
-        const newLayer: KineticSlideLayer = {
-            id: newId,
-            name: `Layer ${layers.length + 1}: ${withQuiz ? 'Mini-Quiz Gate' : 'Feedback Pop-Up'}`,
-            theme: withQuiz ? 'quiz' : 'info',
-            title: withQuiz ? 'Quick Knowledge Check' : 'Discovery Unlocked!',
-            body: withQuiz
-                ? 'Answer this question correctly to unlock the next stage on the base slide.'
-                : 'Here is additional context and feedback triggered by your action on the canvas.',
-            buttonLabel: 'Continue',
-            hasQuiz: withQuiz,
-            quizQuestion: withQuiz ? 'What does the idiom "break the ice" mean?' : '',
-            quizOptions: withQuiz
-                ? [
-                      { id: 'opt_1', text: 'Make people feel more relaxed in a social situation' },
-                      { id: 'opt_2', text: 'Cancel an event due to freezing weather' }
-                  ]
-                : [],
-            correctOptionId: 'opt_1',
-            gateUntilCorrect: true,
-            onCloseAction: 'hide_layer',
-            onCloseTargetEntityId: entities[0]?.id || '',
-            onCloseTargetState: 'normal'
-        };
-        updateBlock({ layers: [...layers, newLayer] });
-        setActiveTab('layers');
-    };
-
-    const clearToBlankCanvas = () => {
-        updateBlock({
-            title: block?.title || 'Interactive Slide Canvas',
-            subtitle: 'Drag objects or click interactive elements on the slide.',
-            backgroundTheme: 'light_grid',
-            backgroundUrl: '',
-            entities: [],
-            zones: [],
-            rules: [],
-            layers: []
-        });
-        setSelectedItem(null);
     };
 
     const activeEntity = selectedItem?.type === 'entity' ? entities.find(e => e.id === selectedItem.id) : null;
@@ -1313,807 +1621,289 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-100 dark:border-slate-800 p-6 space-y-6 shadow-xl">
-            {/* Hidden File Inputs */}
-            <input
-                ref={bgFileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageFileUpload(file, (dataUrl) => updateBlock({ backgroundUrl: dataUrl }));
-                }}
-            />
-            <input
-                ref={objFileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageFileUpload(file, (dataUrl) => addNewEntity(dataUrl));
-                }}
-            />
-
             {/* TOP STUDIO BAR */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-full">
-                        Storyline 360 Studio
+                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                        Multi-Modal Kinetic Studio
                     </span>
                     <h4 className="text-lg font-black text-slate-800 dark:text-white mt-1">
-                        Interactive States, Slide Layers & Triggers
+                        Sorting, Sequencing, Connectors, Sliders & Timeline
                     </h4>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={clearToBlankCanvas}
-                        className="px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest transition-all"
-                    >
-                        Clear Slide
+                <div className="flex flex-wrap bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <button type="button" onClick={() => setActiveTab('canvas')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'canvas' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                        1. Stage ({entities.length + zones.length})
                     </button>
-
-                    <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <button type="button" onClick={() => setActiveTab('canvas')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'canvas' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                            1. Base Slide ({entities.length + zones.length})
-                        </button>
-                        <button type="button" onClick={() => setActiveTab('layers')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'layers' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                            2. Slide Layers ({layers.length})
-                        </button>
-                        <button type="button" onClick={() => setActiveTab('rules')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'rules' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                            3. Triggers ({rules.length})
-                        </button>
-                        <button type="button" onClick={() => setActiveTab('preview')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'preview' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>
-                            4. Play Slide
-                        </button>
-                    </div>
+                    <button type="button" onClick={() => setActiveTab('timeline')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'timeline' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                        2. Timeline ({timelineKeyframes.length})
+                    </button>
+                    <button type="button" onClick={() => setActiveTab('layers')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'layers' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                        3. Layers ({layers.length})
+                    </button>
+                    <button type="button" onClick={() => setActiveTab('rules')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'rules' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                        4. Triggers ({rules.length})
+                    </button>
+                    <button type="button" onClick={() => setActiveTab('preview')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'preview' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>
+                        5. Play
+                    </button>
                 </div>
             </div>
 
-            {/* SLIDE TITLE & BACKDROP CONFIG */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                <div className="md:col-span-4">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Slide Title / Prompt</label>
-                    <input
-                        type="text"
-                        value={block?.title || ''}
-                        onChange={(e) => updateBlock({ title: e.target.value })}
-                        placeholder="Slide instructions..."
-                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-black text-slate-800 dark:text-white outline-none focus:border-indigo-500"
-                    />
-                </div>
-                <div className="md:col-span-3">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Canvas Theme</label>
-                    <select
-                        value={bgThemeKey}
-                        onChange={(e) => updateBlock({ backgroundTheme: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white outline-none"
-                    >
-                        <option value="blank">Clean Blank White/Dark</option>
-                        <option value="light_grid">Light Blueprint Grid</option>
-                        <option value="grid">Dark Blueprint Grid</option>
-                        <option value="parchment">Ancient Parchment</option>
-                        <option value="roman_road">Roman Stone</option>
-                        <option value="physics_lab">Physics Vector Lab</option>
-                    </select>
-                </div>
-                <div className="md:col-span-5">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Custom Background Image (URL or Upload)</label>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            value={block?.backgroundUrl || ''}
-                            onChange={(e) => updateBlock({ backgroundUrl: e.target.value })}
-                            placeholder="Paste image URL or click Upload ->"
-                            className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white outline-none"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => bgFileInputRef.current?.click()}
-                            className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider shrink-0"
-                        >
-                            Upload BG
-                        </button>
-                        {block?.backgroundUrl && (
-                            <button
-                                type="button"
-                                onClick={() => updateBlock({ backgroundUrl: '' })}
-                                className="px-2.5 py-2 rounded-xl bg-rose-100 text-rose-600 text-[10px] font-black"
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* ========================================================= */}
-            {/* TAB 1: BASE SLIDE STAGE & OBJECT INSPECTOR                */}
-            {/* ========================================================= */}
+            {/* TAB 1: STAGE & MULTI-MODAL INSERTION PALETTE */}
             {activeTab === 'canvas' && (
-                <div className="space-y-6">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="text-xs font-bold text-slate-500">
-                            Click any object or drop zone on the slide to edit its label, image, size, or initial state:
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={() => addNewZone(false)} className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                                <Plus size={12} /> Drop Zone
-                            </button>
-                            <button type="button" onClick={() => addNewZone(true)} className="px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 text-amber-700 dark:text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                                <Plus size={12} /> Hotspot
-                            </button>
-                            <button type="button" onClick={() => addNewEntity()} className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-                                <Plus size={12} /> Text / Label Object
-                            </button>
-                            <button type="button" onClick={() => objFileInputRef.current?.click()} className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-                                <Plus size={12} /> Import Image Object
-                            </button>
-                        </div>
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">Add Zone:</span>
+                        <button type="button" onClick={() => addZoneByType('bucket')} className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase">+ Category Bucket</button>
+                        <button type="button" onClick={() => addZoneByType('sequence')} className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase">+ Sequence Slot</button>
+                        <button type="button" onClick={() => addZoneByType('hotspot')} className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black uppercase">+ 📍 Hotspot Pin</button>
+
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-3 mr-1">Add Widget:</span>
+                        <button type="button" onClick={() => addEntityByType('draggable')} className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase">+ Draggable</button>
+                        <button type="button" onClick={() => addEntityByType('connector_node')} className="px-3 py-1.5 rounded-xl bg-cyan-600 text-white text-[10px] font-black uppercase">+ Connector Node</button>
+                        <button type="button" onClick={() => addEntityByType('slider')} className="px-3 py-1.5 rounded-xl bg-slate-800 text-white text-[10px] font-black uppercase">+ Slider</button>
+                        <button type="button" onClick={() => addEntityByType('text_input')} className="px-3 py-1.5 rounded-xl bg-slate-800 text-white text-[10px] font-black uppercase">+ Text Input</button>
+                        <button type="button" onClick={() => addEntityByType('multi_select')} className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 text-[10px] font-black uppercase">+ Multi-Select</button>
                     </div>
 
-                    {/* WYSIWYG AUTHORING STAGE */}
+                    {/* WYSIWYG STAGE */}
                     <div
                         ref={editorCanvasRef}
                         onPointerDown={() => setSelectedItem(null)}
                         onPointerMove={handleEditorPointerMove}
                         onPointerUp={handleEditorPointerUp}
-                        className={`relative w-full aspect-[16/10] min-h-[340px] rounded-[2rem] border-2 border-slate-300 dark:border-slate-700 overflow-hidden select-none touch-none shadow-inner ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
+                        className={`relative w-full aspect-[16/10] min-h-[340px] rounded-[2rem] border-2 border-slate-300 dark:border-slate-700 overflow-hidden select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
                         style={block?.backgroundUrl ? { backgroundImage: `url(${block.backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                     >
-                        {zones.map(z => {
-                            const isSelected = selectedItem?.type === 'zone' && selectedItem.id === z.id;
-                            return (
-                                <div
-                                    key={z.id}
-                                    onPointerDown={(e) => handleEditorPointerDown(e, 'zone', z.id)}
-                                    style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.width}%`, height: `${z.height}%`, transform: 'translate(-50%, -50%)' }}
-                                    className={`absolute rounded-3xl border-2 border-dashed flex flex-col items-center justify-center p-2 cursor-move transition-shadow ${
-                                        z.invisible ? 'border-amber-400/90 bg-amber-500/15 text-amber-300' : 'border-emerald-400 bg-emerald-500/15 text-emerald-300'
-                                    } ${isSelected ? 'ring-4 ring-indigo-500 z-30 bg-emerald-500/25' : 'z-10'}`}
-                                >
-                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-black/50 text-white">
-                                        {z.invisible ? `👁️ Hotspot: ${z.label}` : z.label}
-                                    </span>
-                                </div>
-                            );
-                        })}
-
-                        {entities.map(ent => {
-                            const isSelected = selectedItem?.type === 'entity' && selectedItem.id === ent.id;
-                            const colorClasses = KINETIC_COLORS[ent.color || 'indigo'] || KINETIC_COLORS.indigo;
-
-                            return (
-                                <div
-                                    key={ent.id}
-                                    onPointerDown={(e) => handleEditorPointerDown(e, 'entity', ent.id)}
-                                    style={{
-                                        left: `${ent.x}%`,
-                                        top: `${ent.y}%`,
-                                        transform: `translate(-50%, -50%) scale(${ent.scale || 1}) rotate(${ent.rotation || 0}deg)`
-                                    }}
-                                    className={`absolute z-20 cursor-move transition-shadow ${
-                                        ent.imageUrl
-                                            ? 'p-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 border-2 border-indigo-300 shadow-xl'
-                                            : `px-4 py-2.5 rounded-2xl border-2 shadow-xl ${colorClasses}`
-                                    } ${isSelected ? 'ring-4 ring-amber-400 z-30' : ''} ${ent.initialState === 'hidden' ? 'opacity-50 border-dashed' : ''}`}
-                                >
-                                    {ent.imageUrl ? (
-                                        <div className="flex flex-col items-center gap-1">
-                                            <img src={ent.imageUrl} alt={ent.label} draggable={false} className="w-16 h-16 object-contain rounded-lg pointer-events-none" />
-                                            <span className="text-[10px] font-black text-slate-800 dark:text-white">{ent.label}</span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-1.5 whitespace-nowrap">
-                                            <Move size={12} />
-                                            <div>
-                                                <div className="text-xs font-black leading-none">{ent.label}</div>
-                                                {ent.sublabel && <div className="text-[8px] font-bold opacity-80 mt-0.5">{ent.sublabel}</div>}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {ent.initialState && ent.initialState !== 'normal' && (
-                                        <span className="absolute -top-2.5 -right-2 px-1.5 py-0.5 rounded-full bg-slate-900 text-amber-300 text-[7px] font-black uppercase">
-                                            {ent.initialState}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        {zones.map(z => (
+                            <div
+                                key={z.id}
+                                onPointerDown={(e) => handleEditorPointerDown(e, 'zone', z.id)}
+                                style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.width}%`, height: `${z.height}%`, transform: 'translate(-50%, -50%)' }}
+                                className={`absolute rounded-2xl border-2 border-dashed border-emerald-400 bg-emerald-500/15 text-emerald-200 flex flex-col items-center justify-center p-2 cursor-move ${selectedItem?.id === z.id ? 'ring-4 ring-indigo-500' : ''}`}
+                            >
+                                <span className="text-[10px] font-black uppercase bg-black/50 px-2 py-0.5 rounded">
+                                    {z.isHotspotPin ? `📍 ${z.label}` : z.sequenceOrder ? `#${z.sequenceOrder} ${z.label}` : z.label}
+                                </span>
+                            </div>
+                        ))}
+                        {entities.map(ent => (
+                            <div
+                                key={ent.id}
+                                onPointerDown={(e) => handleEditorPointerDown(e, 'entity', ent.id)}
+                                style={{ left: `${ent.x}%`, top: `${ent.y}%`, transform: 'translate(-50%, -50%)' }}
+                                className={`absolute z-20 px-3.5 py-2 rounded-2xl bg-indigo-600 text-white border-2 border-indigo-300 shadow-lg cursor-move flex items-center gap-1.5 ${selectedItem?.id === ent.id ? 'ring-4 ring-amber-400' : ''}`}
+                            >
+                                <Move size={12} />
+                                <span className="text-xs font-black">{ent.label}</span>
+                                <span className="text-[8px] uppercase bg-black/30 px-1.5 py-0.5 rounded">{ent.entityType || 'drag'}</span>
+                            </div>
+                        ))}
                     </div>
 
-                    {/* SELECTED OBJECT INSPECTOR */}
+                    {/* CONTEXTUAL INSPECTOR FOR SELECTED ENTITY */}
                     {activeEntity && (
-                        <div className="p-5 rounded-3xl bg-indigo-50/60 dark:bg-slate-950 border-2 border-indigo-200 dark:border-indigo-500/30 space-y-4">
-                            <div className="flex items-center justify-between border-b border-indigo-100 dark:border-slate-800 pb-3">
-                                <span className="text-xs font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-                                    Editing Object: {activeEntity.label}
+                        <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-950 border-2 border-indigo-200 dark:border-slate-800 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black uppercase tracking-widest text-indigo-600">
+                                    Editing {activeEntity.entityType || 'draggable'}: {activeEntity.label}
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        updateBlock({ entities: entities.filter(e => e.id !== activeEntity.id) });
-                                        setSelectedItem(null);
-                                    }}
-                                    className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-600 text-[10px] font-black uppercase flex items-center gap-1"
-                                >
-                                    <Trash2 size={12} /> Delete Object
+                                <button type="button" onClick={() => { updateBlock({ entities: entities.filter(e => e.id !== activeEntity.id) }); setSelectedItem(null); }} className="text-rose-500 text-xs font-black flex items-center gap-1">
+                                    <Trash2 size={13} /> Delete
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3">
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Primary Label</label>
-                                    <input
-                                        type="text"
-                                        value={activeEntity.label}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, label: e.target.value } : item) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
-                                    />
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Label</label>
+                                    <input type="text" value={activeEntity.label} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, label: e.target.value } : i) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black" />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Subtitle / Note</label>
-                                    <input
-                                        type="text"
-                                        value={activeEntity.sublabel || ''}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, sublabel: e.target.value } : item) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Initial State</label>
-                                    <select
-                                        value={activeEntity.initialState || 'normal'}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, initialState: e.target.value as any } : item) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                    >
-                                        <option value="normal">Normal (Visible)</option>
-                                        <option value="hidden">Hidden (Reveal via Trigger)</option>
-                                        <option value="disabled">Disabled (Unlock via Trigger)</option>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Interaction Mode</label>
+                                    <select value={activeEntity.entityType || 'draggable'} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, entityType: e.target.value as any } : i) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold">
+                                        <option value="draggable">Draggable Object</option>
+                                        <option value="connector_node">Connector Line Node</option>
+                                        <option value="slider">Slider / Number-Line</option>
+                                        <option value="text_input">Text-Entry Field</option>
+                                        <option value="multi_select">Multi-Select Card</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Color</label>
-                                    <select
-                                        value={activeEntity.color || 'indigo'}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, color: e.target.value as any } : item) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                    >
-                                        <option value="indigo">Indigo</option>
-                                        <option value="emerald">Emerald</option>
-                                        <option value="amber">Amber</option>
-                                        <option value="rose">Rose</option>
-                                        <option value="cyan">Cyan</option>
-                                        <option value="slate">Slate</option>
-                                    </select>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sort Category Tag</label>
+                                    <input type="text" value={activeEntity.category || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, category: e.target.value } : i) })} placeholder="e.g., noun, verb" className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sequence Order #</label>
+                                    <input type="number" value={activeEntity.sequenceIndex ?? ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sequenceIndex: e.target.value ? parseInt(e.target.value) : undefined } : i) })} placeholder="e.g., 1, 2, 3" className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold" />
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-6 pt-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={activeEntity.draggable !== false}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, draggable: e.target.checked } : item) })}
-                                    />
-                                    Draggable by Learner
+                            {/* Mode-Specific Fields */}
+                            {activeEntity.entityType === 'connector_node' && (
+                                <div className="pt-2">
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Target Node to Connect With</label>
+                                    <select value={activeEntity.connectTargetId || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, connectTargetId: e.target.value } : i) })} className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold">
+                                        <option value="">-- Select Matching Node --</option>
+                                        {entities.filter(e => e.id !== activeEntity.id).map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
+                                    </select>
+                                </div>
+                            )}
+
+                            {activeEntity.entityType === 'slider' && (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Min</label>
+                                        <input type="number" value={activeEntity.sliderMin ?? 0} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sliderMin: parseFloat(e.target.value) } : i) })} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Max</label>
+                                        <input type="number" value={activeEntity.sliderMax ?? 100} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sliderMax: parseFloat(e.target.value) } : i) })} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Target Answer</label>
+                                        <input type="number" value={activeEntity.sliderTarget ?? 50} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sliderTarget: parseFloat(e.target.value) } : i) })} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Unit (e.g. N, °C)</label>
+                                        <input type="text" value={activeEntity.sliderUnit || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sliderUnit: e.target.value } : i) })} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeEntity.entityType === 'text_input' && (
+                                <div className="pt-2">
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Expected Answer(s) (Comma-separated)</label>
+                                    <input type="text" value={activeEntity.expectedText || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, expectedText: e.target.value } : i) })} placeholder="e.g., mitochondria, powerhouse" className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
+                                </div>
+                            )}
+
+                            {activeEntity.entityType === 'multi_select' && (
+                                <label className="flex items-center gap-2 text-xs font-black text-indigo-600 pt-2 cursor-pointer">
+                                    <input type="checkbox" checked={Boolean(activeEntity.isCorrectSelect)} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, isCorrectSelect: e.target.checked } : i) })} />
+                                    Should Learner Select This Card? (Correct Multi-Select Item)
                                 </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(activeEntity.allowResize)}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, allowResize: e.target.checked } : item) })}
-                                    />
-                                    Learner Can Scale
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(activeEntity.allowRotate)}
-                                        onChange={(e) => updateBlock({ entities: entities.map(item => item.id === activeEntity.id ? { ...item, allowRotate: e.target.checked } : item) })}
-                                    />
-                                    Learner Can Rotate
-                                </label>
-                            </div>
+                            )}
                         </div>
                     )}
 
-                    {/* SELECTED ZONE INSPECTOR */}
+                    {/* CONTEXTUAL INSPECTOR FOR SELECTED ZONE */}
                     {activeZone && (
-                        <div className="p-5 rounded-3xl bg-emerald-50/60 dark:bg-slate-950 border-2 border-emerald-200 dark:border-emerald-500/30 space-y-4">
-                            <div className="flex items-center justify-between border-b border-emerald-100 dark:border-slate-800 pb-3">
-                                <span className="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
-                                    Editing Zone: {activeZone.label}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        updateBlock({ zones: zones.filter(z => z.id !== activeZone.id) });
-                                        setSelectedItem(null);
-                                    }}
-                                    className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-600 text-[10px] font-black uppercase flex items-center gap-1"
-                                >
-                                    <Trash2 size={12} /> Delete Zone
+                        <div className="p-5 rounded-3xl bg-emerald-50/60 dark:bg-slate-950 border-2 border-emerald-200 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black uppercase tracking-widest text-emerald-700">Editing Zone: {activeZone.label}</span>
+                                <button type="button" onClick={() => { updateBlock({ zones: zones.filter(z => z.id !== activeZone.id) }); setSelectedItem(null); }} className="text-rose-500 text-xs font-black flex items-center gap-1">
+                                    <Trash2 size={13} /> Delete
                                 </button>
                             </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Zone Label</label>
-                                    <input
-                                        type="text"
-                                        value={activeZone.label}
-                                        onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, label: e.target.value } : z) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
-                                    />
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Zone Label</label>
+                                    <input type="text" value={activeZone.label} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, label: e.target.value } : z) })} className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-black" />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Zone Sublabel</label>
-                                    <input
-                                        type="text"
-                                        value={activeZone.sublabel || ''}
-                                        onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, sublabel: e.target.value } : z) })}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                    />
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Capacity (Max Items)</label>
+                                    <input type="number" min="1" max="12" value={activeZone.capacity ?? 1} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, capacity: parseInt(e.target.value) || 1 } : z) })} className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Width ({activeZone.width}%)</label>
-                                    <input type="range" min="10" max="60" value={activeZone.width} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, width: parseInt(e.target.value) } : z) })} className="w-full accent-emerald-600 mt-2" />
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Accepted Category</label>
+                                    <input type="text" value={activeZone.acceptedCategory || ''} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, acceptedCategory: e.target.value || undefined } : z) })} placeholder="e.g., noun" className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Height ({activeZone.height}%)</label>
-                                    <input type="range" min="10" max="60" value={activeZone.height} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, height: parseInt(e.target.value) } : z) })} className="w-full accent-emerald-600 mt-2" />
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sequence Slot #</label>
+                                    <input type="number" value={activeZone.sequenceOrder ?? ''} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, sequenceOrder: e.target.value ? parseInt(e.target.value) : undefined } : z) })} placeholder="e.g., 1" className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
                                 </div>
                             </div>
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                                <input type="checkbox" checked={Boolean(activeZone.isHotspotPin)} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, isHotspotPin: e.target.checked } : z) })} />
+                                Render as Image Hotspot Pin (📍)
+                            </label>
                         </div>
                     )}
                 </div>
             )}
 
-            {/* ========================================================= */}
-            {/* TAB 2: STORYLINE 360 SLIDE LAYERS AUTHORING               */}
-            {/* ========================================================= */}
-            {activeTab === 'layers' && (
+            {/* TAB 2: CAUSE & EFFECT TIMELINE SCRUBBER BUILDER */}
+            {activeTab === 'timeline' && (
                 <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-xs font-bold text-slate-500">
-                            Create pop-up Slide Layers (feedback cards or gated mini-quizzes) that can be launched by any Trigger:
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() => addNewSlideLayer(false)}
-                                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"
-                            >
-                                <Plus size={12} /> Add Feedback Layer
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => addNewSlideLayer(true)}
-                                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"
-                            >
-                                <Plus size={12} /> Add Mini-Quiz Layer
-                            </button>
-                        </div>
-                    </div>
-
-                    {layers.length === 0 && (
-                        <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs font-bold text-slate-400">
-                            No Slide Layers yet. Add a Feedback Layer or Mini-Quiz Layer above, then link it in the Trigger Wizard.
-                        </div>
-                    )}
-
-                    {layers.map((layer, lIdx) => (
-                        <div key={layer.id} className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 dark:border-slate-800 pb-3">
-                                <div className="flex items-center gap-2 flex-1 min-w-[220px]">
-                                    <Layers size={15} className="text-indigo-500 shrink-0" />
-                                    <input
-                                        type="text"
-                                        value={layer.name}
-                                        onChange={(e) => {
-                                            const u = [...layers];
-                                            u[lIdx] = { ...layer, name: e.target.value };
-                                            updateBlock({ layers: u });
-                                        }}
-                                        placeholder="Internal Layer Name..."
-                                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black text-indigo-600 dark:text-indigo-400 flex-1"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <select
-                                        value={layer.theme || 'info'}
-                                        onChange={(e) => {
-                                            const u = [...layers];
-                                            u[lIdx] = { ...layer, theme: e.target.value as any };
-                                            updateBlock({ layers: u });
-                                        }}
-                                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                    >
-                                        <option value="info">Indigo Info Theme</option>
-                                        <option value="success">Emerald Success Theme</option>
-                                        <option value="warning">Amber Warning Theme</option>
-                                        <option value="error">Rose Error Theme</option>
-                                        <option value="quiz">Purple Quiz Theme</option>
-                                    </select>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => updateBlock({ layers: layers.filter(item => item.id !== layer.id) })}
-                                        className="p-2 text-slate-400 hover:text-rose-500"
-                                    >
-                                        <Trash2 size={15} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div className="md:col-span-2">
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Overlay Heading</label>
-                                    <input
-                                        type="text"
-                                        value={layer.title}
-                                        onChange={(e) => {
-                                            const u = [...layers];
-                                            u[lIdx] = { ...layer, title: e.target.value };
-                                            updateBlock({ layers: u });
-                                        }}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Dismiss Button Label</label>
-                                    <input
-                                        type="text"
-                                        value={layer.buttonLabel || 'Continue'}
-                                        onChange={(e) => {
-                                            const u = [...layers];
-                                            u[lIdx] = { ...layer, buttonLabel: e.target.value };
-                                            updateBlock({ layers: u });
-                                        }}
-                                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Overlay Narrative / Feedback Body</label>
-                                <textarea
-                                    value={layer.body}
-                                    onChange={(e) => {
-                                        const u = [...layers];
-                                        u[lIdx] = { ...layer, body: e.target.value };
-                                        updateBlock({ layers: u });
-                                    }}
-                                    rows={2}
-                                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-medium resize-none"
-                                />
-                            </div>
-
-                            {/* Optional Mini-Quiz Toggle & Editor */}
-                            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 space-y-3">
-                                <div className="flex flex-wrap items-center justify-between gap-4">
-                                    <label className="flex items-center gap-2 text-xs font-black text-indigo-600 dark:text-indigo-400 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={Boolean(layer.hasQuiz)}
-                                            onChange={(e) => {
-                                                const u = [...layers];
-                                                u[lIdx] = {
-                                                    ...layer,
-                                                    hasQuiz: e.target.checked,
-                                                    quizOptions: layer.quizOptions?.length ? layer.quizOptions : [
-                                                        { id: 'opt_1', text: 'Correct Option' },
-                                                        { id: 'opt_2', text: 'Distractor Option' }
-                                                    ],
-                                                    correctOptionId: layer.correctOptionId || 'opt_1'
-                                                };
-                                                updateBlock({ layers: u });
-                                            }}
-                                        />
-                                        Embed Interactive Mini-Quiz on This Slide Layer
-                                    </label>
-
-                                    {/* Chained Action When Layer Closes */}
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">When Layer Closes:</span>
-                                        <select
-                                            value={layer.onCloseAction || 'hide_layer'}
-                                            onChange={(e) => {
-                                                const u = [...layers];
-                                                u[lIdx] = { ...layer, onCloseAction: e.target.value as any };
-                                                updateBlock({ layers: u });
-                                            }}
-                                            className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                        >
-                                            <option value="hide_layer">Just Hide Layer</option>
-                                            <option value="change_state">Unlock / Reveal Base Object</option>
-                                            <option value="complete_block">Complete Entire Block</option>
-                                        </select>
-
-                                        {layer.onCloseAction === 'change_state' && (
-                                            <>
-                                                <select
-                                                    value={layer.onCloseTargetEntityId || ''}
-                                                    onChange={(e) => {
-                                                        const u = [...layers];
-                                                        u[lIdx] = { ...layer, onCloseTargetEntityId: e.target.value };
-                                                        updateBlock({ layers: u });
-                                                    }}
-                                                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                                >
-                                                    {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
-                                                </select>
-                                                <select
-                                                    value={layer.onCloseTargetState || 'normal'}
-                                                    onChange={(e) => {
-                                                        const u = [...layers];
-                                                        u[lIdx] = { ...layer, onCloseTargetState: e.target.value as any };
-                                                        updateBlock({ layers: u });
-                                                    }}
-                                                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                                >
-                                                    <option value="normal">Normal (Reveal / Enable)</option>
-                                                    <option value="drop_correct">Drop Correct</option>
-                                                    <option value="hidden">Hidden</option>
-                                                </select>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {layer.hasQuiz && (
-                                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-100 dark:border-slate-800 space-y-3">
-                                        <input
-                                            type="text"
-                                            value={layer.quizQuestion || ''}
-                                            onChange={(e) => {
-                                                const u = [...layers];
-                                                u[lIdx] = { ...layer, quizQuestion: e.target.value };
-                                                updateBlock({ layers: u });
-                                            }}
-                                            placeholder="Mini-quiz question prompt..."
-                                            className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-black"
-                                        />
-                                        <div className="space-y-2">
-                                            {(layer.quizOptions || []).map((opt, oIdx) => (
-                                                <div key={opt.id} className="flex items-center gap-2">
-                                                    <input
-                                                        type="radio"
-                                                        name={`correct_${layer.id}`}
-                                                        checked={layer.correctOptionId === opt.id}
-                                                        onChange={() => {
-                                                            const u = [...layers];
-                                                            u[lIdx] = { ...layer, correctOptionId: opt.id };
-                                                            updateBlock({ layers: u });
-                                                        }}
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={opt.text}
-                                                        onChange={(e) => {
-                                                            const nextOpts = [...(layer.quizOptions || [])];
-                                                            nextOpts[oIdx] = { ...opt, text: e.target.value };
-                                                            const u = [...layers];
-                                                            u[lIdx] = { ...layer, quizOptions: nextOpts };
-                                                            updateBlock({ layers: u });
-                                                        }}
-                                                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-bold"
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* ========================================================= */}
-            {/* TAB 3: STORYLINE 360 TRIGGER WIZARD                       */}
-            {/* ========================================================= */}
-            {activeTab === 'rules' && (
-                <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-slate-500">
-                            Link events (`on_drop` or `on_click`) to Slide Layers, Object States, Motion Paths, or Reactions:
-                        </p>
+                    <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 text-xs font-black text-indigo-600 cursor-pointer">
+                            <input type="checkbox" checked={Boolean(block?.enableTimeline)} onChange={(e) => updateBlock({ enableTimeline: e.target.checked })} />
+                            Enable Cause-and-Effect Timeline Scrubber on Student Canvas
+                        </label>
                         <button
                             type="button"
-                            onClick={() =>
-                                updateBlock({
-                                    rules: [
-                                        ...rules,
-                                        {
-                                            id: `r_${Date.now()}`,
-                                            event: 'on_drop',
-                                            entityId: entities[0]?.id || '',
-                                            zoneId: zones[0]?.id || '',
-                                            action: layers.length > 0 ? 'show_layer' : 'reaction',
-                                            targetLayerId: layers[0]?.id || '',
-                                            targetEntityId: entities[0]?.id || '',
-                                            targetState: 'normal',
-                                            reaction: 'bounce_glow',
-                                            message: 'Correct placement!'
-                                        }
-                                    ]
-                                })
-                            }
-                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"
+                            onClick={() => updateBlock({
+                                enableTimeline: true,
+                                timelineKeyframes: [
+                                    ...timelineKeyframes,
+                                    { id: `kf_${Date.now()}`, progress: Math.min(100, timelineKeyframes.length * 50), title: `Stage ${timelineKeyframes.length + 1}`, description: 'Explain what happens at this point on the timeline...' }
+                                ]
+                            })}
+                            className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase"
                         >
-                            <Plus size={12} /> Add Storyline Trigger
+                            + Add Keyframe
                         </button>
                     </div>
-
-                    {rules.map((r, idx) => (
-                        <div key={r.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">WHEN</span>
-                                <select
-                                    value={r.event || 'on_drop'}
-                                    onChange={(e) => {
-                                        const u = [...rules];
-                                        u[idx] = { ...r, event: e.target.value as any };
-                                        updateBlock({ rules: u });
-                                    }}
-                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
-                                >
-                                    <option value="on_drop">Object Dropped On Zone</option>
-                                    <option value="on_click">User Clicks Object</option>
-                                </select>
-
-                                <select
-                                    value={r.entityId}
-                                    onChange={(e) => {
-                                        const u = [...rules];
-                                        u[idx] = { ...r, entityId: e.target.value };
-                                        updateBlock({ rules: u });
-                                    }}
-                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                >
-                                    {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
-                                </select>
-
-                                {(r.event || 'on_drop') === 'on_drop' && (
-                                    <>
-                                        <span className="text-[10px] font-black uppercase text-slate-400">ON</span>
-                                        <select
-                                            value={r.zoneId}
-                                            onChange={(e) => {
-                                                const u = [...rules];
-                                                u[idx] = { ...r, zoneId: e.target.value };
-                                                updateBlock({ rules: u });
-                                            }}
-                                            className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                        >
-                                            {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
-                                        </select>
-                                    </>
-                                )}
-
-                                <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">THEN</span>
-                                <select
-                                    value={r.action || 'reaction'}
-                                    onChange={(e) => {
-                                        const u = [...rules];
-                                        u[idx] = { ...r, action: e.target.value as any };
-                                        updateBlock({ rules: u });
-                                    }}
-                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
-                                >
-                                    <option value="show_layer">Pop Open Slide Layer</option>
-                                    <option value="change_state">Change State of Object</option>
-                                    <option value="reaction">Play Reaction & Banner</option>
-                                    <option value="move_to_zone">Move Object to Zone</option>
-                                    <option value="complete_block">Complete Interaction</option>
-                                </select>
-
-                                <button
-                                    type="button"
-                                    onClick={() => updateBlock({ rules: rules.filter(item => item.id !== r.id) })}
-                                    className="ml-auto p-1.5 text-slate-400 hover:text-rose-500"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
+                    {timelineKeyframes.map((kf, kIdx) => (
+                        <div key={kf.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border space-y-2">
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-black uppercase text-indigo-600">At {kf.progress}%</span>
+                                <input type="range" min="0" max="100" value={kf.progress} onChange={(e) => { const u = [...timelineKeyframes]; u[kIdx] = { ...kf, progress: parseInt(e.target.value) }; updateBlock({ timelineKeyframes: u }); }} className="w-36 accent-indigo-600" />
+                                <input type="text" value={kf.title} onChange={(e) => { const u = [...timelineKeyframes]; u[kIdx] = { ...kf, title: e.target.value }; updateBlock({ timelineKeyframes: u }); }} className="flex-1 px-3 py-1.5 rounded-xl bg-white border text-xs font-black" placeholder="Stage Title" />
+                                <button type="button" onClick={() => updateBlock({ timelineKeyframes: timelineKeyframes.filter(i => i.id !== kf.id) })} className="text-rose-500"><Trash2 size={14} /></button>
                             </div>
-
-                            {/* Action Target Row */}
-                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                                {r.action === 'show_layer' && (
-                                    <>
-                                        <span className="text-[10px] font-black uppercase text-purple-600">Show Layer:</span>
-                                        <select
-                                            value={r.targetLayerId || layers[0]?.id || ''}
-                                            onChange={(e) => {
-                                                const u = [...rules];
-                                                u[idx] = { ...r, targetLayerId: e.target.value };
-                                                updateBlock({ rules: u });
-                                            }}
-                                            className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black text-purple-600"
-                                        >
-                                            {layers.length === 0 ? (
-                                                <option value="">(Create a Slide Layer in Tab 2 first)</option>
-                                            ) : (
-                                                layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)
-                                            )}
-                                        </select>
-                                    </>
-                                )}
-
-                                {r.action === 'change_state' && (
-                                    <>
-                                        <span className="text-[10px] font-black uppercase text-slate-400">Set Object:</span>
-                                        <select
-                                            value={r.targetEntityId || r.entityId}
-                                            onChange={(e) => {
-                                                const u = [...rules];
-                                                u[idx] = { ...r, targetEntityId: e.target.value };
-                                                updateBlock({ rules: u });
-                                            }}
-                                            className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                        >
-                                            {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
-                                        </select>
-                                        <span className="text-[10px] font-black uppercase text-slate-400">To State:</span>
-                                        <select
-                                            value={r.targetState || 'normal'}
-                                            onChange={(e) => {
-                                                const u = [...rules];
-                                                u[idx] = { ...r, targetState: e.target.value as any };
-                                                updateBlock({ rules: u });
-                                            }}
-                                            className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                        >
-                                            <option value="normal">Normal (Reveal / Enable)</option>
-                                            <option value="drop_correct">Drop Correct (Emerald)</option>
-                                            <option value="drop_incorrect">Drop Incorrect (Rose)</option>
-                                            <option value="hidden">Hidden</option>
-                                            <option value="disabled">Disabled</option>
-                                        </select>
-                                    </>
-                                )}
-
-                                <span className="text-[10px] font-black uppercase text-slate-400">Animation:</span>
-                                <select
-                                    value={r.reaction}
-                                    onChange={(e) => {
-                                        const u = [...rules];
-                                        u[idx] = { ...r, reaction: e.target.value as any };
-                                        updateBlock({ rules: u });
-                                    }}
-                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                >
-                                    <option value="bounce_glow">✨ Bounce & Glow</option>
-                                    <option value="chariot_march">🏛️ Milestone Advance</option>
-                                    <option value="lever_tilt">⚖️ Physics Spin</option>
-                                    <option value="combine_flash">⚡ Combine Flash</option>
-                                    <option value="shake_error">❌ Incorrect Shake</option>
-                                </select>
-
-                                <input
-                                    type="text"
-                                    value={r.message}
-                                    onChange={(e) => {
-                                        const u = [...rules];
-                                        u[idx] = { ...r, message: e.target.value };
-                                        updateBlock({ rules: u });
-                                    }}
-                                    placeholder="Feedback banner message..."
-                                    className="flex-1 min-w-[160px] px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                />
-                            </div>
+                            <input type="text" value={kf.description} onChange={(e) => { const u = [...timelineKeyframes]; u[kIdx] = { ...kf, description: e.target.value }; updateBlock({ timelineKeyframes: u }); }} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs font-medium" placeholder="Cause-and-effect explanation..." />
                         </div>
                     ))}
                 </div>
             )}
 
-            {/* TAB 4: INTERACTIVE SLIDE PREVIEW */}
-            {activeTab === 'preview' && <KineticCanvasBlock block={{ ...block, entities, zones, rules, layers }} />}
+            {/* TAB 3: SLIDE LAYERS */}
+            {activeTab === 'layers' && (
+                <div className="space-y-4">
+                    <button type="button" onClick={() => updateBlock({ layers: [...layers, { id: `layer_${Date.now()}`, name: `Layer ${layers.length + 1}`, theme: 'info', title: 'Layer Title', body: 'Layer feedback...', buttonLabel: 'Continue' }] })} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase">+ Add Slide Layer</button>
+                    {layers.map((l, idx) => (
+                        <div key={l.id} className="p-4 rounded-2xl bg-slate-50 border space-y-2">
+                            <div className="flex items-center gap-2">
+                                <input type="text" value={l.name} onChange={(e) => { const u = [...layers]; u[idx] = { ...l, name: e.target.value }; updateBlock({ layers: u }); }} className="px-3 py-1.5 rounded-xl bg-white border text-xs font-black" />
+                                <input type="text" value={l.title} onChange={(e) => { const u = [...layers]; u[idx] = { ...l, title: e.target.value }; updateBlock({ layers: u }); }} className="flex-1 px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
+                                <button type="button" onClick={() => updateBlock({ layers: layers.filter(i => i.id !== l.id) })} className="text-rose-500"><Trash2 size={14} /></button>
+                            </div>
+                            <textarea value={l.body} onChange={(e) => { const u = [...layers]; u[idx] = { ...l, body: e.target.value }; updateBlock({ layers: u }); }} rows={2} className="w-full px-3 py-1.5 rounded-xl bg-white border text-xs" />
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* TAB 4: TRIGGERS */}
+            {activeTab === 'rules' && (
+                <div className="space-y-3">
+                    <button type="button" onClick={() => updateBlock({ rules: [...rules, { id: `r_${Date.now()}`, event: 'on_drop', entityId: entities[0]?.id || '', zoneId: zones[0]?.id || '', action: 'reaction', reaction: 'bounce_glow', message: 'Great job!' }] })} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase">+ Add Trigger</button>
+                    {rules.map((r, idx) => (
+                        <div key={r.id} className="p-4 rounded-2xl bg-slate-50 border flex flex-wrap items-center gap-2">
+                            <select value={r.event || 'on_drop'} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, event: e.target.value as any }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-black">
+                                <option value="on_drop">When Dropped</option>
+                                <option value="on_click">When Clicked</option>
+                                <option value="on_connect">When Connected</option>
+                            </select>
+                            <select value={r.entityId} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, entityId: e.target.value }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-bold">
+                                {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
+                            </select>
+                            <select value={r.zoneId} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, zoneId: e.target.value }; updateBlock({ rules: u }); }} className="px-2.5 py-1.5 rounded-xl bg-white border text-xs font-bold">
+                                <option value="">(Any / None)</option>
+                                {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
+                            </select>
+                            <input type="text" value={r.message} onChange={(e) => { const u = [...rules]; u[idx] = { ...r, message: e.target.value }; updateBlock({ rules: u }); }} className="flex-1 px-3 py-1.5 rounded-xl bg-white border text-xs font-bold" />
+                            <button type="button" onClick={() => updateBlock({ rules: rules.filter(i => i.id !== r.id) })} className="text-rose-500"><Trash2 size={14} /></button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* TAB 5: LIVE PLAY */}
+            {activeTab === 'preview' && <KineticCanvasBlock block={{ ...block, entities, zones, rules, layers, timelineKeyframes }} />}
         </div>
     );
 };
