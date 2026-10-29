@@ -474,10 +474,11 @@ export interface KineticSlideLayer {
 export interface KineticRule {
     id: string;
     event?: 'on_drop' | 'on_click' | 'on_connect' | 'on_slider_match' | 'on_text_match';
-    entityId: string;
-    zoneId: string;
+    entityId: string;           // Source object that triggers the event
+    zoneId: string;             // Source zone where entityId is dropped (for 'on_drop')
+    destinationZoneId?: string; // 🔥 Target zone where targetEntityId glides to (for 'move_to_zone')
     action?: 'reaction' | 'change_state' | 'show_layer' | 'hide_layer' | 'move_to_zone' | 'animate_motion' | 'complete_block';
-    targetEntityId?: string;
+    targetEntityId?: string;    // Object to move or change state
     targetState?: KineticObjectState;
     targetLayerId?: string;
     // Storyline 360 Motion Path Animation Parameters
@@ -551,11 +552,17 @@ const LAYER_THEME_STYLES: Record<string, { border: string; badge: string; header
 
 export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) => {
     const canvasRef = useRef<HTMLDivElement>(null);
+    const activeTimeoutsRef = useRef<number[]>([]);
 
+    // Serialize initial entities by content so parent re-renders don't wipe in-flight animations
+    const entitiesSignature = useMemo(() => JSON.stringify(block?.entities || []), [block?.entities]);
     const initialEntities: KineticEntity[] = useMemo(() => {
-        if (Array.isArray(block?.entities)) return JSON.parse(JSON.stringify(block.entities));
-        return [];
-    }, [block?.entities]);
+        try {
+            return JSON.parse(entitiesSignature);
+        } catch {
+            return [];
+        }
+    }, [entitiesSignature]);
 
     const zones: KineticZone[] = useMemo(() => {
         if (Array.isArray(block?.zones)) return block.zones;
@@ -619,17 +626,34 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const [reactionBanner, setReactionBanner] = useState<string | null>(null);
     const [isVerified, setIsVerified] = useState(false);
 
-    // Keep a ref to latest snappedMap & entities so chained timeouts always read fresh state
+    // 🔥 Live Refs so async motion-path timeouts ALWAYS see current state, rules & zones
     const snappedMapRef = useRef<Record<string, string>>(snappedMap);
     useEffect(() => { snappedMapRef.current = snappedMap; }, [snappedMap]);
+
     const entitiesRef = useRef<KineticEntity[]>(entities);
     useEffect(() => { entitiesRef.current = entities; }, [entities]);
 
+    const rulesRef = useRef<KineticRule[]>(rules);
+    useEffect(() => { rulesRef.current = rules; }, [rules]);
+
+    const zonesRef = useRef<KineticZone[]>(zones);
+    useEffect(() => { zonesRef.current = zones; }, [zones]);
+
+    // Cleanup timers on unmount
     useEffect(() => {
-        setEntities(initialEntities);
-        setObjectStates(buildInitialStateMap(initialEntities));
-        setSliderValues(buildInitialSliderMap(initialEntities));
-    }, [initialEntities]);
+        return () => {
+            activeTimeoutsRef.current.forEach(t => window.clearTimeout(t));
+        };
+    }, []);
+
+    // Only reset entities if the underlying block definition genuinely changed
+    useEffect(() => {
+        const parsed = JSON.parse(entitiesSignature);
+        setEntities(parsed);
+        entitiesRef.current = parsed;
+        setObjectStates(buildInitialStateMap(parsed));
+        setSliderValues(buildInitialSliderMap(parsed));
+    }, [entitiesSignature]);
 
     useEffect(() => {
         if (onStateChange) {
@@ -639,7 +663,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 activeLayerId, isVerified
             });
         }
-    }, [entities, snappedMap, objectStates, connections, sliderValues, textValues, multiSelectedIds, timelineProgress, activeLayerId, isVerified, onStateChange]);
+    }, [entities, snappedMap, objectStates, connections, sliderValues, textValues, multiSelectedIds, timelineProgress, activeLayerId, isVerified]);
 
     const selectedEntity = entities.find(e => e.id === selectedId) || null;
     const activeLayer = layers.find(l => l.id === activeLayerId) || null;
@@ -677,10 +701,10 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const triggerCanvasReaction = (reactionType: string, message: string) => {
         if (reactionType) setActiveReaction(reactionType);
         if (message) setReactionBanner(message);
-        setTimeout(() => setActiveReaction(null), 2200);
+        const tid = window.setTimeout(() => setActiveReaction(null), 2200);
+        activeTimeoutsRef.current.push(tid);
     };
 
-    // Compute neat tiled coordinates inside a multi-capacity bucket/zone
     const computeZoneTiledCoords = (targetZone: KineticZone, entityId: string, currentSnapped: Record<string, string>) => {
         const maxCap = targetZone.capacity || (targetZone.acceptedCategory ? 6 : 1);
         const currentOccupants = Object.keys(currentSnapped).filter(
@@ -702,10 +726,15 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         return { snapX, snapY, occupantCount: currentOccupants.length, maxCap };
     };
 
-    // Evaluate category sorting, sequence order, and cascading on_drop rules whenever an object lands in a zone
-    // (whether dragged manually OR moved there via a trigger!)
-    const evaluateZoneArrival = (entityId: string, matchedZone: KineticZone, visitedRuleIds: Set<string> = new Set()) => {
-        const movedEntity = entitiesRef.current.find(e => e.id === entityId);
+    // 🔥 Evaluate category sorting, sequence order, and cascading on_drop rules whenever an object lands in a zone
+    const evaluateZoneArrival = (
+        entityId: string,
+        matchedZone: KineticZone,
+        visitedRuleIds: Set<string> = new Set()
+    ) => {
+        const currentEntities = entitiesRef.current;
+        const currentRules = rulesRef.current;
+        const movedEntity = currentEntities.find(e => e.id === entityId);
         if (!movedEntity) return;
 
         // 1. Check Category Sorting match
@@ -726,12 +755,12 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             }
         }
 
-        // 3. Fire any cascading on_drop triggers for this entity + zone (or wildcard zoneId === '')
-        const dropRules = rules.filter(
+        // 3. Find any cascading on_drop triggers for this entity in this zone (or wildcard empty zoneId)
+        const dropRules = currentRules.filter(
             r =>
                 (r.event || 'on_drop') === 'on_drop' &&
                 r.entityId === entityId &&
-                (r.zoneId === matchedZone.id || !r.zoneId) &&
+                (!r.zoneId || r.zoneId === matchedZone.id) &&
                 !visitedRuleIds.has(r.id)
         );
 
@@ -755,43 +784,45 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             visitedRuleIds?: Set<string>;
         }
     ) => {
-        const duration = options?.duration || 900;
-        const curve = MOTION_CURVES[options?.curve || 'ease_in_out'] || MOTION_CURVES.ease_in_out;
+        const duration = options?.duration || 850;
+        const curve = MOTION_CURVES[options?.curve || 'spring_bounce'] || MOTION_CURVES.spring_bounce;
 
         const sourceObj = entitiesRef.current.find(e => e.id === targetId);
         if (sourceObj) {
             setActiveMotionTrail({ x1: sourceObj.x, y1: sourceObj.y, x2: destX, y2: destY });
         }
 
-        setAnimatingEntities(prev => ({ ...prev, [targetId]: { duration, curve } }));
+        // Immediately register snap map so capacity calculations for subsequent items are accurate
+        if (options?.snapToZoneId) {
+            const nextMap = { ...snappedMapRef.current, [targetId]: options.snapToZoneId };
+            snappedMapRef.current = nextMap;
+            setSnappedMap(nextMap);
+        }
 
+        // Make sure hidden/disabled objects become visible before moving
         setObjectStates(prev => ({
             ...prev,
             [targetId]: options?.nextState || (prev[targetId] === 'hidden' || prev[targetId] === 'disabled' ? 'normal' : prev[targetId])
         }));
 
-        if (options?.snapToZoneId) {
-            setSnappedMap(prev => {
-                const updated = { ...prev, [targetId]: options.snapToZoneId! };
-                snappedMapRef.current = updated;
-                return updated;
-            });
-        }
+        // Enable CSS transition AND update coordinates together
+        setAnimatingEntities(prev => ({ ...prev, [targetId]: { duration, curve } }));
 
-        requestAnimationFrame(() => {
-            setEntities(prev => prev.map(ent => {
-                if (ent.id !== targetId) return ent;
-                return {
-                    ...ent,
-                    x: destX,
-                    y: destY,
-                    scale: options?.scale !== undefined ? options.scale : ent.scale,
-                    rotation: options?.rotation !== undefined ? options.rotation : ent.rotation
-                };
-            }));
+        const updatedEntities = entitiesRef.current.map(ent => {
+            if (ent.id !== targetId) return ent;
+            return {
+                ...ent,
+                x: destX,
+                y: destY,
+                scale: options?.scale !== undefined ? options.scale : ent.scale,
+                rotation: options?.rotation !== undefined ? options.rotation : ent.rotation
+            };
         });
+        entitiesRef.current = updatedEntities;
+        setEntities(updatedEntities);
 
-        setTimeout(() => {
+        // Schedule arrival evaluation right when the glide completes
+        const tid = window.setTimeout(() => {
             setAnimatingEntities(prev => {
                 const copy = { ...prev };
                 delete copy[targetId];
@@ -799,14 +830,29 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             });
             setActiveMotionTrail(null);
 
-            // 🔥 CASCADE: If this animated object landed in a zone, fire that zone's arrival & on_drop triggers!
+            // Determine if it landed in an explicit snapToZoneId OR within any zone's bounding box
+            let landedZone: KineticZone | undefined;
             if (options?.snapToZoneId) {
-                const landedZone = zones.find(z => z.id === options.snapToZoneId);
+                landedZone = zonesRef.current.find(z => z.id === options.snapToZoneId);
+            } else {
+                landedZone = zonesRef.current.find(z => {
+                    const halfW = (z.isHotspotPin ? Math.max(z.width, 16) : z.width) / 2;
+                    const halfH = (z.isHotspotPin ? Math.max(z.height, 16) : z.height) / 2;
+                    return destX >= z.x - halfW && destX <= z.x + halfW && destY >= z.y - halfH && destY <= z.y + halfH;
+                });
                 if (landedZone) {
-                    evaluateZoneArrival(targetId, landedZone, options.visitedRuleIds || new Set());
+                    const nextMap = { ...snappedMapRef.current, [targetId]: landedZone.id };
+                    snappedMapRef.current = nextMap;
+                    setSnappedMap(nextMap);
                 }
             }
-        }, duration + 60);
+
+            if (landedZone) {
+                evaluateZoneArrival(targetId, landedZone, options?.visitedRuleIds || new Set());
+            }
+        }, duration + 50);
+
+        activeTimeoutsRef.current.push(tid);
     };
 
     const openSlideLayer = (layerId: string) => {
@@ -852,7 +898,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setLayerQuizSubmitted(false);
     };
 
-    // Execute triggers with visitedRuleIds set so chained triggers never cause infinite loops
+    // 🔥 Execute triggers with full support for destinationZoneId & smart fallback
     const executeTriggers = (
         matchingRules: KineticRule[],
         sourceEntityId: string,
@@ -867,11 +913,15 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         const newlyFiredIds = unvisited.map(r => r.id);
         setFiredRuleIds(prev => Array.from(new Set([...prev, ...newlyFiredIds])));
 
+        const currentZones = zonesRef.current;
+        const currentEntities = entitiesRef.current;
+
         unvisited.forEach(rule => {
             const actionType = rule.action || 'reaction';
             if (rule.message || rule.reaction) {
                 triggerCanvasReaction(rule.reaction || 'bounce_glow', rule.message);
             }
+
             if (actionType === 'show_layer' && rule.targetLayerId) {
                 openSlideLayer(rule.targetLayerId);
             } else if (actionType === 'hide_layer') {
@@ -887,7 +937,31 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 }));
             } else if (actionType === 'move_to_zone') {
                 const targetId = rule.targetEntityId || sourceEntityId;
-                const destZone = zones.find(z => z.id === rule.zoneId);
+                const targetEnt = currentEntities.find(e => e.id === targetId);
+
+                // 1. Prefer explicit destinationZoneId
+                let destZone = rule.destinationZoneId
+                    ? currentZones.find(z => z.id === rule.destinationZoneId)
+                    : undefined;
+
+                // 2. If no destinationZoneId was set AND targetId is a different object,
+                //    check if targetEnt has a matching category bucket or sequence slot!
+                if (!destZone && targetId !== sourceEntityId && targetEnt) {
+                    if (targetEnt.category) {
+                        destZone = currentZones.find(
+                            z => z.acceptedCategory && z.acceptedCategory.trim().toLowerCase() === targetEnt.category!.trim().toLowerCase()
+                        );
+                    }
+                    if (!destZone && targetEnt.sequenceIndex !== undefined) {
+                        destZone = currentZones.find(z => z.sequenceOrder === targetEnt.sequenceIndex);
+                    }
+                }
+
+                // 3. Otherwise fall back to rule.zoneId or first available zone
+                if (!destZone) {
+                    destZone = currentZones.find(z => z.id === rule.zoneId) || currentZones[0];
+                }
+
                 if (destZone) {
                     const { snapX, snapY } = computeZoneTiledCoords(destZone, targetId, snappedMapRef.current);
                     animateEntityAlongPath(targetId, snapX, snapY, {
@@ -904,7 +978,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                 const targetId = rule.targetEntityId || sourceEntityId;
                 const destX = rule.motionX ?? 50;
                 const destY = rule.motionY ?? 40;
-                const landingZone = zones.find(z => {
+                const landingZone = currentZones.find(z => {
                     const halfW = (z.isHotspotPin ? Math.max(z.width, 16) : z.width) / 2;
                     const halfH = (z.isHotspotPin ? Math.max(z.height, 16) : z.height) / 2;
                     return destX >= z.x - halfW && destX <= z.x + halfW && destY >= z.y - halfH && destY <= z.y + halfH;
@@ -922,7 +996,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
                     duration: rule.motionDuration || 900,
                     curve: rule.motionCurve || 'ease_in_out',
                     snapToZoneId: landingZone?.id,
-                    nextState: rule.targetState,
+                    nextState: rule.targetState || 'drop_correct',
                     visitedRuleIds: nextVisited
                 });
             } else if (actionType === 'complete_block') {
@@ -957,7 +1031,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
             sourceEnt.connectTargetId === targetEnt.id ||
             targetEnt.connectTargetId === sourceEnt.id;
 
-        const connectRules = rules.filter(
+        const connectRules = rulesRef.current.filter(
             r => r.event === 'on_connect' && (r.entityId === sourceEnt.id || r.entityId === targetEnt.id)
         );
 
@@ -1006,14 +1080,14 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
 
         if (eType === 'multi_select') {
             handleMultiSelectToggle(entityId);
-            const clickRules = rules.filter(r => r.event === 'on_click' && r.entityId === entityId);
+            const clickRules = rulesRef.current.filter(r => r.event === 'on_click' && r.entityId === entityId);
             if (clickRules.length > 0) executeTriggers(clickRules, entityId);
             return;
         }
 
         if (eType === 'slider' || eType === 'text_input') return;
 
-        const clickRules = rules.filter(r => r.event === 'on_click' && r.entityId === entityId);
+        const clickRules = rulesRef.current.filter(r => r.event === 'on_click' && r.entityId === entityId);
         if (clickRules.length > 0) {
             executeTriggers(clickRules, entityId);
         } else if (ent.draggable === false) {
@@ -1037,7 +1111,11 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         const clampedX = Math.max(5, Math.min(95, rawX));
         const clampedY = Math.max(6, Math.min(94, rawY));
 
-        setEntities(prev => prev.map(ent => ent.id === entityId ? { ...ent, x: clampedX, y: clampedY } : ent));
+        setEntities(prev => {
+            const next = prev.map(ent => ent.id === entityId ? { ...ent, x: clampedX, y: clampedY } : ent);
+            entitiesRef.current = next;
+            return next;
+        });
     };
 
     const handleCanvasPointerMove = (e: React.PointerEvent) => {
@@ -1054,11 +1132,11 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
         setDraggingId(null);
 
-        const movedEntity = entities.find(ent => ent.id === entityId);
+        const movedEntity = entitiesRef.current.find(ent => ent.id === entityId);
         if (!movedEntity) return;
 
         let matchedZone: KineticZone | null = null;
-        for (const z of zones) {
+        for (const z of zonesRef.current) {
             const halfW = (z.isHotspotPin ? Math.max(z.width, 16) : z.width) / 2;
             const halfH = (z.isHotspotPin ? Math.max(z.height, 16) : z.height) / 2;
             if (movedEntity.x >= (z.x - halfW) && movedEntity.x <= (z.x + halfW) &&
@@ -1069,39 +1147,47 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         }
 
         if (matchedZone) {
-            const { snapX, snapY, occupantCount, maxCap } = computeZoneTiledCoords(matchedZone, entityId, snappedMap);
+            const { snapX, snapY, occupantCount, maxCap } = computeZoneTiledCoords(matchedZone, entityId, snappedMapRef.current);
 
             if (occupantCount >= maxCap) {
                 triggerCanvasReaction('shake_error', `${matchedZone.label} is at full capacity (${maxCap}/${maxCap})!`);
                 return;
             }
 
-            // Smooth snap animation into the zone (which will also evaluateZoneArrival & cascade triggers!)
+            // Snap into the zone and immediately evaluate arrival + fire any cascading triggers!
             animateEntityAlongPath(entityId, snapX, snapY, {
                 duration: 240,
                 curve: 'spring_bounce',
                 snapToZoneId: matchedZone.id
             });
         } else {
-            const nextSnapped = { ...snappedMap };
+            const nextSnapped = { ...snappedMapRef.current };
             delete nextSnapped[entityId];
-            setSnappedMap(nextSnapped);
             snappedMapRef.current = nextSnapped;
+            setSnappedMap(nextSnapped);
             setObjectStates(prev => ({ ...prev, [entityId]: 'normal' }));
         }
     };
 
     const updateEntityTransform = (id: string, field: 'scale' | 'rotation', value: number) => {
         if (isVerified) return;
-        setEntities(prev => prev.map(ent => ent.id === id ? { ...ent, [field]: value } : ent));
+        setEntities(prev => {
+            const next = prev.map(ent => ent.id === id ? { ...ent, [field]: value } : ent);
+            entitiesRef.current = next;
+            return next;
+        });
     };
 
     const handleReset = () => {
-        setEntities(JSON.parse(JSON.stringify(initialEntities)));
-        setObjectStates(buildInitialStateMap(initialEntities));
+        activeTimeoutsRef.current.forEach(t => window.clearTimeout(t));
+        activeTimeoutsRef.current = [];
+        const fresh = JSON.parse(entitiesSignature);
+        entitiesRef.current = fresh;
+        setEntities(fresh);
+        setObjectStates(buildInitialStateMap(fresh));
         setAnimatingEntities({});
         setActiveMotionTrail(null);
-        setSliderValues(buildInitialSliderMap(initialEntities));
+        setSliderValues(buildInitialSliderMap(fresh));
         setTextValues({});
         setMultiSelectedIds([]);
         setConnections({});
@@ -1113,8 +1199,8 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setActiveLayerId(null);
         setLayerQuizSelected(null);
         setLayerQuizSubmitted(false);
-        setSnappedMap({});
         snappedMapRef.current = {};
+        setSnappedMap({});
         setSelectedId(null);
         setActiveReaction(null);
         setReactionBanner(null);
@@ -1701,7 +1787,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         onChange({ ...block, type: 'kinetic_canvas', entities, zones, rules, layers, timelineKeyframes, ...patch });
     };
 
-    // Compress uploaded local image file into WebP Data URL for Firestore/JSON storage
     const handleImageFileUpload = (file: File, onResult: (dataUrl: string) => void) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -1828,7 +1913,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-100 dark:border-slate-800 p-6 space-y-6 shadow-xl">
-            {/* Hidden File Inputs for Background & Object Sprites */}
             <input
                 ref={bgFileInputRef}
                 type="file"
@@ -1906,7 +1990,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 </div>
             </div>
 
-            {/* 🔥 RESTORED SLIDE TITLE, BACKGROUND THEME & IMAGE UPLOADER BAR */}
+            {/* SLIDE TITLE, BACKGROUND THEME & IMAGE UPLOADER BAR */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                 <div className="md:col-span-4">
                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Slide Title / Prompt</label>
@@ -1995,7 +2079,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                             {rules.filter(r => r.action === 'animate_motion' || r.action === 'move_to_zone').map(r => {
                                 const targetObj = entities.find(e => e.id === (r.targetEntityId || r.entityId));
                                 if (!targetObj) return null;
-                                const destZone = r.action === 'move_to_zone' ? zones.find(z => z.id === r.zoneId) : null;
+                                const destZoneId = r.destinationZoneId || r.zoneId;
+                                const destZone = r.action === 'move_to_zone' ? zones.find(z => z.id === destZoneId) : null;
                                 const endX = destZone ? destZone.x : (r.motionX ?? 50);
                                 const endY = destZone ? destZone.y : (r.motionY ?? 40);
                                 return (
@@ -2065,7 +2150,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         })}
                     </div>
 
-                    {/* 🔥 RESTORED FULL OBJECT INSPECTOR (WITH SCALE, ROTATION & IMAGE UPLOAD) */}
+                    {/* FULL OBJECT INSPECTOR */}
                     {activeEntity && (
                         <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-950 border-2 border-indigo-200 dark:border-slate-800 space-y-4">
                             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
@@ -2077,7 +2162,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 </button>
                             </div>
 
-                            {/* Row 1: Label, Sublabel, Interaction Mode, Color, Initial State */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                                 <div>
                                     <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Primary Label</label>
@@ -2118,7 +2202,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 </div>
                             </div>
 
-                            {/* 🔥 Row 2: Restored Scale, Rotation & Image Sprite Upload Controls */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-200/70 dark:border-slate-800">
                                 <div>
                                     <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
@@ -2178,7 +2261,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 </div>
                             </div>
 
-                            {/* Row 3: Sorting Category, Sequence Order & Learner Transform Permissions */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-200/70 dark:border-slate-800">
                                 <div>
                                     <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sort Category Tag</label>
@@ -2218,7 +2300,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         </div>
                     )}
 
-                    {/* CONTEXTUAL INSPECTOR FOR SELECTED ZONE (WITH WIDTH & HEIGHT SLIDERS) */}
+                    {/* ZONE INSPECTOR */}
                     {activeZone && (
                         <div className="p-5 rounded-3xl bg-emerald-50/60 dark:bg-slate-950 border-2 border-emerald-200 space-y-4">
                             <div className="flex items-center justify-between">
@@ -2254,7 +2336,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 </div>
             )}
 
-            {/* TAB 2: CAUSE & EFFECT TIMELINE SCRUBBER BUILDER */}
+            {/* TAB 2: TIMELINE SCRUBBER BUILDER */}
             {activeTab === 'timeline' && (
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -2307,12 +2389,14 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 </div>
             )}
 
-            {/* TAB 4: TRIGGERS & CASCADING MOTION PATH WIZARD */}
+            {/* ========================================================= */}
+            {/* TAB 4: TRIGGERS & CASCADING MOTION PATH WIZARD            */}
+            {/* ========================================================= */}
             {activeTab === 'rules' && (
                 <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-bold text-slate-500">
-                            Triggers automatically cascade: if Trigger 1 glides Object B into a Zone, any `on_drop` Trigger for Object B in that Zone will automatically fire next!
+                            Triggers automatically cascade: when Trigger 1 glides Object B into Destination Zone 2, any `on_drop` Trigger waiting for Object B in Zone 2 will fire automatically!
                         </p>
                         <button
                             type="button"
@@ -2325,6 +2409,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                             event: 'on_drop',
                                             entityId: entities[0]?.id || '',
                                             zoneId: zones[0]?.id || '',
+                                            destinationZoneId: zones[1]?.id || zones[0]?.id || '',
                                             action: 'move_to_zone',
                                             targetEntityId: entities[1]?.id || entities[0]?.id || '',
                                             motionScale: 1,
@@ -2373,19 +2458,23 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                     {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
                                 </select>
 
-                                <span className="text-[10px] font-black uppercase text-slate-400">ZONE:</span>
-                                <select
-                                    value={r.zoneId}
-                                    onChange={(e) => {
-                                        const u = [...rules];
-                                        u[idx] = { ...r, zoneId: e.target.value };
-                                        updateBlock({ rules: u });
-                                    }}
-                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                >
-                                    <option value="">(Any Zone)</option>
-                                    {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
-                                </select>
+                                {(r.event || 'on_drop') === 'on_drop' && (
+                                    <>
+                                        <span className="text-[10px] font-black uppercase text-slate-400">IN ZONE:</span>
+                                        <select
+                                            value={r.zoneId}
+                                            onChange={(e) => {
+                                                const u = [...rules];
+                                                u[idx] = { ...r, zoneId: e.target.value };
+                                                updateBlock({ rules: u });
+                                            }}
+                                            className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                        >
+                                            <option value="">(Any Zone)</option>
+                                            {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
+                                        </select>
+                                    </>
+                                )}
 
                                 <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">THEN</span>
                                 <select
@@ -2414,6 +2503,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 </button>
                             </div>
 
+                            {/* 🔥 SEPARATE destinationZoneId DROPDOWN SO IT NEVER OVERWRITES r.zoneId */}
                             {(r.action === 'animate_motion' || r.action === 'move_to_zone') && (
                                 <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-slate-900 border border-indigo-200/70 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                                     <div>
@@ -2433,15 +2523,15 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
                                     {r.action === 'move_to_zone' ? (
                                         <div>
-                                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Destination Zone</label>
+                                            <label className="text-[9px] font-black uppercase text-emerald-600 block mb-1">Destination Zone</label>
                                             <select
-                                                value={r.zoneId}
+                                                value={r.destinationZoneId || r.zoneId || ''}
                                                 onChange={(e) => {
                                                     const u = [...rules];
-                                                    u[idx] = { ...r, zoneId: e.target.value };
+                                                    u[idx] = { ...r, destinationZoneId: e.target.value };
                                                     updateBlock({ rules: u });
                                                 }}
-                                                className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-bold"
+                                                className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border border-emerald-300 text-xs font-black text-emerald-700"
                                             >
                                                 {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
                                             </select>
