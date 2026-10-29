@@ -371,7 +371,7 @@ export const ChatDialogueBlock = ({ lines }: any) => {
 };
 
 // ============================================================================
-//  7. KINETIC CANVAS BLOCK (Multi-Modal Storyline 360 Engine + Motion Paths)
+//  7. KINETIC CANVAS BLOCK (Multi-Modal Storyline 360 Engine + Cascading Motion)
 // ============================================================================
 export type KineticObjectState = 'normal' | 'selected' | 'drop_correct' | 'drop_incorrect' | 'hidden' | 'disabled';
 export type KineticEntityType = 'draggable' | 'hotspot_label' | 'connector_node' | 'slider' | 'text_input' | 'multi_select';
@@ -480,12 +480,12 @@ export interface KineticRule {
     targetEntityId?: string;
     targetState?: KineticObjectState;
     targetLayerId?: string;
-    // 🔥 Storyline 360 Motion Path Animation Parameters
-    motionX?: number;          // Destination X% (0-100) for 'animate_motion'
-    motionY?: number;          // Destination Y% (0-100) for 'animate_motion'
-    motionScale?: number;      // Optional target scale at end of motion path
-    motionRotation?: number;   // Optional target rotation (deg) at end of motion path
-    motionDuration?: number;   // Duration in ms (default: 900)
+    // Storyline 360 Motion Path Animation Parameters
+    motionX?: number;
+    motionY?: number;
+    motionScale?: number;
+    motionRotation?: number;
+    motionDuration?: number;
     motionCurve?: 'ease_in_out' | 'spring_bounce' | 'linear';
     reaction: 'bounce_glow' | 'chariot_march' | 'lever_tilt' | 'combine_flash' | 'shake_error';
     message: string;
@@ -619,6 +619,12 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
     const [reactionBanner, setReactionBanner] = useState<string | null>(null);
     const [isVerified, setIsVerified] = useState(false);
 
+    // Keep a ref to latest snappedMap & entities so chained timeouts always read fresh state
+    const snappedMapRef = useRef<Record<string, string>>(snappedMap);
+    useEffect(() => { snappedMapRef.current = snappedMap; }, [snappedMap]);
+    const entitiesRef = useRef<KineticEntity[]>(entities);
+    useEffect(() => { entitiesRef.current = entities; }, [entities]);
+
     useEffect(() => {
         setEntities(initialEntities);
         setObjectStates(buildInitialStateMap(initialEntities));
@@ -674,7 +680,68 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setTimeout(() => setActiveReaction(null), 2200);
     };
 
-const animateEntityAlongPath = (
+    // Compute neat tiled coordinates inside a multi-capacity bucket/zone
+    const computeZoneTiledCoords = (targetZone: KineticZone, entityId: string, currentSnapped: Record<string, string>) => {
+        const maxCap = targetZone.capacity || (targetZone.acceptedCategory ? 6 : 1);
+        const currentOccupants = Object.keys(currentSnapped).filter(
+            k => currentSnapped[k] === targetZone.id && k !== entityId
+        );
+        const slotIdx = currentOccupants.length;
+        let snapX = targetZone.x;
+        let snapY = targetZone.y;
+
+        if (maxCap > 1) {
+            const cols = 2;
+            const col = slotIdx % cols;
+            const row = Math.floor(slotIdx / cols);
+            const offsetX = (col === 0 ? -1 : 1) * Math.min(targetZone.width * 0.22, 9);
+            const offsetY = (row - 0.5) * Math.min(targetZone.height * 0.28, 9);
+            snapX = Math.max(6, Math.min(94, targetZone.x + offsetX));
+            snapY = Math.max(8, Math.min(92, targetZone.y + offsetY));
+        }
+        return { snapX, snapY, occupantCount: currentOccupants.length, maxCap };
+    };
+
+    // Evaluate category sorting, sequence order, and cascading on_drop rules whenever an object lands in a zone
+    // (whether dragged manually OR moved there via a trigger!)
+    const evaluateZoneArrival = (entityId: string, matchedZone: KineticZone, visitedRuleIds: Set<string> = new Set()) => {
+        const movedEntity = entitiesRef.current.find(e => e.id === entityId);
+        if (!movedEntity) return;
+
+        // 1. Check Category Sorting match
+        if (matchedZone.acceptedCategory && movedEntity.category) {
+            if (matchedZone.acceptedCategory.trim().toLowerCase() === movedEntity.category.trim().toLowerCase()) {
+                setObjectStates(prev => ({ ...prev, [entityId]: 'drop_correct' }));
+            } else {
+                setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
+            }
+        }
+
+        // 2. Check Sequence / Ordering match
+        if (matchedZone.sequenceOrder !== undefined && movedEntity.sequenceIndex !== undefined) {
+            if (matchedZone.sequenceOrder === movedEntity.sequenceIndex) {
+                setObjectStates(prev => ({ ...prev, [entityId]: 'drop_correct' }));
+            } else {
+                setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
+            }
+        }
+
+        // 3. Fire any cascading on_drop triggers for this entity + zone (or wildcard zoneId === '')
+        const dropRules = rules.filter(
+            r =>
+                (r.event || 'on_drop') === 'on_drop' &&
+                r.entityId === entityId &&
+                (r.zoneId === matchedZone.id || !r.zoneId) &&
+                !visitedRuleIds.has(r.id)
+        );
+
+        if (dropRules.length > 0) {
+            executeTriggers(dropRules, entityId, visitedRuleIds);
+        }
+    };
+
+    // 🔥 ANIMATE AN ENTITY ALONG A MOTION PATH (AND CASCADE ZONE ARRIVAL TRIGGERS)
+    const animateEntityAlongPath = (
         targetId: string,
         destX: number,
         destY: number,
@@ -685,26 +752,32 @@ const animateEntityAlongPath = (
             curve?: string;
             snapToZoneId?: string;
             nextState?: KineticObjectState;
+            visitedRuleIds?: Set<string>;
         }
     ) => {
         const duration = options?.duration || 900;
         const curve = MOTION_CURVES[options?.curve || 'ease_in_out'] || MOTION_CURVES.ease_in_out;
 
-        const sourceObj = entities.find(e => e.id === targetId);
+        const sourceObj = entitiesRef.current.find(e => e.id === targetId);
         if (sourceObj) {
             setActiveMotionTrail({ x1: sourceObj.x, y1: sourceObj.y, x2: destX, y2: destY });
         }
 
-        // Enable CSS transition on this specific object for the duration of the motion path
         setAnimatingEntities(prev => ({ ...prev, [targetId]: { duration, curve } }));
 
-        // Ensure hidden/disabled object becomes visible if animated
         setObjectStates(prev => ({
             ...prev,
-            [targetId]: options?.nextState || (prev[targetId] === 'hidden' ? 'normal' : prev[targetId])
+            [targetId]: options?.nextState || (prev[targetId] === 'hidden' || prev[targetId] === 'disabled' ? 'normal' : prev[targetId])
         }));
 
-        // Trigger the coordinate/scale/rotation interpolation on the next frame
+        if (options?.snapToZoneId) {
+            setSnappedMap(prev => {
+                const updated = { ...prev, [targetId]: options.snapToZoneId! };
+                snappedMapRef.current = updated;
+                return updated;
+            });
+        }
+
         requestAnimationFrame(() => {
             setEntities(prev => prev.map(ent => {
                 if (ent.id !== targetId) return ent;
@@ -716,10 +789,6 @@ const animateEntityAlongPath = (
                     rotation: options?.rotation !== undefined ? options.rotation : ent.rotation
                 };
             }));
-
-            if (options?.snapToZoneId) {
-                setSnappedMap(prev => ({ ...prev, [targetId]: options.snapToZoneId! }));
-            }
         });
 
         setTimeout(() => {
@@ -729,7 +798,15 @@ const animateEntityAlongPath = (
                 return copy;
             });
             setActiveMotionTrail(null);
-        }, duration + 80);
+
+            // 🔥 CASCADE: If this animated object landed in a zone, fire that zone's arrival & on_drop triggers!
+            if (options?.snapToZoneId) {
+                const landedZone = zones.find(z => z.id === options.snapToZoneId);
+                if (landedZone) {
+                    evaluateZoneArrival(targetId, landedZone, options.visitedRuleIds || new Set());
+                }
+            }
+        }, duration + 60);
     };
 
     const openSlideLayer = (layerId: string) => {
@@ -775,12 +852,22 @@ const animateEntityAlongPath = (
         setLayerQuizSubmitted(false);
     };
 
-    const executeTriggers = (matchingRules: KineticRule[], sourceEntityId: string) => {
-        if (matchingRules.length === 0) return;
-        const newlyFiredIds = matchingRules.map(r => r.id);
+    // Execute triggers with visitedRuleIds set so chained triggers never cause infinite loops
+    const executeTriggers = (
+        matchingRules: KineticRule[],
+        sourceEntityId: string,
+        visitedRuleIds: Set<string> = new Set()
+    ) => {
+        const unvisited = matchingRules.filter(r => !visitedRuleIds.has(r.id));
+        if (unvisited.length === 0) return;
+
+        const nextVisited = new Set(visitedRuleIds);
+        unvisited.forEach(r => nextVisited.add(r.id));
+
+        const newlyFiredIds = unvisited.map(r => r.id);
         setFiredRuleIds(prev => Array.from(new Set([...prev, ...newlyFiredIds])));
 
-        matchingRules.forEach(rule => {
+        unvisited.forEach(rule => {
             const actionType = rule.action || 'reaction';
             if (rule.message || rule.reaction) {
                 triggerCanvasReaction(rule.reaction || 'bounce_glow', rule.message);
@@ -802,32 +889,41 @@ const animateEntityAlongPath = (
                 const targetId = rule.targetEntityId || sourceEntityId;
                 const destZone = zones.find(z => z.id === rule.zoneId);
                 if (destZone) {
-                    animateEntityAlongPath(targetId, destZone.x, destZone.y, {
+                    const { snapX, snapY } = computeZoneTiledCoords(destZone, targetId, snappedMapRef.current);
+                    animateEntityAlongPath(targetId, snapX, snapY, {
                         scale: rule.motionScale,
                         rotation: rule.motionRotation,
-                        duration: rule.motionDuration || 900,
+                        duration: rule.motionDuration || 850,
                         curve: rule.motionCurve || 'spring_bounce',
                         snapToZoneId: destZone.id,
-                        nextState: rule.targetState || 'drop_correct'
+                        nextState: rule.targetState || 'drop_correct',
+                        visitedRuleIds: nextVisited
                     });
                 }
             } else if (actionType === 'animate_motion') {
                 const targetId = rule.targetEntityId || sourceEntityId;
                 const destX = rule.motionX ?? 50;
                 const destY = rule.motionY ?? 40;
-                // Check if destination lands inside a zone so it also registers as snapped
                 const landingZone = zones.find(z => {
-                    const halfW = z.width / 2;
-                    const halfH = z.height / 2;
+                    const halfW = (z.isHotspotPin ? Math.max(z.width, 16) : z.width) / 2;
+                    const halfH = (z.isHotspotPin ? Math.max(z.height, 16) : z.height) / 2;
                     return destX >= z.x - halfW && destX <= z.x + halfW && destY >= z.y - halfH && destY <= z.y + halfH;
                 });
-                animateEntityAlongPath(targetId, destX, destY, {
+                let finalX = destX;
+                let finalY = destY;
+                if (landingZone) {
+                    const tiled = computeZoneTiledCoords(landingZone, targetId, snappedMapRef.current);
+                    finalX = tiled.snapX;
+                    finalY = tiled.snapY;
+                }
+                animateEntityAlongPath(targetId, finalX, finalY, {
                     scale: rule.motionScale,
                     rotation: rule.motionRotation,
                     duration: rule.motionDuration || 900,
                     curve: rule.motionCurve || 'ease_in_out',
                     snapToZoneId: landingZone?.id,
-                    nextState: rule.targetState
+                    nextState: rule.targetState,
+                    visitedRuleIds: nextVisited
                 });
             } else if (actionType === 'complete_block') {
                 setIsVerified(true);
@@ -973,74 +1069,24 @@ const animateEntityAlongPath = (
         }
 
         if (matchedZone) {
-            const maxCap = matchedZone.capacity || (matchedZone.acceptedCategory ? 6 : 1);
-            const currentOccupants = Object.keys(snappedMap).filter(
-                k => snappedMap[k] === matchedZone!.id && k !== entityId
-            );
+            const { snapX, snapY, occupantCount, maxCap } = computeZoneTiledCoords(matchedZone, entityId, snappedMap);
 
-            if (currentOccupants.length >= maxCap) {
+            if (occupantCount >= maxCap) {
                 triggerCanvasReaction('shake_error', `${matchedZone.label} is at full capacity (${maxCap}/${maxCap})!`);
                 return;
             }
 
-            const slotIdx = currentOccupants.length;
-            let snapX = matchedZone.x;
-            let snapY = matchedZone.y;
-
-            if (maxCap > 1) {
-                const cols = 2;
-                const col = slotIdx % cols;
-                const row = Math.floor(slotIdx / cols);
-                const offsetX = (col === 0 ? -1 : 1) * Math.min(matchedZone.width * 0.22, 9);
-                const offsetY = (row - 0.5) * Math.min(matchedZone.height * 0.28, 9);
-                snapX = Math.max(6, Math.min(94, matchedZone.x + offsetX));
-                snapY = Math.max(8, Math.min(92, matchedZone.y + offsetY));
-            }
-
-            // Smooth snap animation into the zone
+            // Smooth snap animation into the zone (which will also evaluateZoneArrival & cascade triggers!)
             animateEntityAlongPath(entityId, snapX, snapY, {
-                duration: 260,
+                duration: 240,
                 curve: 'spring_bounce',
                 snapToZoneId: matchedZone.id
             });
-
-            const dropRules = rules.filter(r => (r.event || 'on_drop') === 'on_drop' && r.entityId === entityId && r.zoneId === matchedZone!.id);
-            if (dropRules.length > 0) {
-                executeTriggers(dropRules, entityId);
-                return;
-            }
-
-            if (matchedZone.acceptedCategory && movedEntity.category) {
-                if (matchedZone.acceptedCategory.trim().toLowerCase() === movedEntity.category.trim().toLowerCase()) {
-                    setObjectStates(prev => ({ ...prev, [entityId]: 'drop_correct' }));
-                    triggerCanvasReaction('bounce_glow', `Sorted into ${matchedZone.label}!`);
-                } else {
-                    setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
-                    triggerCanvasReaction('shake_error', `Wrong category for ${movedEntity.label}!`);
-                }
-                return;
-            }
-
-            if (matchedZone.sequenceOrder !== undefined && movedEntity.sequenceIndex !== undefined) {
-                if (matchedZone.sequenceOrder === movedEntity.sequenceIndex) {
-                    setObjectStates(prev => ({ ...prev, [entityId]: 'drop_correct' }));
-                    triggerCanvasReaction('bounce_glow', `Sequence #${matchedZone.sequenceOrder} locked!`);
-                } else {
-                    setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
-                    triggerCanvasReaction('shake_error', `Sequence mismatch for slot #${matchedZone.sequenceOrder}!`);
-                }
-                return;
-            }
-
-            const zoneHasOtherRules = rules.some(r => (r.event || 'on_drop') === 'on_drop' && r.zoneId === matchedZone!.id);
-            if (zoneHasOtherRules) {
-                setObjectStates(prev => ({ ...prev, [entityId]: 'drop_incorrect' }));
-                triggerCanvasReaction('shake_error', 'Try a different placement!');
-            }
         } else {
             const nextSnapped = { ...snappedMap };
             delete nextSnapped[entityId];
             setSnappedMap(nextSnapped);
+            snappedMapRef.current = nextSnapped;
             setObjectStates(prev => ({ ...prev, [entityId]: 'normal' }));
         }
     };
@@ -1068,6 +1114,7 @@ const animateEntityAlongPath = (
         setLayerQuizSelected(null);
         setLayerQuizSubmitted(false);
         setSnappedMap({});
+        snappedMapRef.current = {};
         setSelectedId(null);
         setActiveReaction(null);
         setReactionBanner(null);
@@ -1426,7 +1473,6 @@ const animateEntityAlongPath = (
                                     top: `${ent.y}%`,
                                     width: ent.width ? `${ent.width}px` : undefined,
                                     transform: `translate(-50%, -50%) scale(${ent.scale || 1}) rotate(${ent.rotation || 0}deg)`,
-                                    // 🔥 Smooth Motion Path interpolation when triggered or timeline-scrubbed, zero-lag when dragged!
                                     transition: isDragging
                                         ? 'none'
                                         : animConfig
@@ -1446,25 +1492,46 @@ const animateEntityAlongPath = (
                                     isSelected ? 'ring-4 ring-amber-300 dark:ring-indigo-400 scale-105' : ''
                                 }`}
                             >
-                                <div className="flex items-center gap-2 whitespace-nowrap">
-                                    {eType === 'connector_node' ? (
-                                        <span className="w-3.5 h-3.5 rounded-full bg-white border-2 border-indigo-600 shrink-0" />
-                                    ) : eType === 'multi_select' ? (
-                                        <span className={`w-4 h-4 rounded-md border-2 flex items-center justify-center ${
-                                            multiSelectedIds.includes(ent.id) ? 'bg-white text-indigo-600 border-white' : 'border-white/60'
-                                        }`}>
-                                            {multiSelectedIds.includes(ent.id) && <Check size={11} strokeWidth={3} />}
-                                        </span>
-                                    ) : ent.draggable !== false ? (
-                                        <Move size={13} className="opacity-70 shrink-0" />
-                                    ) : null}
-
-                                    <div className="text-left">
-                                        <div className="font-black text-xs sm:text-sm leading-tight">{ent.label}</div>
-                                        {ent.sublabel && <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">{ent.sublabel}</div>}
+                                {ent.imageUrl ? (
+                                    <div className="flex flex-col items-center text-center gap-1.5">
+                                        <img
+                                            src={ent.imageUrl}
+                                            alt={ent.label}
+                                            draggable={false}
+                                            className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-xl pointer-events-none select-none"
+                                        />
+                                        {ent.label && (
+                                            <span className="text-[11px] font-black text-slate-800 dark:text-white px-1.5 leading-tight">
+                                                {ent.label}
+                                            </span>
+                                        )}
+                                        {ent.sublabel && (
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                {ent.sublabel}
+                                            </span>
+                                        )}
                                     </div>
-                                    {(isSnapped || st === 'drop_correct') && <CheckCircle2 size={14} className="text-white shrink-0 ml-1" />}
-                                </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 whitespace-nowrap">
+                                        {eType === 'connector_node' ? (
+                                            <span className="w-3.5 h-3.5 rounded-full bg-white border-2 border-indigo-600 shrink-0" />
+                                        ) : eType === 'multi_select' ? (
+                                            <span className={`w-4 h-4 rounded-md border-2 flex items-center justify-center ${
+                                                multiSelectedIds.includes(ent.id) ? 'bg-white text-indigo-600 border-white' : 'border-white/60'
+                                            }`}>
+                                                {multiSelectedIds.includes(ent.id) && <Check size={11} strokeWidth={3} />}
+                                            </span>
+                                        ) : ent.draggable !== false ? (
+                                            <Move size={13} className="opacity-70 shrink-0" />
+                                        ) : null}
+
+                                        <div className="text-left">
+                                            <div className="font-black text-xs sm:text-sm leading-tight">{ent.label}</div>
+                                            {ent.sublabel && <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">{ent.sublabel}</div>}
+                                        </div>
+                                        {(isSnapped || st === 'drop_correct') && <CheckCircle2 size={14} className="text-white shrink-0 ml-1" />}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -1487,6 +1554,11 @@ const animateEntityAlongPath = (
                                         </button>
                                     )}
                                 </div>
+                                {activeLayer.imageUrl && (
+                                    <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-40 bg-slate-100 dark:bg-slate-950 flex items-center justify-center">
+                                        <img src={activeLayer.imageUrl} alt={activeLayer.title} className="w-full h-full object-contain max-h-40" />
+                                    </div>
+                                )}
                                 <h4 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{activeLayer.title}</h4>
                                 {activeLayer.body && <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed mb-5 whitespace-pre-wrap">{activeLayer.body}</p>}
 
@@ -1562,25 +1634,25 @@ const animateEntityAlongPath = (
                     </div>
                 )}
 
-                {/* Transform Controls Dock */}
-                {selectedEntity && !activeLayer && (selectedEntity.allowResize || selectedEntity.allowRotate) && (
+                {/* Transform Controls Dock (Student View Scale & Rotate) */}
+                {selectedEntity && !activeLayer && (selectedEntity.allowResize !== false || selectedEntity.allowRotate) && (
                     <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-slate-800 shadow-md flex flex-wrap items-center justify-between gap-6">
                         <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
                             Transform: {selectedEntity.label}
                         </span>
                         <div className="flex flex-wrap items-center gap-6 flex-1 justify-end">
-                            {selectedEntity.allowResize && (
+                            {selectedEntity.allowResize !== false && (
                                 <div className="flex items-center gap-3 min-w-[170px]">
                                     <Maximize2 size={14} className="text-slate-400" />
-                                    <input type="range" min="0.5" max="2.2" step="0.1" value={selectedEntity.scale} onChange={(e) => updateEntityTransform(selectedEntity.id, 'scale', parseFloat(e.target.value))} className="flex-1 accent-indigo-600 cursor-pointer" />
-                                    <span className="text-xs font-black text-slate-700 dark:text-slate-200 tabular-nums w-9">{selectedEntity.scale.toFixed(1)}x</span>
+                                    <input type="range" min="0.5" max="2.2" step="0.1" value={selectedEntity.scale || 1} onChange={(e) => updateEntityTransform(selectedEntity.id, 'scale', parseFloat(e.target.value))} className="flex-1 accent-indigo-600 cursor-pointer" />
+                                    <span className="text-xs font-black text-slate-700 dark:text-slate-200 tabular-nums w-9">{(selectedEntity.scale || 1).toFixed(1)}x</span>
                                 </div>
                             )}
                             {selectedEntity.allowRotate && (
                                 <div className="flex items-center gap-3 min-w-[170px]">
                                     <RotateCw size={14} className="text-slate-400" />
-                                    <input type="range" min="-180" max="180" step="5" value={selectedEntity.rotation} onChange={(e) => updateEntityTransform(selectedEntity.id, 'rotation', parseInt(e.target.value))} className="flex-1 accent-indigo-600 cursor-pointer" />
-                                    <span className="text-xs font-black text-slate-700 dark:text-slate-200 tabular-nums w-10">{selectedEntity.rotation}°</span>
+                                    <input type="range" min="-180" max="180" step="5" value={selectedEntity.rotation || 0} onChange={(e) => updateEntityTransform(selectedEntity.id, 'rotation', parseInt(e.target.value))} className="flex-1 accent-indigo-600 cursor-pointer" />
+                                    <span className="text-xs font-black text-slate-700 dark:text-slate-200 tabular-nums w-10">{selectedEntity.rotation || 0}°</span>
                                 </div>
                             )}
                         </div>
@@ -1608,13 +1680,16 @@ const animateEntityAlongPath = (
 };
 
 // ============================================================================
-//  8. KINETIC CANVAS BUILDER (Multi-Modal Studio + Motion Path Vector Editor)
+//  8. KINETIC CANVAS BUILDER (Complete Studio: Image Uploads, Theme, Resize & Motion)
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     const [activeTab, setActiveTab] = useState<'canvas' | 'timeline' | 'layers' | 'rules' | 'preview'>('canvas');
     const [selectedItem, setSelectedItem] = useState<{ type: 'entity' | 'zone', id: string } | null>(null);
     const [draggingTarget, setDraggingTarget] = useState<{ type: 'entity' | 'zone', id: string } | null>(null);
     const editorCanvasRef = useRef<HTMLDivElement>(null);
+    const bgFileInputRef = useRef<HTMLInputElement>(null);
+    const objFileInputRef = useRef<HTMLInputElement>(null);
+    const selectedObjImageInputRef = useRef<HTMLInputElement>(null);
 
     const entities: KineticEntity[] = Array.isArray(block?.entities) ? block.entities : [];
     const zones: KineticZone[] = Array.isArray(block?.zones) ? block.zones : [];
@@ -1624,6 +1699,31 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
     const updateBlock = (patch: any) => {
         onChange({ ...block, type: 'kinetic_canvas', entities, zones, rules, layers, timelineKeyframes, ...patch });
+    };
+
+    // Compress uploaded local image file into WebP Data URL for Firestore/JSON storage
+    const handleImageFileUpload = (file: File, onResult: (dataUrl: string) => void) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxDim = 900;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                    else { w = Math.round((w * maxDim) / h); h = maxDim; }
+                }
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, w, h);
+                onResult(canvas.toDataURL('image/webp', 0.82));
+            };
+            img.src = String(ev.target?.result || '');
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleEditorPointerDown = (e: React.PointerEvent, type: 'entity' | 'zone', id: string) => {
@@ -1652,17 +1752,19 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         setDraggingTarget(null);
     };
 
-    const addEntityByType = (entityType: KineticEntityType) => {
+    const addEntityByType = (entityType: KineticEntityType, withImageUrl?: string) => {
         const newId = `ent_${Date.now()}`;
         const base: KineticEntity = {
             id: newId,
             entityType,
             label:
+                withImageUrl ? 'Sprite Object' :
                 entityType === 'connector_node' ? `Node ${entities.length + 1}` :
                 entityType === 'slider' ? 'Force Slider' :
                 entityType === 'text_input' ? 'Label Prompt' :
                 entityType === 'multi_select' ? 'Selectable Option' :
                 `Object ${entities.length + 1}`,
+            imageUrl: withImageUrl || '',
             color: entityType === 'connector_node' ? 'cyan' : entityType === 'multi_select' ? 'amber' : 'indigo',
             x: 50,
             y: 78,
@@ -1670,6 +1772,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             rotation: 0,
             draggable: entityType === 'draggable' || entityType === 'hotspot_label',
             initialState: 'normal',
+            allowResize: true,
+            allowRotate: true,
             sliderMin: 0,
             sliderMax: 100,
             sliderStep: 5,
@@ -1703,12 +1807,65 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         setSelectedItem({ type: 'zone', id: newId });
     };
 
+    const clearToBlankCanvas = () => {
+        updateBlock({
+            title: block?.title || 'Interactive Slide Canvas',
+            subtitle: 'Drag objects or click interactive elements on the slide.',
+            backgroundTheme: 'blank',
+            backgroundUrl: '',
+            entities: [],
+            zones: [],
+            rules: [],
+            layers: [],
+            timelineKeyframes: []
+        });
+        setSelectedItem(null);
+    };
+
     const activeEntity = selectedItem?.type === 'entity' ? entities.find(e => e.id === selectedItem.id) : null;
     const activeZone = selectedItem?.type === 'zone' ? zones.find(z => z.id === selectedItem.id) : null;
     const bgThemeKey = block?.backgroundTheme || 'grid';
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-100 dark:border-slate-800 p-6 space-y-6 shadow-xl">
+            {/* Hidden File Inputs for Background & Object Sprites */}
+            <input
+                ref={bgFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageFileUpload(file, (dataUrl) => updateBlock({ backgroundUrl: dataUrl }));
+                }}
+            />
+            <input
+                ref={objFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageFileUpload(file, (dataUrl) => addEntityByType('draggable', dataUrl));
+                }}
+            />
+            <input
+                ref={selectedObjImageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && activeEntity) {
+                        handleImageFileUpload(file, (dataUrl) => {
+                            updateBlock({
+                                entities: entities.map(i => i.id === activeEntity.id ? { ...i, imageUrl: dataUrl } : i)
+                            });
+                        });
+                    }
+                }}
+            />
+
             {/* TOP STUDIO BAR */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div>
@@ -1720,22 +1877,90 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     </h4>
                 </div>
 
-                <div className="flex flex-wrap bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <button type="button" onClick={() => setActiveTab('canvas')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'canvas' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                        1. Stage ({entities.length + zones.length})
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={clearToBlankCanvas}
+                        className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-wider"
+                    >
+                        Clear to Blank
                     </button>
-                    <button type="button" onClick={() => setActiveTab('timeline')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'timeline' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                        2. Timeline ({timelineKeyframes.length})
-                    </button>
-                    <button type="button" onClick={() => setActiveTab('layers')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'layers' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                        3. Layers ({layers.length})
-                    </button>
-                    <button type="button" onClick={() => setActiveTab('rules')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'rules' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
-                        4. Triggers & Motion ({rules.length})
-                    </button>
-                    <button type="button" onClick={() => setActiveTab('preview')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'preview' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>
-                        5. Play
-                    </button>
+
+                    <div className="flex flex-wrap bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <button type="button" onClick={() => setActiveTab('canvas')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'canvas' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                            1. Stage ({entities.length + zones.length})
+                        </button>
+                        <button type="button" onClick={() => setActiveTab('timeline')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'timeline' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                            2. Timeline ({timelineKeyframes.length})
+                        </button>
+                        <button type="button" onClick={() => setActiveTab('layers')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'layers' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                            3. Layers ({layers.length})
+                        </button>
+                        <button type="button" onClick={() => setActiveTab('rules')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'rules' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                            4. Triggers & Motion ({rules.length})
+                        </button>
+                        <button type="button" onClick={() => setActiveTab('preview')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${activeTab === 'preview' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>
+                            5. Play
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* 🔥 RESTORED SLIDE TITLE, BACKGROUND THEME & IMAGE UPLOADER BAR */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                <div className="md:col-span-4">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Slide Title / Prompt</label>
+                    <input
+                        type="text"
+                        value={block?.title || ''}
+                        onChange={(e) => updateBlock({ title: e.target.value })}
+                        placeholder="Slide instructions..."
+                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-black text-slate-800 dark:text-white outline-none focus:border-indigo-500"
+                    />
+                </div>
+                <div className="md:col-span-3">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Canvas Background Theme</label>
+                    <select
+                        value={bgThemeKey}
+                        onChange={(e) => updateBlock({ backgroundTheme: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white outline-none"
+                    >
+                        <option value="blank">Clean Blank White/Dark</option>
+                        <option value="light_grid">Light Blueprint Grid</option>
+                        <option value="grid">Dark Blueprint Grid</option>
+                        <option value="parchment">Ancient Parchment</option>
+                        <option value="roman_road">Roman Stone</option>
+                        <option value="physics_lab">Physics Vector Lab</option>
+                    </select>
+                </div>
+                <div className="md:col-span-5">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Custom Background Image (URL or Upload)</label>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={block?.backgroundUrl || ''}
+                            onChange={(e) => updateBlock({ backgroundUrl: e.target.value })}
+                            placeholder="Paste image URL or click Upload BG ->"
+                            className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white outline-none"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => bgFileInputRef.current?.click()}
+                            className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider shrink-0"
+                        >
+                            Upload BG
+                        </button>
+                        {block?.backgroundUrl && (
+                            <button
+                                type="button"
+                                onClick={() => updateBlock({ backgroundUrl: '' })}
+                                className="px-2.5 py-2 rounded-xl bg-rose-100 text-rose-600 text-[10px] font-black"
+                                title="Clear Background Image"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -1748,9 +1973,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         <button type="button" onClick={() => addZoneByType('sequence')} className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase">+ Sequence Slot</button>
                         <button type="button" onClick={() => addZoneByType('hotspot')} className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black uppercase">+ 📍 Hotspot Pin</button>
 
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-3 mr-1">Add Widget:</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 mr-1">Add Object:</span>
                         <button type="button" onClick={() => addEntityByType('draggable')} className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase">+ Draggable</button>
-                        <button type="button" onClick={() => addEntityByType('connector_node')} className="px-3 py-1.5 rounded-xl bg-cyan-600 text-white text-[10px] font-black uppercase">+ Connector Node</button>
+                        <button type="button" onClick={() => objFileInputRef.current?.click()} className="px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase">+ 🖼️ Image Sprite</button>
+                        <button type="button" onClick={() => addEntityByType('connector_node')} className="px-3 py-1.5 rounded-xl bg-cyan-600 text-white text-[10px] font-black uppercase">+ Connector</button>
                         <button type="button" onClick={() => addEntityByType('slider')} className="px-3 py-1.5 rounded-xl bg-slate-800 text-white text-[10px] font-black uppercase">+ Slider</button>
                         <button type="button" onClick={() => addEntityByType('text_input')} className="px-3 py-1.5 rounded-xl bg-slate-800 text-white text-[10px] font-black uppercase">+ Text Input</button>
                         <button type="button" onClick={() => addEntityByType('multi_select')} className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 text-[10px] font-black uppercase">+ Multi-Select</button>
@@ -1765,7 +1991,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         className={`relative w-full aspect-[16/10] min-h-[340px] rounded-[2rem] border-2 border-slate-300 dark:border-slate-700 overflow-hidden select-none touch-none ${KINETIC_BACKGROUNDS[bgThemeKey] || KINETIC_BACKGROUNDS.grid}`}
                         style={block?.backgroundUrl ? { backgroundImage: `url(${block.backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                     >
-                        {/* Render Dashed Motion Path Vectors on the Builder Canvas */}
                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
                             {rules.filter(r => r.action === 'animate_motion' || r.action === 'move_to_zone').map(r => {
                                 const targetObj = entities.find(e => e.id === (r.targetEntityId || r.entityId));
@@ -1800,43 +2025,72 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 <span className="text-[10px] font-black uppercase bg-black/50 px-2 py-0.5 rounded">
                                     {z.isHotspotPin ? `📍 ${z.label}` : z.sequenceOrder ? `#${z.sequenceOrder} ${z.label}` : z.label}
                                 </span>
+                                <span className="text-[8px] bg-black/40 text-white px-1.5 rounded mt-1">
+                                    {z.width}% × {z.height}% (Cap: {z.capacity ?? 1})
+                                </span>
                             </div>
                         ))}
-                        {entities.map(ent => (
-                            <div
-                                key={ent.id}
-                                onPointerDown={(e) => handleEditorPointerDown(e, 'entity', ent.id)}
-                                style={{ left: `${ent.x}%`, top: `${ent.y}%`, transform: 'translate(-50%, -50%)' }}
-                                className={`absolute z-20 px-3.5 py-2 rounded-2xl bg-indigo-600 text-white border-2 border-indigo-300 shadow-lg cursor-move flex items-center gap-1.5 ${selectedItem?.id === ent.id ? 'ring-4 ring-amber-400' : ''}`}
-                            >
-                                <Move size={12} />
-                                <span className="text-xs font-black">{ent.label}</span>
-                                <span className="text-[8px] uppercase bg-black/30 px-1.5 py-0.5 rounded">{ent.entityType || 'drag'}</span>
-                            </div>
-                        ))}
+
+                        {entities.map(ent => {
+                            const colorClasses = KINETIC_COLORS[ent.color || 'indigo'] || KINETIC_COLORS.indigo;
+                            return (
+                                <div
+                                    key={ent.id}
+                                    onPointerDown={(e) => handleEditorPointerDown(e, 'entity', ent.id)}
+                                    style={{
+                                        left: `${ent.x}%`,
+                                        top: `${ent.y}%`,
+                                        transform: `translate(-50%, -50%) scale(${ent.scale || 1}) rotate(${ent.rotation || 0}deg)`
+                                    }}
+                                    className={`absolute z-20 cursor-move transition-shadow ${
+                                        ent.imageUrl
+                                            ? 'p-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 border-2 border-indigo-300 shadow-xl'
+                                            : `px-3.5 py-2 rounded-2xl border-2 shadow-lg ${colorClasses}`
+                                    } ${selectedItem?.id === ent.id ? 'ring-4 ring-amber-400 z-30' : ''}`}
+                                >
+                                    {ent.imageUrl ? (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <img src={ent.imageUrl} alt={ent.label} draggable={false} className="w-16 h-16 object-contain rounded-lg pointer-events-none" />
+                                            <span className="text-[10px] font-black text-slate-800 dark:text-white">{ent.label}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                            <Move size={12} />
+                                            <span className="text-xs font-black">{ent.label}</span>
+                                            <span className="text-[8px] uppercase bg-black/30 px-1.5 py-0.5 rounded">{ent.entityType || 'drag'}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
 
-                    {/* CONTEXTUAL INSPECTOR FOR SELECTED ENTITY */}
+                    {/* 🔥 RESTORED FULL OBJECT INSPECTOR (WITH SCALE, ROTATION & IMAGE UPLOAD) */}
                     {activeEntity && (
                         <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-950 border-2 border-indigo-200 dark:border-slate-800 space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
                                 <span className="text-xs font-black uppercase tracking-widest text-indigo-600">
                                     Editing {activeEntity.entityType || 'draggable'}: {activeEntity.label}
                                 </span>
                                 <button type="button" onClick={() => { updateBlock({ entities: entities.filter(e => e.id !== activeEntity.id) }); setSelectedItem(null); }} className="text-rose-500 text-xs font-black flex items-center gap-1">
-                                    <Trash2 size={13} /> Delete
+                                    <Trash2 size={13} /> Delete Object
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {/* Row 1: Label, Sublabel, Interaction Mode, Color, Initial State */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Label</label>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Primary Label</label>
                                     <input type="text" value={activeEntity.label} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, label: e.target.value } : i) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sublabel / Note</label>
+                                    <input type="text" value={activeEntity.sublabel || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sublabel: e.target.value } : i) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold" />
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Interaction Mode</label>
                                     <select value={activeEntity.entityType || 'draggable'} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, entityType: e.target.value as any } : i) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold">
-                                        <option value="draggable">Draggable / Button Object</option>
+                                        <option value="draggable">Draggable / Button</option>
                                         <option value="connector_node">Connector Line Node</option>
                                         <option value="slider">Slider / Number-Line</option>
                                         <option value="text_input">Text-Entry Field</option>
@@ -1844,53 +2098,155 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sort Category Tag</label>
-                                    <input type="text" value={activeEntity.category || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, category: e.target.value } : i) })} placeholder="e.g., noun, verb" className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold" />
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Color Theme</label>
+                                    <select value={activeEntity.color || 'indigo'} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, color: e.target.value as any } : i) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold">
+                                        <option value="indigo">Indigo</option>
+                                        <option value="emerald">Emerald</option>
+                                        <option value="amber">Amber</option>
+                                        <option value="rose">Rose</option>
+                                        <option value="cyan">Cyan</option>
+                                        <option value="slate">Slate</option>
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sequence Order #</label>
-                                    <input type="number" value={activeEntity.sequenceIndex ?? ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sequenceIndex: e.target.value ? parseInt(e.target.value) : undefined } : i) })} placeholder="e.g., 1, 2, 3" className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold" />
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Initial State</label>
+                                    <select value={activeEntity.initialState || 'normal'} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, initialState: e.target.value as any } : i) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold">
+                                        <option value="normal">Normal (Visible)</option>
+                                        <option value="hidden">Hidden</option>
+                                        <option value="disabled">Disabled</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-6 pt-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-                                <label className="flex items-center gap-2 cursor-pointer">
+                            {/* 🔥 Row 2: Restored Scale, Rotation & Image Sprite Upload Controls */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-200/70 dark:border-slate-800">
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                        Object Scale / Size ({(activeEntity.scale || 1).toFixed(1)}x)
+                                    </label>
                                     <input
-                                        type="checkbox"
-                                        checked={activeEntity.draggable !== false}
-                                        onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, draggable: e.target.checked } : i) })}
+                                        type="range"
+                                        min="0.4"
+                                        max="2.5"
+                                        step="0.1"
+                                        value={activeEntity.scale || 1}
+                                        onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, scale: parseFloat(e.target.value) } : i) })}
+                                        className="w-full accent-indigo-600 cursor-pointer mt-2"
                                     />
-                                    Learner Can Drag (Uncheck to make it a Clickable Trigger Button)
-                                </label>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                        Object Rotation ({activeEntity.rotation || 0}°)
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="-180"
+                                        max="180"
+                                        step="5"
+                                        value={activeEntity.rotation || 0}
+                                        onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, rotation: parseInt(e.target.value) } : i) })}
+                                        className="w-full accent-indigo-600 cursor-pointer mt-2"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Object Sprite Image (URL or Upload)</label>
+                                    <div className="flex gap-1.5">
+                                        <input
+                                            type="text"
+                                            value={activeEntity.imageUrl || ''}
+                                            onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, imageUrl: e.target.value } : i) })}
+                                            placeholder="Image URL..."
+                                            className="flex-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => selectedObjImageInputRef.current?.click()}
+                                            className="px-2.5 py-1.5 rounded-xl bg-indigo-600 text-white text-[9px] font-black uppercase shrink-0"
+                                        >
+                                            Upload
+                                        </button>
+                                        {activeEntity.imageUrl && (
+                                            <button
+                                                type="button"
+                                                onClick={() => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, imageUrl: '' } : i) })}
+                                                className="px-2 py-1.5 rounded-xl bg-rose-100 text-rose-600 text-xs font-black"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Row 3: Sorting Category, Sequence Order & Learner Transform Permissions */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-200/70 dark:border-slate-800">
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sort Category Tag</label>
+                                    <input type="text" value={activeEntity.category || ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, category: e.target.value } : i) })} placeholder="e.g., noun, verb" className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sequence Order #</label>
+                                    <input type="number" value={activeEntity.sequenceIndex ?? ''} onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, sequenceIndex: e.target.value ? parseInt(e.target.value) : undefined } : i) })} placeholder="e.g., 1, 2, 3" className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold" />
+                                </div>
+                                <div className="md:col-span-2 flex flex-wrap items-center gap-4 pt-4 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={activeEntity.draggable !== false}
+                                            onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, draggable: e.target.checked } : i) })}
+                                        />
+                                        Draggable
+                                    </label>
+                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={activeEntity.allowResize !== false}
+                                            onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, allowResize: e.target.checked } : i) })}
+                                        />
+                                        Learner Can Resize
+                                    </label>
+                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(activeEntity.allowRotate)}
+                                            onChange={(e) => updateBlock({ entities: entities.map(i => i.id === activeEntity.id ? { ...i, allowRotate: e.target.checked } : i) })}
+                                        />
+                                        Learner Can Rotate
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* CONTEXTUAL INSPECTOR FOR SELECTED ZONE */}
+                    {/* CONTEXTUAL INSPECTOR FOR SELECTED ZONE (WITH WIDTH & HEIGHT SLIDERS) */}
                     {activeZone && (
                         <div className="p-5 rounded-3xl bg-emerald-50/60 dark:bg-slate-950 border-2 border-emerald-200 space-y-4">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-black uppercase tracking-widest text-emerald-700">Editing Zone: {activeZone.label}</span>
                                 <button type="button" onClick={() => { updateBlock({ zones: zones.filter(z => z.id !== activeZone.id) }); setSelectedItem(null); }} className="text-rose-500 text-xs font-black flex items-center gap-1">
-                                    <Trash2 size={13} /> Delete
+                                    <Trash2 size={13} /> Delete Zone
                                 </button>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                <div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                                <div className="col-span-2">
                                     <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Zone Label</label>
                                     <input type="text" value={activeZone.label} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, label: e.target.value } : z) })} className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-black" />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Capacity (Max Items)</label>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Capacity</label>
                                     <input type="number" min="1" max="12" value={activeZone.capacity ?? 1} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, capacity: parseInt(e.target.value) || 1 } : z) })} className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Accepted Category</label>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Category Filter</label>
                                     <input type="text" value={activeZone.acceptedCategory || ''} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, acceptedCategory: e.target.value || undefined } : z) })} placeholder="e.g., noun" className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Sequence Slot #</label>
-                                    <input type="number" value={activeZone.sequenceOrder ?? ''} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, sequenceOrder: e.target.value ? parseInt(e.target.value) : undefined } : z) })} placeholder="e.g., 1" className="w-full px-3 py-2 rounded-xl bg-white border text-xs font-bold" />
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Width ({activeZone.width}%)</label>
+                                    <input type="range" min="10" max="75" value={activeZone.width} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, width: parseInt(e.target.value) } : z) })} className="w-full accent-emerald-600 mt-2" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Height ({activeZone.height}%)</label>
+                                    <input type="range" min="10" max="75" value={activeZone.height} onChange={(e) => updateBlock({ zones: zones.map(z => z.id === activeZone.id ? { ...z, height: parseInt(e.target.value) } : z) })} className="w-full accent-emerald-600 mt-2" />
                                 </div>
                             </div>
                         </div>
@@ -1951,14 +2307,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 </div>
             )}
 
-            {/* ========================================================= */}
-            {/* TAB 4: TRIGGERS & MOTION PATH ANIMATION WIZARD            */}
-            {/* ========================================================= */}
+            {/* TAB 4: TRIGGERS & CASCADING MOTION PATH WIZARD */}
             {activeTab === 'rules' && (
                 <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-bold text-slate-500">
-                            Configure triggers to animate objects along a Motion Path (`animate_motion` or `move_to_zone`), change states, or pop open Slide Layers:
+                            Triggers automatically cascade: if Trigger 1 glides Object B into a Zone, any `on_drop` Trigger for Object B in that Zone will automatically fire next!
                         </p>
                         <button
                             type="button"
@@ -1968,19 +2322,17 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                         ...rules,
                                         {
                                             id: `r_${Date.now()}`,
-                                            event: 'on_click',
+                                            event: 'on_drop',
                                             entityId: entities[0]?.id || '',
                                             zoneId: zones[0]?.id || '',
-                                            action: 'animate_motion',
+                                            action: 'move_to_zone',
                                             targetEntityId: entities[1]?.id || entities[0]?.id || '',
-                                            motionX: 50,
-                                            motionY: 35,
-                                            motionScale: 1.2,
+                                            motionScale: 1,
                                             motionRotation: 0,
-                                            motionDuration: 900,
+                                            motionDuration: 850,
                                             motionCurve: 'spring_bounce',
                                             reaction: 'bounce_glow',
-                                            message: 'Motion Path Triggered!'
+                                            message: 'Chain reaction triggered!'
                                         }
                                     ]
                                 })
@@ -1993,7 +2345,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
                     {rules.map((r, idx) => (
                         <div key={r.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
-                            {/* Primary Row: WHEN [Event] [Source Object] -> THEN [Action] */}
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">WHEN</span>
                                 <select
@@ -2005,8 +2356,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                     }}
                                     className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
                                 >
+                                    <option value="on_drop">Object Enters / Dropped On Zone</option>
                                     <option value="on_click">User Clicks Object</option>
-                                    <option value="on_drop">Object Dropped On Zone</option>
                                     <option value="on_connect">Connector Linked</option>
                                 </select>
 
@@ -2022,22 +2373,19 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                     {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.label}</option>)}
                                 </select>
 
-                                {(r.event || 'on_drop') === 'on_drop' && (
-                                    <>
-                                        <span className="text-[10px] font-black uppercase text-slate-400">ON</span>
-                                        <select
-                                            value={r.zoneId}
-                                            onChange={(e) => {
-                                                const u = [...rules];
-                                                u[idx] = { ...r, zoneId: e.target.value };
-                                                updateBlock({ rules: u });
-                                            }}
-                                            className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
-                                        >
-                                            {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
-                                        </select>
-                                    </>
-                                )}
+                                <span className="text-[10px] font-black uppercase text-slate-400">ZONE:</span>
+                                <select
+                                    value={r.zoneId}
+                                    onChange={(e) => {
+                                        const u = [...rules];
+                                        u[idx] = { ...r, zoneId: e.target.value };
+                                        updateBlock({ rules: u });
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                                >
+                                    <option value="">(Any Zone)</option>
+                                    {zones.map(z => <option key={z.id} value={z.id}>{z.label}</option>)}
+                                </select>
 
                                 <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">THEN</span>
                                 <select
@@ -2049,8 +2397,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                     }}
                                     className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black text-indigo-600"
                                 >
-                                    <option value="animate_motion">🚀 Animate Object Along Motion Path (X%, Y%)</option>
-                                    <option value="move_to_zone">🎯 Glide Object Into Target Zone</option>
+                                    <option value="move_to_zone">🎯 Glide Object Into Zone / Bucket</option>
+                                    <option value="animate_motion">🚀 Animate Object Along Path (X%, Y%)</option>
                                     <option value="change_state">🔄 Change State of Object</option>
                                     <option value="show_layer">📑 Pop Open Slide Layer</option>
                                     <option value="reaction">✨ Play Reaction & Banner</option>
@@ -2066,7 +2414,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 </button>
                             </div>
 
-                            {/* Secondary Row: Motion Path & Target Parameters */}
                             {(r.action === 'animate_motion' || r.action === 'move_to_zone') && (
                                 <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-slate-900 border border-indigo-200/70 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                                     <div>
@@ -2158,10 +2505,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                             step="100"
                                             min="200"
                                             max="4000"
-                                            value={r.motionDuration ?? 900}
+                                            value={r.motionDuration ?? 850}
                                             onChange={(e) => {
                                                 const u = [...rules];
-                                                u[idx] = { ...r, motionDuration: parseInt(e.target.value) || 900 };
+                                                u[idx] = { ...r, motionDuration: parseInt(e.target.value) || 850 };
                                                 updateBlock({ rules: u });
                                             }}
                                             className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-950 border text-xs font-bold"
@@ -2187,7 +2534,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 </div>
                             )}
 
-                            {/* Banner Message Row */}
                             <div className="flex items-center gap-2 pt-1">
                                 <span className="text-[10px] font-black uppercase text-slate-400">Banner:</span>
                                 <input
