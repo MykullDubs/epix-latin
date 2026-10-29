@@ -1113,13 +1113,14 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
 };
 
 // ============================================================================
-//  MAIN STUDENT CLASS VIEW (ENTRY POINT)
+//  MAIN STUDENT CLASS VIEW (ENTRY POINT — WITH MULTI-SOURCE COHORT RESOLUTION)
 // ============================================================================
 export default function StudentClassView({ 
-    classData, lessons = [], curriculums = [], allDecks = {}, onBack, 
+    classData: initialClassData, lessons = [], curriculums = [], allDecks = {}, onBack, 
     onSelectLesson, userData, user, setActiveTab, setSelectedLessonId, ExamPlayerView, onLogActivity 
 }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades' | 'live' | 'readings'>('lessons');
+  const [liveClassData, setLiveClassData] = useState<any>(initialClassData);
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [completionLogs, setCompletionLogs] = useState<any[]>([]);
   const [liveSession, setLiveSession] = useState<any>(null);
@@ -1128,20 +1129,167 @@ export default function StudentClassView({
   const [activeReading, setActiveReading] = useState<any>(null);
   const [selectedExamLog, setSelectedExamLog] = useState<any>(null);
   const [replayTutorial, setReplayTutorial] = useState(false);
-  
-  const initialCurrId = classData?.assignedCurriculums?.[0];
-  const initialExpandedId = typeof initialCurrId === 'object' ? (initialCurrId.curriculumId || initialCurrId.id) : initialCurrId;
+  const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({});
 
-  const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
-      [initialExpandedId]: true 
-  });
-  
+  // Keep classData synced in real-time with Firestore so instructor cohort assignments appear immediately
+  useEffect(() => {
+    setLiveClassData(initialClassData);
+    if (!initialClassData?.id) return;
+    const classRef = doc(db, 'artifacts', appId, 'classes', initialClassData.id);
+    const unsubClass = onSnapshot(classRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setLiveClassData({ id: docSnap.id, ...docSnap.data() });
+      }
+    });
+    return () => unsubClass();
+  }, [initialClassData?.id]);
+
+  const classData = liveClassData || initialClassData;
   const theme = getSubjectTheme(classData?.subject);
-  const studentEmail = user?.email || userData?.email || auth?.currentUser?.email || '';
+  const studentUid = user?.uid || userData?.uid || auth?.currentUser?.uid || '';
+  const studentEmail = (user?.email || userData?.email || auth?.currentUser?.email || '').trim().toLowerCase();
   const safeEmail = (studentEmail || 'unknown').replace(/\./g, ',');
 
-  // COHORT LOGIC: Extract cohort ID from user
-  const studentCohortId = userData?.cohortId;
+  // ============================================================================
+  //  🔥 MULTI-SOURCE COHORT RESOLVER
+  //  Checks userData, classData.cohorts[], classData.studentCohorts, and roster
+  // ============================================================================
+  const studentCohortIds = useMemo(() => {
+    const matched = new Set<string>();
+
+    const addIfValid = (val: any) => {
+      if (!val) return;
+      if (Array.isArray(val)) {
+        val.forEach(v => addIfValid(v));
+      } else if (typeof val === 'string' && val.trim() !== '') {
+        matched.add(val.trim());
+      } else if (typeof val === 'object' && (val.id || val.cohortId)) {
+        matched.add(String(val.id || val.cohortId).trim());
+      }
+    };
+
+    // 1. Check userData fields
+    addIfValid(userData?.cohortId);
+    addIfValid(userData?.cohortIds);
+    addIfValid(userData?.profile?.main?.cohortId);
+    if (classData?.id && userData?.cohorts && typeof userData.cohorts === 'object') {
+      addIfValid(userData.cohorts[classData.id]);
+    }
+
+    // 2. Check classData.studentCohorts map (by email, safeEmail, or UID)
+    if (classData?.studentCohorts && typeof classData.studentCohorts === 'object') {
+      addIfValid(classData.studentCohorts[studentEmail]);
+      addIfValid(classData.studentCohorts[safeEmail]);
+      if (studentUid) addIfValid(classData.studentCohorts[studentUid]);
+    }
+
+    // 3. Check classData.cohorts array (e.g., [{ id, name, studentEmails: [...], students: [...] }])
+    if (Array.isArray(classData?.cohorts)) {
+      classData.cohorts.forEach((c: any) => {
+        if (!c || typeof c !== 'object') return;
+        const cId = c.id || c.cohortId || c.name;
+        const memberList = [
+          ...(Array.isArray(c.studentEmails) ? c.studentEmails : []),
+          ...(Array.isArray(c.students) ? c.students : []),
+          ...(Array.isArray(c.members) ? c.members : []),
+          ...(Array.isArray(c.memberIds) ? c.memberIds : [])
+        ];
+
+        const isMember = memberList.some((m: any) => {
+          if (typeof m === 'string') {
+            const norm = m.trim().toLowerCase();
+            return norm === studentEmail || norm === safeEmail || (studentUid && m === studentUid);
+          }
+          if (typeof m === 'object' && m !== null) {
+            const mEmail = (m.email || m.studentEmail || '').trim().toLowerCase();
+            const mUid = m.uid || m.id || '';
+            return (studentEmail && mEmail === studentEmail) || (studentUid && mUid === studentUid);
+          }
+          return false;
+        });
+
+        if (isMember && cId) {
+          matched.add(String(cId).trim());
+          if (c.name) matched.add(String(c.name).trim());
+        }
+      });
+    }
+
+    // 4. Check classData.students / classData.roster array for per-student cohortId
+    const roster = Array.isArray(classData?.students)
+      ? classData.students
+      : Array.isArray(classData?.roster)
+      ? classData.roster
+      : [];
+    roster.forEach((s: any) => {
+      if (typeof s === 'object' && s !== null) {
+        const sEmail = (s.email || s.studentEmail || '').trim().toLowerCase();
+        const sUid = s.uid || s.id || '';
+        if ((studentEmail && sEmail === studentEmail) || (studentUid && sUid === studentUid)) {
+          addIfValid(s.cohortId || s.cohort || s.cohortIds);
+        }
+      }
+    });
+
+    return Array.from(matched);
+  }, [userData, classData, studentEmail, safeEmail, studentUid]);
+
+  // Helper: Check if an assignment/curriculum belongs to the whole class OR matches this student's cohort(s)
+  const matchesStudentCohort = (item: any) => {
+    if (!item || typeof item === 'string') return true;
+
+    const rawCohort = item.cohortId ?? item.cohort ?? item.targetCohortId;
+    const rawCohortArray = Array.isArray(item.cohortIds) ? item.cohortIds : null;
+
+    // If no cohort restriction is set on the item, it's a class-wide assignment
+    if (!rawCohort && (!rawCohortArray || rawCohortArray.length === 0)) {
+      return true;
+    }
+
+    // Universal cohort keywords that mean "entire class"
+    const isUniversalCohort = (val: string) => {
+      const norm = val.trim().toLowerCase();
+      return (
+        norm === '' ||
+        norm === 'all' ||
+        norm === 'everyone' ||
+        norm === 'default' ||
+        norm === 'none' ||
+        norm === 'class' ||
+        norm === 'entire_class' ||
+        (classData?.id && val === classData.id) ||
+        (classData?.name && norm === classData.name.trim().toLowerCase())
+      );
+    };
+
+    if (typeof rawCohort === 'string' && isUniversalCohort(rawCohort)) {
+      return true;
+    }
+
+    if (rawCohortArray && rawCohortArray.some((c: any) => typeof c === 'string' && isUniversalCohort(c))) {
+      return true;
+    }
+
+    // If the class only has cohorts defined on items, check if student belongs to that cohort
+    if (studentCohortIds.length > 0) {
+      if (typeof rawCohort === 'string' && studentCohortIds.includes(rawCohort.trim())) {
+        return true;
+      }
+      if (rawCohortArray && rawCohortArray.some((c: any) => studentCohortIds.includes(String(c).trim()))) {
+        return true;
+      }
+      return false;
+    }
+
+    // Fallback: If the student hasn't been placed in a specific sub-cohort yet,
+    // check whether this cohortId is actually the ID of the class itself or if the class has no sub-cohorts
+    const classHasSubCohorts = Array.isArray(classData?.cohorts) && classData.cohorts.length > 0;
+    if (!classHasSubCohorts) {
+      return true;
+    }
+
+    return false;
+  };
 
   // Listen to completion logs using the resolved studentEmail
   useEffect(() => {
@@ -1157,7 +1305,7 @@ export default function StudentClassView({
       const ids = docs.flatMap((d: any) => [d.itemId, d.originalId, d.itemTitle].filter(Boolean));
       setCompletedItems(ids);
     });
-  }, [classData, studentEmail]);
+  }, [classData?.id, studentEmail]);
 
   useEffect(() => {
     if (!classData?.id) return;
@@ -1193,57 +1341,123 @@ export default function StudentClassView({
 
   const toggleRoadmap = (currId: string) => setExpandedRoadmaps(prev => ({ ...prev, [currId]: !prev[currId] }));
 
-  // ADVANCED MAPPING LOGIC (Supports cohorts AND string/object payloads)
-  const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
-  const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
+  // ============================================================================
+  //  🔥 COLLECT ASSIGNMENTS & CURRICULUMS (TOP-LEVEL + NESTED INSIDE COHORTS)
+  // ============================================================================
+  const rawAssignments = useMemo(() => {
+    const list: any[] = [];
+    if (Array.isArray(classData?.assignments)) list.push(...classData.assignments);
+    if (Array.isArray(classData?.assignedLessons)) list.push(...classData.assignedLessons);
 
-  const relevantAssignments = rawAssignments.filter((assignment: any) => {
-      if (typeof assignment === 'string') return true; 
-      if (assignment.cohortId && studentCohortId) return assignment.cohortId === studentCohortId;
-      if (assignment.cohortId && !studentCohortId) return false; 
-      return true; 
-  });
+    // Also pull assignments stored directly inside matching cohort objects in classData.cohorts[]
+    if (Array.isArray(classData?.cohorts)) {
+      classData.cohorts.forEach((c: any) => {
+        const cId = c?.id || c?.cohortId || c?.name;
+        const isMyCohort = !cId || studentCohortIds.includes(String(cId).trim()) || (c?.name && studentCohortIds.includes(String(c.name).trim()));
+        if (isMyCohort) {
+          if (Array.isArray(c?.assignments)) list.push(...c.assignments);
+          if (Array.isArray(c?.lessonIds)) list.push(...c.lessonIds);
+          if (Array.isArray(c?.lessons)) list.push(...c.lessons);
+        }
+      });
+    }
+    return list;
+  }, [classData, studentCohortIds]);
 
-  const relevantCurriculums = rawCurriculums.filter((curr: any) => {
-      if (typeof curr === 'string') return true;
-      if (curr.cohortId && studentCohortId) return curr.cohortId === studentCohortId;
-      if (curr.cohortId && !studentCohortId) return false;
-      return true;
-  });
+  const rawCurriculums = useMemo(() => {
+    const list: any[] = [];
+    if (Array.isArray(classData?.assignedCurriculums)) list.push(...classData.assignedCurriculums);
+    if (Array.isArray(classData?.curriculums)) list.push(...classData.curriculums);
+    if (classData?.curriculumId) list.push(classData.curriculumId);
 
-  const populatedAssignments = relevantAssignments.map((assignment: any) => {
-      const targetId = typeof assignment === 'string' ? assignment : (assignment.lessonId || assignment.contentId || assignment.id);
-      
-      let node = lessons.find((l: any) => l.id === targetId);
-      if (node) return typeof assignment === 'object' ? { ...node, ...assignment, id: node.id || targetId } : node;
-      
-      let deck = allDecks?.[targetId] || Object.values(allDecks || {}).find((d: any) => d.id === targetId);
-      if (deck) {
-          return {
-              id: deck.id || targetId,
-              title: deck.title || deck.name,
-              contentType: 'deck',
-              type: 'deck', 
-              blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }],
-              ...(typeof assignment === 'object' ? assignment : {})
+    // Also pull curriculums stored directly inside matching cohort objects in classData.cohorts[]
+    if (Array.isArray(classData?.cohorts)) {
+      classData.cohorts.forEach((c: any) => {
+        const cId = c?.id || c?.cohortId || c?.name;
+        const isMyCohort = !cId || studentCohortIds.includes(String(cId).trim()) || (c?.name && studentCohortIds.includes(String(c.name).trim()));
+        if (isMyCohort) {
+          if (Array.isArray(c?.assignedCurriculums)) list.push(...c.assignedCurriculums);
+          if (Array.isArray(c?.curriculumIds)) list.push(...c.curriculumIds);
+          if (c?.curriculumId) list.push(c.curriculumId);
+        }
+      });
+    }
+    return list;
+  }, [classData, studentCohortIds]);
+
+  const relevantAssignments = rawAssignments.filter(matchesStudentCohort);
+  const relevantCurriculums = rawCurriculums.filter(matchesStudentCohort);
+
+  // Deduplicate and populate assignments
+  const populatedAssignments = useMemo(() => {
+    const seen = new Set<string>();
+    return relevantAssignments.map((assignment: any) => {
+      const targetId = typeof assignment === 'string'
+        ? assignment
+        : (assignment.lessonId || assignment.contentId || assignment.originalId || assignment.id);
+
+      let resolved: any = null;
+      const node = lessons.find((l: any) => l.id === targetId);
+      if (node) {
+        resolved = typeof assignment === 'object' ? { ...node, ...assignment, id: node.id || targetId } : node;
+      } else {
+        const deck = allDecks?.[targetId] || Object.values(allDecks || {}).find((d: any) => d.id === targetId);
+        if (deck) {
+          resolved = {
+            id: deck.id || targetId,
+            title: deck.title || deck.name,
+            contentType: 'deck',
+            type: 'deck',
+            blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }],
+            ...(typeof assignment === 'object' ? assignment : {})
           };
+        } else if (typeof assignment === 'object' && (assignment.title || assignment.name)) {
+          resolved = { ...assignment, id: targetId || assignment.title };
+        }
       }
 
-      if (typeof assignment === 'object' && (assignment.title || assignment.name)) return assignment;
-      return null;
-  }).filter(Boolean);
+      if (!resolved) return null;
+      const uniqueKey = String(resolved.id || resolved.title);
+      if (seen.has(uniqueKey)) return null;
+      seen.add(uniqueKey);
+      return resolved;
+    }).filter(Boolean);
+  }, [relevantAssignments, lessons, allDecks]);
 
-  const assignedCurriculums = relevantCurriculums.map((curr: any) => {
-      const targetId = typeof curr === 'string' ? curr : (curr.curriculumId || curr.contentId || curr.id);
+  // Deduplicate and populate curriculums
+  const assignedCurriculums = useMemo(() => {
+    const seen = new Set<string>();
+    return relevantCurriculums.map((curr: any) => {
+      const targetId = typeof curr === 'string'
+        ? curr
+        : (curr.curriculumId || curr.contentId || curr.id);
       const found = curriculums.find((c: any) => c.id === targetId);
-      return found ? (typeof curr === 'object' ? { ...found, ...curr } : found) : null;
-  }).filter(Boolean);
+      const resolved = found
+        ? (typeof curr === 'object' ? { ...found, ...curr, id: found.id } : found)
+        : (typeof curr === 'object' && Array.isArray(curr.lessonIds) ? curr : null);
 
-  const standaloneLessons = populatedAssignments.filter((a: any) => !(a.contentType === 'exam' || a.contentType === 'test' || a.type === 'reading') && !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id)));
+      if (!resolved || !resolved.id || seen.has(resolved.id)) return null;
+      seen.add(resolved.id);
+      return resolved;
+    }).filter(Boolean);
+  }, [relevantCurriculums, curriculums]);
+
+  // Auto-expand the first visible curriculum roadmap for this student
+  useEffect(() => {
+    if (assignedCurriculums.length > 0) {
+      const firstId = assignedCurriculums[0].id;
+      setExpandedRoadmaps(prev => (Object.keys(prev).length === 0 ? { [firstId]: true } : prev));
+    }
+  }, [assignedCurriculums]);
+
+  const standaloneLessons = populatedAssignments.filter(
+    (a: any) =>
+      !(a.contentType === 'exam' || a.contentType === 'test' || a.type === 'reading') &&
+      !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id))
+  );
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
   const readingsList = populatedAssignments.filter((a: any) => a.type === 'reading' || a.contentType === 'reading');
 
-  // Helper to match an item to its completion log or userData.completedAssignments
   const getExamCompletionLog = (item: any) => {
       const itemIds = [item.id, item.lessonId, item.contentId, item.originalId].filter(Boolean);
       return completionLogs.find((l: any) => 
@@ -1260,7 +1474,6 @@ export default function StudentClassView({
       return itemIds.some(id => completedItems.includes(id) || userCompleted.includes(id));
   };
 
-  // CALCULATE AVAILABLE (UNCOMPLETED) EXAMS FOR BADGES
   const availableExamsCount = useMemo(() => {
       return examList.filter((exam: any) => !isExamCompleted(exam)).length;
   }, [examList, completionLogs, completedItems, userData?.completedAssignments]);
@@ -1340,6 +1553,7 @@ export default function StudentClassView({
       {/* 🔥 NEW STUDENT ONBOARDING TUTORIAL OVERLAY */}
       <TutorialOverlay
           key={replayTutorial ? 'replay-tour' : 'auto-tour'}
+          variant="class"
           user={user}
           userData={userData}
           forceOpen={replayTutorial}
@@ -1372,7 +1586,6 @@ export default function StudentClassView({
                         <span className="px-2 py-0.5 bg-white/20 text-white rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm truncate max-w-[100px]">
                             {classData?.subject || 'Subject'}
                         </span>
-                        {/* HEADER EXAM AVAILABLE BADGE */}
                         {availableExamsCount > 0 && (
                             <button
                                 type="button"
@@ -1385,13 +1598,12 @@ export default function StudentClassView({
                         )}
                     </div>
                     <h1 className="text-white font-black text-lg md:text-2xl uppercase tracking-tighter leading-none truncate">
-                        {classData.name}
+                        {classData?.name || classData?.title}
                     </h1>
                 </div>
             </div>
 
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                {/* 1-CLICK REPLAY TUTORIAL BUTTON */}
                 <button
                     type="button"
                     onClick={() => setReplayTutorial(true)}
@@ -1422,7 +1634,6 @@ export default function StudentClassView({
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20 pt-6">
 
-        {/* BANNER IF EXAM IS AVAILABLE AND STUDENT IS ON LESSONS TAB */}
         {availableExamsCount > 0 && activeSubTab === 'lessons' && (
             <div className="px-4 max-w-xl mx-auto mb-6 animate-in slide-in-from-top-2 duration-300">
                 <button
@@ -1499,7 +1710,6 @@ export default function StudentClassView({
 
              {assignedCurriculums.length === 0 && standaloneLessons.length === 0 && (
                 <div className="text-center p-12 bg-white/50 dark:bg-slate-900/30 backdrop-blur-md rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800 m-4 transition-colors duration-300">
-                    <Map size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
                     <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 mb-2">Map Loading...</h3>
                     <p className="text-slate-500 dark:text-slate-400 font-bold">Your instructor hasn't drawn the path yet.</p>
                 </div>
@@ -1542,7 +1752,6 @@ export default function StudentClassView({
 
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={studentEmail} />}
         
-        {/* UPDATED EXAMS TAB: Passes isCompleted, examLog, and onReviewLog to ExamCard */}
         {activeSubTab === 'exams' && (
           <section className="space-y-4 px-4 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4">
             {examList.length === 0 ? (
