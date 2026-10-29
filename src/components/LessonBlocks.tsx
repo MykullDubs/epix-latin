@@ -674,8 +674,7 @@ export const KineticCanvasBlock = ({ block, onComplete, onStateChange }: any) =>
         setTimeout(() => setActiveReaction(null), 2200);
     };
 
-    // 🔥 ANIMATE AN ENTITY ALONG A MOTION PATH
-    const animateEntity alongPath = (
+const animateEntityAlongPath = (
         targetId: string,
         destX: number,
         destY: number,
