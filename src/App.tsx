@@ -18,13 +18,14 @@ import {
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, AlertTriangle, FlipVertical, HelpCircle, 
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, Maximize2,
-  Terminal, Code
+  Terminal, Code, Shield
 } from 'lucide-react';
 import { KineticCanvasBlock } from './components/LessonBlocks';
 import PrepositionExam from './components/PrepositionExam';
 import LandingPage from './components/LandingPage';
 import StudentClassView from './components/StudentClassView';
 import InstructorDashboard from './components/instructor/InstructorDashboard';
+import AdminDashboardView from './components/admin/AdminDashboardView';
 import FlashcardView from './components/FlashcardView';
 import BuilderHub from './components/instructor/BuilderHub';
 import ProfileView from './components/ProfileView';
@@ -173,6 +174,65 @@ function Toast({ message, onClose }: any) {
     <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-sm text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300 border border-white/10">
       <Check size={16} className="text-emerald-400" />
       <span className="text-sm font-medium tracking-wide">{message}</span>
+    </div>
+  );
+}
+
+// --- FLOATING ROLE SWITCHER DOCK (ADMIN / INSTRUCTOR / STUDENT) ---
+function RoleSwitcherDock({
+  activeMode,
+  onSelectMode,
+  onLogout
+}: {
+  activeMode: 'admin' | 'instructor' | 'student';
+  onSelectMode: (mode: 'admin' | 'instructor' | 'student') => void;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="fixed bottom-4 right-4 z-[9990] flex items-center gap-1.5 bg-slate-900/95 dark:bg-black/95 text-white p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl backdrop-blur-xl">
+      <button
+        type="button"
+        onClick={() => onSelectMode('admin')}
+        className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+          activeMode === 'admin'
+            ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+        }`}
+      >
+        <Shield size={13} /> Admin
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelectMode('instructor')}
+        className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+          activeMode === 'instructor'
+            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+        }`}
+      >
+        <GraduationCap size={13} /> Studio
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelectMode('student')}
+        className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+          activeMode === 'student'
+            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+        }`}
+      >
+        <User size={13} /> Student
+      </button>
+      {activeMode === 'admin' && (
+        <button
+          type="button"
+          onClick={onLogout}
+          title="Sign Out"
+          className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors ml-0.5"
+        >
+          <LogOut size={13} />
+        </button>
+      )}
     </div>
   );
 }
@@ -819,7 +879,6 @@ function HomeView({ setActiveTab, lessons, onSelectClass, onSelectLesson, onSele
   const completedSet = new Set(userData?.completedAssignments || []);
   const studentEmail = (user?.email || userData?.email || '').trim().toLowerCase();
 
-  // Keep local activeStudentClass synced if `classes` updates in real time
   useEffect(() => {
     if (!activeStudentClass || !Array.isArray(classes)) return;
     const fresh = classes.find((c: any) => c.id === activeStudentClass.id);
@@ -1092,6 +1151,9 @@ function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  // Non-destructive role switcher state ('admin' | 'instructor' | 'student' | null)
+  const [viewRoleOverride, setViewRoleOverride] = useState<'admin' | 'instructor' | 'student' | null>(null);
+
   // Content & State
   const [systemDecks, setSystemDecks] = useState<any>({});
   const [systemLessons, setSystemLessons] = useState<any[]>([]);
@@ -1110,6 +1172,16 @@ function App() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [classLessons, setClassLessons] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+
+  // Determine the user's base privilege and currently active view mode
+  const baseRole = userData?.role || 'student';
+  const hasStaffPrivileges = baseRole === 'admin' || baseRole === 'org_admin' || baseRole === 'instructor';
+  const activeViewMode: 'admin' | 'instructor' | 'student' = useMemo(() => {
+    if (viewRoleOverride) return viewRoleOverride;
+    if (baseRole === 'admin' || baseRole === 'org_admin') return 'admin';
+    if (baseRole === 'instructor') return 'instructor';
+    return 'student';
+  }, [viewRoleOverride, baseRole]);
 
   // --- MEMOS ---
   const allDecks = useMemo(() => {
@@ -1166,6 +1238,7 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
+      setViewRoleOverride(null);
       setAuthChecked(true);
     });
     return () => unsubscribe();
@@ -1246,7 +1319,6 @@ function App() {
       const mergedList = Array.from(classMap.values());
       setEnrolledClasses(mergedList);
 
-      // Keep open StudentClassView synced in real time
       setActiveStudentClass((prev: any) => {
         if (!prev) return null;
         return classMap.get(prev.id) || prev;
@@ -1264,7 +1336,10 @@ function App() {
     let unsubClassesPrimary = () => {};
     let unsubClassesSecondary = () => {};
 
-    if (userData?.role === 'instructor') {
+    const isStaffAccount =
+      userData?.role === 'instructor' || userData?.role === 'admin' || userData?.role === 'org_admin';
+
+    if (isStaffAccount && activeViewMode !== 'student') {
       const qSub = query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'));
       unsubClassesPrimary = onSnapshot(qSub, (snap) => {
         subCollectionClasses = snap.docs.map((d) => ({ id: d.id, instructorId: user.uid, ...(d.data() as Record<string, any>) }));
@@ -1280,7 +1355,7 @@ function App() {
         (snap) => {
           rootCollectionClasses = snap.docs
             .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }))
-            .filter((c: any) => !c.instructorId || c.instructorId === user.uid || subCollectionClasses.some((s) => s.id === c.id));
+            .filter((c: any) => userData?.role === 'admin' || !c.instructorId || c.instructorId === user.uid || subCollectionClasses.some((s) => s.id === c.id));
           publishMergedClasses();
         },
         () => {}
@@ -1310,7 +1385,7 @@ function App() {
             const emails = Array.isArray(c.studentEmails) ? c.studentEmails : [];
             const inEmails = emails.some((e: string) => String(e).toLowerCase() === lowerEmail);
             const matchesEnrolledId = subCollectionClasses.some((s) => s.id === c.id);
-            return inEmails || matchesEnrolledId;
+            return inEmails || matchesEnrolledId || isStaffAccount;
           });
           publishMergedClasses();
         },
@@ -1330,7 +1405,7 @@ function App() {
       unsubClassesPrimary();
       unsubClassesSecondary();
     };
-  }, [user, userData?.role]);
+  }, [user, userData?.role, activeViewMode]);
 
   // --- HANDLERS ---
   const handleCreateCard = useCallback(
@@ -1477,7 +1552,7 @@ function App() {
     [user, displayName]
   );
 
-  // --- FIREBASE MUTATIONS FOR CLASSES (WRITES TO BOTH SUBCOLLECTION & ROOT COLLECTION) ---
+  // --- FIREBASE MUTATIONS FOR CLASSES ---
   const handleCreateClass = useCallback(
     async (name: string) => {
       if (!user) return;
@@ -1801,37 +1876,64 @@ function App() {
     onClickLesson: handleContentSelection
   };
 
-  const isInstructor = userData.role === 'instructor';
-
-  if (isInstructor) {
+  // 🔥 ROUTE 1: ADMIN COMMAND CENTER
+  if (activeViewMode === 'admin') {
+    const adminUserPayload = {
+      ...userData,
+      uid: user.uid,
+      email: user.email,
+      role: userData.role === 'org_admin' ? 'org_admin' : 'admin'
+    };
     return (
-      <InstructorDashboard
-        user={user}
-        userData={{ ...userData, classes: enrolledClasses }}
-        allDecks={allDecks}
-        lessons={libraryLessons}
-        curriculums={curriculums}
-        activityLogs={activityLogs}
-        {...commonHandlers}
-        onCreateClass={handleCreateClass}
-        onDeleteClass={handleDeleteClass}
-        onRenameClass={handleRenameClass}
-        onAddStudent={handleAddStudent}
-        onRemoveStudent={handleRemoveStudent}
-        onAssign={handleAssign}
-        onRevoke={handleRevoke}
-        onStartPresentation={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'presentation', contentId, classId })}
-        onStartVocabGame={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'trivia', contentId, classId })}
-        onStartConnectFour={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'connect_four', contentId, classId })}
-        onStartSlipstream={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'slipstream', contentId, classId })}
-        onStartMarbleScrabble={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'marble_scrabble', contentId, classId })}
-        onSwitchView={() => setUserData((prev: any) => ({ ...prev, role: 'student' }))}
-        onSwitchToBasicView={() => console.log("Basic view transition handled in routing")}
-        onLogout={() => signOut(auth)}
-      />
+      <div className="relative h-screen w-full overflow-hidden">
+        <AdminDashboardView user={adminUserPayload} activeOrg={null} />
+        <RoleSwitcherDock
+          activeMode="admin"
+          onSelectMode={(mode) => setViewRoleOverride(mode)}
+          onLogout={() => signOut(auth)}
+        />
+      </div>
     );
   }
 
+  // 🔥 ROUTE 2: INSTRUCTOR STUDIO DASHBOARD
+  if (activeViewMode === 'instructor') {
+    return (
+      <div className="relative h-screen w-full overflow-hidden">
+        <InstructorDashboard
+          user={user}
+          userData={{ ...userData, classes: enrolledClasses }}
+          allDecks={allDecks}
+          lessons={libraryLessons}
+          curriculums={curriculums}
+          activityLogs={activityLogs}
+          {...commonHandlers}
+          onCreateClass={handleCreateClass}
+          onDeleteClass={handleDeleteClass}
+          onRenameClass={handleRenameClass}
+          onAddStudent={handleAddStudent}
+          onRemoveStudent={handleRemoveStudent}
+          onAssign={handleAssign}
+          onRevoke={handleRevoke}
+          onStartPresentation={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'presentation', contentId, classId })}
+          onStartVocabGame={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'trivia', contentId, classId })}
+          onStartConnectFour={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'connect_four', contentId, classId })}
+          onStartSlipstream={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'slipstream', contentId, classId })}
+          onStartMarbleScrabble={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'marble_scrabble', contentId, classId })}
+          onSwitchView={() => setViewRoleOverride('student')}
+          onSwitchToBasicView={() => setViewRoleOverride('student')}
+          onLogout={() => signOut(auth)}
+        />
+        <RoleSwitcherDock
+          activeMode="instructor"
+          onSelectMode={(mode) => setViewRoleOverride(mode)}
+          onLogout={() => signOut(auth)}
+        />
+      </div>
+    );
+  }
+
+  // 🔥 ROUTE 3: STUDENT VIEW
   const renderStudentView = () => {
     let content;
     let viewKey;
@@ -1926,6 +2028,16 @@ function App() {
         {/* BOTTOM NAVIGATION (4 BUTTONS - HIDDEN IN FULLSCREEN EXAMS) */}
         {!isFullscreenMode && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} />}
       </div>
+
+      {/* Show Floating Role Switcher Dock if logged-in account is an Admin or Instructor */}
+      {hasStaffPrivileges && (
+        <RoleSwitcherDock
+          activeMode="student"
+          onSelectMode={(mode) => setViewRoleOverride(mode)}
+          onLogout={() => signOut(auth)}
+        />
+      )}
+
       <style>{` 
         .perspective-1000 { perspective: 1000px; } 
         .preserve-3d { transform-style: preserve-3d; } 
