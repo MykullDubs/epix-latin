@@ -852,7 +852,6 @@ function HomeView({ setActiveTab, lessons, onSelectClass, onSelectLesson, onSele
     .filter(Boolean)
     .filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.some((e: string) => e.toLowerCase() === studentEmail))
     .filter((l: any) => {
-      // 🔥 FIXED: Only filter out by cohortId if the student actually has a different cohortId assigned
       if (!l.cohortId) return true;
       const normCohort = String(l.cohortId).trim().toLowerCase();
       if (normCohort === 'all' || normCohort === 'everyone' || normCohort === 'default' || normCohort === 'class') return true;
@@ -1181,28 +1180,28 @@ function App() {
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => {
-      if (docSnap.exists()) setUserData(docSnap.data());
+      if (docSnap.exists()) setUserData(docSnap.data() as Record<string, any>);
       else setUserData(DEFAULT_USER_DATA);
     });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'custom_cards'), (snap) =>
-      setCustomCards(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setCustomCards(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) })))
     );
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'custom_lessons'), (snap) =>
-      setCustomLessons(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setCustomLessons(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) })))
     );
     const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => {
       const d: any = {};
       snap.docs.forEach((docSnap) => {
-        d[docSnap.id] = docSnap.data();
+        d[docSnap.id] = docSnap.data() as Record<string, any>;
       });
       if (Object.keys(d).length > 0) setSystemDecks(d);
     });
     const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => {
-      const l = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const l = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
       if (l.length > 0) setSystemLessons(l);
     });
 
-    // 🔥 FIX 1: Load Curriculums from BOTH top-level 'curriculums' AND 'custom_curriculums'
+    // Load Curriculums from BOTH top-level 'curriculums' AND 'custom_curriculums'
     let topCurriculums: any[] = [];
     let userCurriculums: any[] = [];
     const syncCurriculums = () => {
@@ -1214,14 +1213,14 @@ function App() {
     };
 
     const unsubCurriculums = onSnapshot(collection(db, 'artifacts', appId, 'curriculums'), (snap) => {
-      topCurriculums = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      topCurriculums = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
       syncCurriculums();
     });
 
     const unsubCustomCurriculums = onSnapshot(
       collectionGroup(db, 'custom_curriculums'),
       (snap) => {
-        userCurriculums = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        userCurriculums = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
         syncCurriculums();
       },
       () => {}
@@ -1229,10 +1228,10 @@ function App() {
 
     const unsubLogs = onSnapshot(
       query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(500)),
-      (snap) => setActivityLogs(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      (snap) => setActivityLogs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) })))
     );
 
-    // 🔥 FIX 2: Unified Class Listener (Merges users/{uid}/classes & top-level classes/{id})
+    // Unified Class Listener (Merges users/{uid}/classes & top-level classes/{id})
     let subCollectionClasses: any[] = [];
     let rootCollectionClasses: any[] = [];
 
@@ -1268,8 +1267,7 @@ function App() {
     if (userData?.role === 'instructor') {
       const qSub = query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'));
       unsubClassesPrimary = onSnapshot(qSub, (snap) => {
-        subCollectionClasses = snap.docs.map((d) => ({ id: d.id, instructorId: user.uid, ...d.data() }));
-        // Mirror instructor classes to top-level 'classes' collection so all studio tools & students stay in sync
+        subCollectionClasses = snap.docs.map((d) => ({ id: d.id, instructorId: user.uid, ...(d.data() as Record<string, any>) }));
         subCollectionClasses.forEach((cls) => {
           setDoc(doc(db, 'artifacts', appId, 'classes', cls.id), cls, { merge: true }).catch(() => {});
         });
@@ -1281,7 +1279,7 @@ function App() {
         qRoot,
         (snap) => {
           rootCollectionClasses = snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
+            .map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }))
             .filter((c: any) => !c.instructorId || c.instructorId === user.uid || subCollectionClasses.some((s) => s.id === c.id));
           publishMergedClasses();
         },
@@ -1293,7 +1291,7 @@ function App() {
       unsubClassesPrimary = onSnapshot(
         qStudentGroup,
         (snap) => {
-          subCollectionClasses = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          subCollectionClasses = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
           publishMergedClasses();
         },
         (error) => {
@@ -1302,12 +1300,11 @@ function App() {
         }
       );
 
-      // Also listen to top-level classes collection so any curriculum/assignment written to root classes/{id} merges in
       const qRootAll = query(collection(db, 'artifacts', appId, 'classes'));
       unsubClassesSecondary = onSnapshot(
         qRootAll,
         (snap) => {
-          const allRoot = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const allRoot = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
           const lowerEmail = userEmail.toLowerCase();
           rootCollectionClasses = allRoot.filter((c: any) => {
             const emails = Array.isArray(c.studentEmails) ? c.studentEmails : [];
@@ -1393,7 +1390,6 @@ function App() {
     [user]
   );
 
-  // 🔥 Save Curriculums to BOTH top-level 'curriculums' and instructor 'custom_curriculums'
   const handleCreateCurriculum = useCallback(
     async (c: any) => {
       if (!user) return;
@@ -1559,16 +1555,16 @@ function App() {
     [user]
   );
 
-const handleRemoveStudent = useCallback(
+  const handleRemoveStudent = useCallback(
     async (classId: string, email: string) => {
       if (!user) return;
       try {
         const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
         const classDoc = await getDoc(classRef);
         if (classDoc.exists()) {
-          const data = classDoc.data() as Record<string, any>; // 🔥 Explicit record cast
-          const nextStudents = (data?.students || []).filter((s: any) => s.email !== email);
-          const nextEmails = (data?.studentEmails || []).filter((e: string) => e !== email);
+          const data = (classDoc.data() as Record<string, any>) || {};
+          const nextStudents = (data.students || []).filter((s: any) => s.email !== email);
+          const nextEmails = (data.studentEmails || []).filter((e: string) => e !== email);
           await updateDoc(classRef, { students: nextStudents, studentEmails: nextEmails });
           await setDoc(doc(db, 'artifacts', appId, 'classes', classId), { students: nextStudents, studentEmails: nextEmails }, { merge: true });
         }
@@ -1579,7 +1575,6 @@ const handleRemoveStudent = useCallback(
     [user]
   );
 
-  // 🔥 UPGRADED: Handles lessons, decks, exams, AND curriculums with optional cohortId
   const handleAssign = useCallback(
     async (classIdOrPayload: any, payload?: any, explicitCohortId?: string | null) => {
       if (!user) return;
@@ -1645,7 +1640,7 @@ const handleRemoveStudent = useCallback(
         const cleanDoc = async (ref: any) => {
           const snap = await getDoc(ref);
           if (!snap.exists()) return;
-          const data = snap.data();
+          const data = (snap.data() as Record<string, any>) || {};
           const nextAssignments = (data.assignments || []).filter((a: any) => {
             const aId = typeof a === 'string' ? a : (a.lessonId || a.curriculumId || a.id || a.contentId);
             return aId !== lessonId;
