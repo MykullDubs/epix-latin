@@ -1443,11 +1443,18 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                                                     )}
                                                     {blockType === 'discussion' && <DiscussionBlock block={block} />}
                                                     {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
-                                                    {blockType === 'game' && block.gameType === 'marble-scrabble' && (
-                                                        <div className="w-full h-[80vh] pointer-events-auto rounded-[3rem] overflow-hidden shadow-2xl border border-slate-800">
-                                                            <MarbleScrabble block={block} isProjector={true} liveState={liveState} onUpdateLiveState={updateLiveState} studentId="projector" />
-                                                        </div>
-                                                    )}
+                                                   {blockType === 'game' && block.gameType === 'marble-scrabble' && (
+    <div className="w-full h-[80vh] pointer-events-auto rounded-[3rem] overflow-hidden shadow-2xl border border-slate-800">
+        <MarbleScrabble
+            block={block}
+            classId={classId}
+            isProjector={true}
+            liveState={liveState}
+            onUpdateLiveState={updateLiveState}
+            studentId="projector"
+        />
+    </div>
+)}
                                                     {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                                                     {blockType === 'callout' && <CalloutBlock block={block} />}
                                                     {blockType === 'drawing' && <DrawingBlock block={block} liveState={liveState} />}
