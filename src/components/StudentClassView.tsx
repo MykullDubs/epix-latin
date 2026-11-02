@@ -7,13 +7,13 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { auth, db, storage, appId } from '../config/firebase';
 import { 
-    MessageSquare, Send, ArrowLeft, BookOpen, CheckCircle2, 
+    MessageSquare, Send, ArrowLeft, ArrowRight, BookOpen, CheckCircle2, 
     Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
     ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
     Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2,
     Triangle, Circle, XCircle, X, ArrowDownCircle, Settings, Sparkles,
     Layers, HelpCircle, PlayCircle, BookText, Highlighter, PenTool,
-    AlignLeft, Save, Clock, AlertTriangle, MessageCircle
+    AlignLeft, Save, Clock, AlertTriangle, MessageCircle, ExternalLink, Trash2
 } from 'lucide-react';
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
@@ -137,13 +137,13 @@ const ExamBreakdownModal = ({ log, onClose }: any) => {
                                         </div>
                                         <p className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4 leading-relaxed">{q.prompt}</p>
                                         
-                                        <div className="text-sm text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/70 p-4 rounded-xl border border-slate-200/50 dark:border-slate-700/50 mb-3 whitespace-pre-wrap font-serif">
+                                        <div translate="no" className="notranslate text-sm text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/70 p-4 rounded-xl border border-slate-200/50 dark:border-slate-700/50 mb-3 whitespace-pre-wrap font-serif">
                                             <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-2 font-sans">Your Answer</span>
                                             {q.studentVal}
                                         </div>
 
                                         {!isConsideredCorrect && q.correctVal && !isEssay && (
-                                            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 mt-3 bg-emerald-50 dark:bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
+                                            <div translate="no" className="notranslate text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 mt-3 bg-emerald-50 dark:bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
                                                 <CheckCircle2 size={14}/> Correct Answer: {q.correctVal}
                                             </div>
                                         )}
@@ -261,19 +261,65 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
 };
 
 // ============================================================================
-//  IMMERSIVE READING & ANNOTATION COMPONENT
+//  🔥 IMMERSIVE READING, LINK VIEWER, GLOSSARY & ANNOTATION COMPONENT
 // ============================================================================
-const ReadingAnnotator = ({ reading, onExit, theme }: any) => {
+const ReadingAnnotator = ({ reading, onExit, theme, studentEmail, classId }: any) => {
+    const [activeView, setActiveView] = useState<'passage' | 'link'>(
+        reading?.content || (Array.isArray(reading?.blocks) && reading.blocks.length > 0)
+            ? 'passage'
+            : reading?.externalUrl
+            ? 'link'
+            : 'passage'
+    );
     const [activeBlock, setActiveBlock] = useState<number | null>(null);
     const [annotations, setAnnotations] = useState<Record<number, string>>({});
     const [draftNote, setDraftNote] = useState("");
+    const [selectedGloss, setSelectedGloss] = useState<any | null>(null);
+    const [checkpointAnswers, setCheckpointAnswers] = useState<Record<string, string>>({});
+    const [checkpointsSubmitted, setCheckpointsSubmitted] = useState(false);
+    const [isCompleted, setIsCompleted] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const readingId = reading?.id || reading?.lessonId || 'reading_doc';
+    const targetLang = reading?.language || 'la';
+    const glossary: any[] = Array.isArray(reading?.glossary) ? reading.glossary : [];
+    const checkpoints: any[] = Array.isArray(reading?.checkpoints) ? reading.checkpoints : [];
 
     const paragraphs = useMemo(() => {
         if (Array.isArray(reading?.content)) return reading.content;
-        if (typeof reading?.content === 'string') return reading.content.split('\n').filter((p: string) => p.trim() !== '');
-        if (reading?.blocks) return reading.blocks.map((b: any) => b.text || b.content || '').filter(Boolean);
+        if (typeof reading?.content === 'string' && reading.content.trim() !== '') {
+            return reading.content.split('\n').filter((p: string) => p.trim() !== '');
+        }
+        if (Array.isArray(reading?.blocks)) {
+            const extracted = reading.blocks
+                .map((b: any) => b.text || b.content || '')
+                .join('\n')
+                .split('\n')
+                .filter((p: string) => p.trim() !== '');
+            if (extracted.length > 0) return extracted;
+        }
+        if (reading?.externalUrl) {
+            return [`External Resource Linked: ${reading.externalUrl}`];
+        }
         return ["Content missing or format not supported."];
     }, [reading]);
+
+    // Sync saved annotations & completion status from Firestore
+    useEffect(() => {
+        if (!classId || !readingId || !studentEmail) return;
+        const docId = `${classId}_${readingId}_${studentEmail.replace(/\./g, ',')}`;
+        const refDoc = doc(db, 'artifacts', appId, 'reading_annotations', docId);
+        const unsub = onSnapshot(refDoc, (snap) => {
+            if (snap.exists()) {
+                const data = snap.data() as Record<string, any>;
+                if (data.paragraphNotes && typeof data.paragraphNotes === 'object') {
+                    setAnnotations(data.paragraphNotes);
+                }
+                if (data.completed) setIsCompleted(true);
+            }
+        }, () => {});
+        return () => unsub();
+    }, [classId, readingId, studentEmail]);
 
     const handleSelectBlock = (idx: number) => {
         if (activeBlock === idx) {
@@ -285,35 +331,147 @@ const ReadingAnnotator = ({ reading, onExit, theme }: any) => {
         }
     };
 
-    const handleSaveNote = () => {
+    const handleSaveNote = async () => {
         if (activeBlock === null) return;
+        const nextAnnotations = { ...annotations };
         if (!draftNote.trim()) {
-            const newAnnotations = { ...annotations };
-            delete newAnnotations[activeBlock];
-            setAnnotations(newAnnotations);
+            delete nextAnnotations[activeBlock];
         } else {
-            setAnnotations({ ...annotations, [activeBlock]: draftNote });
+            nextAnnotations[activeBlock] = draftNote.trim();
         }
+        setAnnotations(nextAnnotations);
         setActiveBlock(null);
         setDraftNote("");
+
+        if (classId && studentEmail) {
+            const docId = `${classId}_${readingId}_${studentEmail.replace(/\./g, ',')}`;
+            await setDoc(
+                doc(db, 'artifacts', appId, 'reading_annotations', docId),
+                {
+                    classId,
+                    readingId,
+                    studentEmail,
+                    paragraphNotes: nextAnnotations,
+                    updatedAt: Date.now()
+                },
+                { merge: true }
+            ).catch(() => {});
+        }
+    };
+
+    const handleCompleteReading = async () => {
+        if (isCompleted || isSubmitting) return;
+        if (checkpoints.length > 0 && !checkpointsSubmitted) {
+            setCheckpointsSubmitted(true);
+            const allRight = checkpoints.every((cp: any) => checkpointAnswers[cp.id] === cp.correctId);
+            if (!allRight) return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const cleanEmail = (studentEmail || '').replace(/,/g, '.');
+            if (cleanEmail) {
+                await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
+                    studentEmail: cleanEmail,
+                    itemId: readingId,
+                    itemTitle: reading?.title || 'Assigned Reading',
+                    type: 'completion',
+                    activityType: 'reading',
+                    xp: reading?.xp || 60,
+                    timestamp: Date.now()
+                });
+            }
+            if (classId && studentEmail) {
+                const docId = `${classId}_${readingId}_${studentEmail.replace(/\./g, ',')}`;
+                await setDoc(
+                    doc(db, 'artifacts', appId, 'reading_annotations', docId),
+                    { completed: true, completedAt: Date.now() },
+                    { merge: true }
+                ).catch(() => {});
+            }
+            setIsCompleted(true);
+        } catch (err) {
+            console.error("Failed to mark reading complete:", err);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Render interactive glossary tokens inside each paragraph
+    const renderParagraphWithGlossary = (text: string) => {
+        if (!glossary.length) return text;
+        const tokens = text.split(/(\s+)/);
+        return tokens.map((tok, i) => {
+            const clean = tok.replace(/[.,;!?:"'()[\]]/g, '').toLowerCase();
+            const match = clean ? glossary.find((g: any) => (g.term || '').trim().toLowerCase() === clean) : null;
+            if (!match) return <React.Fragment key={i}>{tok}</React.Fragment>;
+            return (
+                <button
+                    key={i}
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedGloss(match);
+                    }}
+                    className="inline font-black text-indigo-600 dark:text-indigo-400 underline decoration-indigo-400 decoration-2 underline-offset-4 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 px-1 rounded transition-colors"
+                >
+                    {tok}
+                </button>
+            );
+        });
     };
 
     return (
         <div className="fixed inset-0 z-[9999] bg-slate-50 dark:bg-slate-950 flex flex-col animate-in slide-in-from-bottom-8 duration-500 font-sans transition-colors duration-300">
             {/* Header */}
-            <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 p-4 md:p-6 flex items-center justify-between shrink-0 shadow-sm z-30">
+            <header className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 p-4 md:p-6 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-sm z-30">
                 <div className="flex items-center gap-4 min-w-0 flex-1">
                     <button onClick={onExit} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors shrink-0 text-slate-500 dark:text-slate-400">
                         <X size={20} />
                     </button>
                     <div className="min-w-0">
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${theme?.color || 'text-indigo-500'}`}>Reading Assignment</span>
-                        <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white truncate">{reading?.title || 'Untitled Document'}</h2>
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${theme?.color || 'text-indigo-500'}`}>
+                                Reading Assignment • {targetLang.toUpperCase()}
+                            </span>
+                            {reading?.sourceCitation && (
+                                <span className="text-[10px] font-bold text-slate-400 truncate">• {reading.sourceCitation}</span>
+                            )}
+                        </div>
+                        <h2 translate="no" className="notranslate text-lg md:text-xl font-black text-slate-900 dark:text-white truncate">
+                            {reading?.title || 'Untitled Document'}
+                        </h2>
                     </div>
                 </div>
-                <div className="hidden sm:flex items-center gap-2 shrink-0 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-full border border-indigo-100 dark:border-indigo-500/20">
-                    <PenTool size={16} />
-                    <span className="text-xs font-bold uppercase tracking-widest">Annotate Mode</span>
+
+                <div className="flex items-center gap-2.5 shrink-0">
+                    {reading?.externalUrl && (
+                        <a
+                            href={reading.externalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 text-slate-700 dark:text-slate-200 text-xs font-black uppercase tracking-widest flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
+                        >
+                            Source Link <ExternalLink size={13} />
+                        </a>
+                    )}
+
+                    <button
+                        type="button"
+                        disabled={isCompleted || isSubmitting}
+                        onClick={handleCompleteReading}
+                        className={`px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest shadow-md flex items-center gap-1.5 transition-all active:scale-95 ${
+                            isCompleted
+                                ? 'bg-emerald-500 text-white'
+                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                        }`}
+                    >
+                        {isCompleted ? (
+                            <><CheckCircle2 size={15} /> Completed (+{reading?.xp || 60} XP)</>
+                        ) : (
+                            <><Sparkles size={15} /> Complete Reading</>
+                        )}
+                    </button>
                 </div>
             </header>
 
@@ -322,44 +480,160 @@ const ReadingAnnotator = ({ reading, onExit, theme }: any) => {
                 {/* Main Text Area */}
                 <div className={`flex-1 overflow-y-auto custom-scrollbar p-6 md:p-12 transition-all duration-500 ${activeBlock !== null ? 'md:pr-[400px]' : ''}`}>
                     <div className="max-w-3xl mx-auto space-y-6 pb-32">
-                        {reading?.author && (
-                            <p className="text-slate-400 font-black uppercase tracking-widest text-sm mb-8 border-b border-slate-200 dark:border-slate-800 pb-4">
-                                By {reading.author}
-                            </p>
+                        {(reading?.subtitle || reading?.description) && (
+                            <div className="p-4 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-500/20 text-indigo-950 dark:text-indigo-200 text-xs font-bold leading-relaxed">
+                                {reading.subtitle || reading.description}
+                            </div>
                         )}
-                        
-                        {paragraphs.map((para: string, idx: number) => {
-                            const isAnnotated = !!annotations[idx];
-                            const isActive = activeBlock === idx;
 
-                            return (
-                                <div 
-                                    key={idx} 
-                                    onClick={() => handleSelectBlock(idx)}
-                                    className={`relative p-4 md:p-6 rounded-[2rem] transition-all duration-300 cursor-pointer group ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 shadow-inner border border-indigo-200 dark:border-indigo-800' : isAnnotated ? 'bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 hover:bg-slate-100 dark:hover:bg-slate-800/50' : 'border border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
+                        {reading?.externalUrl && paragraphs.length > 0 && (
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveView('passage')}
+                                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                                        activeView === 'passage'
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 border border-slate-200 dark:border-slate-800'
+                                    }`}
                                 >
-                                    {isAnnotated && !isActive && (
-                                        <div className="absolute -left-2 top-6 w-1.5 h-8 bg-amber-400 rounded-r-full shadow-[0_0_10px_rgba(251,191,36,0.6)]" />
-                                    )}
-                                    {isActive && (
-                                        <div className="absolute -left-2 top-6 w-1.5 h-8 bg-indigo-500 rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.6)] animate-pulse" />
-                                    )}
-                                    <p className={`text-lg md:text-xl leading-relaxed transition-colors duration-300 ${isActive ? 'text-indigo-950 dark:text-indigo-100' : 'text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'}`}>
-                                        {para}
-                                    </p>
-                                    
-                                    {/* Quick action hint */}
-                                    <div className={`absolute top-4 right-4 text-indigo-400 opacity-0 transition-opacity ${!isActive && 'group-hover:opacity-100'}`}>
-                                        <Highlighter size={18} />
+                                    📖 Interactive Text & Notes
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveView('link')}
+                                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                                        activeView === 'link'
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 border border-slate-200 dark:border-slate-800'
+                                    }`}
+                                >
+                                    🔗 Embedded Source Preview
+                                </button>
+                            </div>
+                        )}
+
+                        {activeView === 'link' && reading?.externalUrl ? (
+                            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
+                                <iframe
+                                    src={reading.externalUrl}
+                                    title={reading.title || 'External Reading'}
+                                    className="w-full h-[65vh] border-0"
+                                />
+                            </div>
+                        ) : (
+                            <div lang={targetLang} translate="no" className="notranslate space-y-4">
+                                {paragraphs.map((para: string, idx: number) => {
+                                    const isAnnotated = !!annotations[idx];
+                                    const isActive = activeBlock === idx;
+
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            onClick={() => handleSelectBlock(idx)}
+                                            className={`relative p-4 md:p-6 rounded-[2rem] transition-all duration-300 cursor-pointer group ${
+                                                isActive
+                                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 shadow-inner border border-indigo-200 dark:border-indigo-800'
+                                                    : isAnnotated
+                                                    ? 'bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                                                    : 'border border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                                            }`}
+                                        >
+                                            {isAnnotated && !isActive && (
+                                                <div className="absolute -left-2 top-6 w-1.5 h-8 bg-amber-400 rounded-r-full shadow-[0_0_10px_rgba(251,191,36,0.6)]" />
+                                            )}
+                                            {isActive && (
+                                                <div className="absolute -left-2 top-6 w-1.5 h-8 bg-indigo-500 rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.6)] animate-pulse" />
+                                            )}
+                                            <p className={`text-lg md:text-xl font-serif leading-relaxed transition-colors duration-300 ${isActive ? 'text-indigo-950 dark:text-indigo-100' : 'text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'}`}>
+                                                {renderParagraphWithGlossary(para)}
+                                            </p>
+                                            {isAnnotated && (
+                                                <p className="mt-3 text-xs font-sans font-bold text-amber-700 dark:text-amber-400 bg-amber-100/60 dark:bg-amber-500/10 px-3 py-1.5 rounded-xl">
+                                                    📝 {annotations[idx]}
+                                                </p>
+                                            )}
+                                            <div className={`absolute top-4 right-4 text-indigo-400 opacity-0 transition-opacity ${!isActive && 'group-hover:opacity-100'}`}>
+                                                <Highlighter size={18} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Pop-up Glossary Definition Banner */}
+                        {selectedGloss && (
+                            <div className="p-5 rounded-3xl bg-slate-900 text-white shadow-2xl border border-indigo-500/40 flex items-center justify-between gap-4 animate-in slide-in-from-bottom-2">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span translate="no" className="notranslate text-lg font-black text-amber-400">
+                                            {selectedGloss.term}
+                                        </span>
+                                        {selectedGloss.partOfSpeech && (
+                                            <span className="px-2 py-0.5 rounded bg-white/10 text-[10px] font-black uppercase">
+                                                {selectedGloss.partOfSpeech}
+                                            </span>
+                                        )}
                                     </div>
+                                    <p className="text-sm font-medium text-slate-200 mt-1">{selectedGloss.definition}</p>
                                 </div>
-                            );
-                        })}
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedGloss(null)}
+                                    className="p-2 rounded-full bg-white/10 hover:bg-white/20"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Comprehension Checkpoints */}
+                        {checkpoints.length > 0 && (
+                            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xl space-y-5 mt-8">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                                    <HelpCircle size={16} /> Comprehension Checkpoints
+                                </h3>
+                                {checkpoints.map((cp: any, idx: number) => (
+                                    <div key={cp.id || idx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800 space-y-3">
+                                        <p className="text-sm font-black text-slate-800 dark:text-white">
+                                            {idx + 1}. {cp.question}
+                                        </p>
+                                        <div className="space-y-2">
+                                            {(cp.options || []).map((opt: any) => {
+                                                const isPicked = checkpointAnswers[cp.id] === opt.id;
+                                                const isRight = cp.correctId === opt.id;
+                                                let style = 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800';
+                                                if (checkpointsSubmitted) {
+                                                    if (isRight) style = 'bg-emerald-50 border-emerald-500 text-emerald-800 font-black';
+                                                    else if (isPicked) style = 'bg-rose-50 border-rose-500 text-rose-700';
+                                                } else if (isPicked) {
+                                                    style = 'bg-indigo-50 border-indigo-500 text-indigo-700 font-black';
+                                                }
+                                                return (
+                                                    <button
+                                                        key={opt.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setCheckpointAnswers((prev) => ({ ...prev, [cp.id]: opt.id }));
+                                                            setCheckpointsSubmitted(false);
+                                                        }}
+                                                        className={`w-full p-3 rounded-xl border-2 text-left text-xs font-bold transition-all ${style}`}
+                                                    >
+                                                        {opt.text}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Annotation Slide-out Panel */}
-                <div className={`absolute top-0 right-0 h-full w-full md:w-[380px] bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border-l border-slate-200 dark:border-slate-800 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${activeBlock !== null ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className={`absolute top-0 right-0 h-full w-full md:w-[380px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-l border-slate-200 dark:border-slate-800 shadow-2xl transition-transform duration-500 ease-out flex flex-col z-40 ${activeBlock !== null ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/50">
                         <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                             <AlignLeft size={18} />
@@ -371,7 +645,7 @@ const ReadingAnnotator = ({ reading, onExit, theme }: any) => {
                     <div className="flex-1 p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-[1.5rem] p-4 border border-slate-200 dark:border-slate-700">
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Selected Text</span>
-                            <p className="text-sm text-slate-600 dark:text-slate-300 font-medium line-clamp-4 italic border-l-2 border-indigo-300 pl-3">
+                            <p translate="no" className="notranslate text-sm text-slate-600 dark:text-slate-300 font-serif line-clamp-4 italic border-l-2 border-indigo-300 pl-3">
                                 {activeBlock !== null ? paragraphs[activeBlock] : ''}
                             </p>
                         </div>
@@ -381,7 +655,7 @@ const ReadingAnnotator = ({ reading, onExit, theme }: any) => {
                                 autoFocus
                                 value={draftNote}
                                 onChange={(e) => setDraftNote(e.target.value)}
-                                placeholder="Add your thoughts, questions, or highlights here..."
+                                placeholder="Add your translation notes, grammar breakdown, or questions here..."
                                 className="flex-1 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-6 text-slate-800 dark:text-slate-100 resize-none outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner"
                             />
                         </div>
@@ -400,7 +674,6 @@ const ReadingAnnotator = ({ reading, onExit, theme }: any) => {
         </div>
     );
 };
-
 
 // ============================================================================
 //  INTERNAL FORUM COMPONENT
@@ -424,13 +697,13 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   useEffect(() => {
     if (!classId) return;
     const q = query(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), orderBy('timestamp', 'desc'));
-    return onSnapshot(q, (snap) => setTopics(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return onSnapshot(q, (snap) => setTopics(snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }))));
   }, [classId]);
 
   useEffect(() => {
     if (!activeTopic) return;
     const q = query(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses'), orderBy('timestamp', 'asc'));
-    return onSnapshot(q, (snap) => setResponses(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return onSnapshot(q, (snap) => setResponses(snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }))));
   }, [classId, activeTopic]);
 
   const handleToggleLike = async (responseId: string, currentLikes: string[] = [], authorId: string) => {
@@ -893,9 +1166,9 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
     }
 
     return (
-        <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-[4px] border-slate-800 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]">
+        <div translate="no" className="notranslate h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-[4px] border-slate-800 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]">
             <div className="bg-slate-900 p-6 rounded-[2rem] shadow-sm border border-slate-800 mb-4 text-center shrink-0">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-black px-3 py-1 rounded-lg inline-block mb-3 border border-slate-700">Target {liveSession.currentBlockIndex + 1}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-black px-3 py-1 rounded-lg inline-block mb-3 border border-slate-700">Target {(liveSession.currentBlockIndex || 0) + 1}</span>
                 <h2 className="text-xl md:text-2xl font-bold text-white leading-tight">{quizQuestion}</h2>
             </div>
             <div className="flex-1 grid grid-cols-2 gap-4 pb-2">
@@ -1096,13 +1369,13 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
     }
 
     return (
-        <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-4 border-slate-800">
+        <div translate="no" className="notranslate h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-4 border-slate-800">
             <div className={`p-6 rounded-[2rem] mb-4 text-center border-b-4 ${myTeam === 1 ? 'bg-rose-900/50 border-rose-500' : 'bg-indigo-900/50 border-indigo-500'}`}>
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Squad Intelligence Task</span>
                 <h2 className="text-xl font-bold text-white leading-tight">"{currentQ?.question}"</h2>
             </div>
             <div className="flex-1 flex flex-col gap-3">
-                {currentQ?.options.map((opt: any) => (
+                {(currentQ?.options || []).map((opt: any) => (
                     <button key={opt.id} onClick={() => submitAnswer(opt.id)} className={`flex-1 rounded-2xl p-4 font-black text-sm uppercase tracking-widest transition-all border-2 ${myAnswer === opt.id ? 'bg-white text-black border-white' : 'bg-slate-900 text-slate-400 border-slate-800 active:bg-slate-800'}`}>
                         {opt.text}
                     </button>
@@ -1131,28 +1404,47 @@ export default function StudentClassView({
   const [replayTutorial, setReplayTutorial] = useState(false);
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({});
 
-  // Keep classData synced in real-time with Firestore so instructor cohort assignments appear immediately
+  // 🔥 Listen to BOTH the instructor's class subcollection AND top-level classes collection
   useEffect(() => {
     setLiveClassData(initialClassData);
     if (!initialClassData?.id) return;
-    const classRef = doc(db, 'artifacts', appId, 'classes', initialClassData.id);
-    const unsubClass = onSnapshot(classRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setLiveClassData({ id: docSnap.id, ...docSnap.data() });
-      }
-    });
-    return () => unsubClass();
-  }, [initialClassData?.id]);
+
+    const unsubs: Array<() => void> = [];
+
+    if (initialClassData.instructorId) {
+      const instructorClassRef = doc(db, 'artifacts', appId, 'users', initialClassData.instructorId, 'classes', initialClassData.id);
+      unsubs.push(
+        onSnapshot(instructorClassRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const incoming = docSnap.data() as Record<string, any>;
+            setLiveClassData((prev: any) => ({ ...prev, id: docSnap.id, ...incoming }));
+          }
+        }, () => {})
+      );
+    }
+
+    const rootClassRef = doc(db, 'artifacts', appId, 'classes', initialClassData.id);
+    unsubs.push(
+      onSnapshot(rootClassRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const incoming = docSnap.data() as Record<string, any>;
+          setLiveClassData((prev: any) => ({ ...prev, id: docSnap.id, ...incoming }));
+        }
+      }, () => {})
+    );
+
+    return () => unsubs.forEach(u => u());
+  }, [initialClassData?.id, initialClassData?.instructorId]);
 
   const classData = liveClassData || initialClassData;
   const theme = getSubjectTheme(classData?.subject);
   const studentUid = user?.uid || userData?.uid || auth?.currentUser?.uid || '';
-  const studentEmail = (user?.email || userData?.email || auth?.currentUser?.email || '').trim().toLowerCase();
+  const rawStudentEmail = user?.email || userData?.email || auth?.currentUser?.email || '';
+  const studentEmail = rawStudentEmail.trim().toLowerCase();
   const safeEmail = (studentEmail || 'unknown').replace(/\./g, ',');
 
   // ============================================================================
   //  🔥 MULTI-SOURCE COHORT RESOLVER
-  //  Checks userData, classData.cohorts[], classData.studentCohorts, and roster
   // ============================================================================
   const studentCohortIds = useMemo(() => {
     const matched = new Set<string>();
@@ -1168,7 +1460,6 @@ export default function StudentClassView({
       }
     };
 
-    // 1. Check userData fields
     addIfValid(userData?.cohortId);
     addIfValid(userData?.cohortIds);
     addIfValid(userData?.profile?.main?.cohortId);
@@ -1176,14 +1467,13 @@ export default function StudentClassView({
       addIfValid(userData.cohorts[classData.id]);
     }
 
-    // 2. Check classData.studentCohorts map (by email, safeEmail, or UID)
     if (classData?.studentCohorts && typeof classData.studentCohorts === 'object') {
+      addIfValid(classData.studentCohorts[rawStudentEmail]);
       addIfValid(classData.studentCohorts[studentEmail]);
       addIfValid(classData.studentCohorts[safeEmail]);
       if (studentUid) addIfValid(classData.studentCohorts[studentUid]);
     }
 
-    // 3. Check classData.cohorts array (e.g., [{ id, name, studentEmails: [...], students: [...] }])
     if (Array.isArray(classData?.cohorts)) {
       classData.cohorts.forEach((c: any) => {
         if (!c || typeof c !== 'object') return;
@@ -1215,7 +1505,6 @@ export default function StudentClassView({
       });
     }
 
-    // 4. Check classData.students / classData.roster array for per-student cohortId
     const roster = Array.isArray(classData?.students)
       ? classData.students
       : Array.isArray(classData?.roster)
@@ -1232,21 +1521,23 @@ export default function StudentClassView({
     });
 
     return Array.from(matched);
-  }, [userData, classData, studentEmail, safeEmail, studentUid]);
+  }, [userData, classData, rawStudentEmail, studentEmail, safeEmail, studentUid]);
 
-  // Helper: Check if an assignment/curriculum belongs to the whole class OR matches this student's cohort(s)
   const matchesStudentCohort = (item: any) => {
     if (!item || typeof item === 'string') return true;
 
     const rawCohort = item.cohortId ?? item.cohort ?? item.targetCohortId;
     const rawCohortArray = Array.isArray(item.cohortIds) ? item.cohortIds : null;
 
-    // If no cohort restriction is set on the item, it's a class-wide assignment
     if (!rawCohort && (!rawCohortArray || rawCohortArray.length === 0)) {
       return true;
     }
 
-    // Universal cohort keywords that mean "entire class"
+    // If student has no specific sub-cohort restriction, never hide class assignments from them
+    if (studentCohortIds.length === 0) {
+      return true;
+    }
+
     const isUniversalCohort = (val: string) => {
       const norm = val.trim().toLowerCase();
       return (
@@ -1262,57 +1553,36 @@ export default function StudentClassView({
       );
     };
 
-    if (typeof rawCohort === 'string' && isUniversalCohort(rawCohort)) {
-      return true;
-    }
+    if (typeof rawCohort === 'string' && isUniversalCohort(rawCohort)) return true;
+    if (rawCohortArray && rawCohortArray.some((c: any) => typeof c === 'string' && isUniversalCohort(c))) return true;
 
-    if (rawCohortArray && rawCohortArray.some((c: any) => typeof c === 'string' && isUniversalCohort(c))) {
-      return true;
-    }
-
-    // If the class only has cohorts defined on items, check if student belongs to that cohort
-    if (studentCohortIds.length > 0) {
-      if (typeof rawCohort === 'string' && studentCohortIds.includes(rawCohort.trim())) {
-        return true;
-      }
-      if (rawCohortArray && rawCohortArray.some((c: any) => studentCohortIds.includes(String(c).trim()))) {
-        return true;
-      }
-      return false;
-    }
-
-    // Fallback: If the student hasn't been placed in a specific sub-cohort yet,
-    // check whether this cohortId is actually the ID of the class itself or if the class has no sub-cohorts
-    const classHasSubCohorts = Array.isArray(classData?.cohorts) && classData.cohorts.length > 0;
-    if (!classHasSubCohorts) {
-      return true;
-    }
+    if (typeof rawCohort === 'string' && studentCohortIds.includes(rawCohort.trim())) return true;
+    if (rawCohortArray && rawCohortArray.some((c: any) => studentCohortIds.includes(String(c).trim()))) return true;
 
     return false;
   };
 
-  // Listen to completion logs using the resolved studentEmail
   useEffect(() => {
-    if (!classData || !studentEmail) return;
+    if (!classData || !rawStudentEmail) return;
     const q = query(
         collection(db, 'artifacts', appId, 'activity_logs'), 
-        where('studentEmail', '==', studentEmail), 
+        where('studentEmail', '==', rawStudentEmail), 
         where('type', '==', 'completion')
     );
     return onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const docs = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
       setCompletionLogs(docs);
       const ids = docs.flatMap((d: any) => [d.itemId, d.originalId, d.itemTitle].filter(Boolean));
       setCompletedItems(ids);
     });
-  }, [classData?.id, studentEmail]);
+  }, [classData?.id, rawStudentEmail]);
 
   useEffect(() => {
     if (!classData?.id) return;
     const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classData.id);
     const unsubSession = onSnapshot(sessionRef, async (docSnap) => {
         if (docSnap.exists()) {
-            setLiveSession(docSnap.data());
+            setLiveSession(docSnap.data() as Record<string, any>);
         } else {
             setLiveSession(null);
             setActiveDeck(null);
@@ -1326,7 +1596,7 @@ export default function StudentClassView({
           const deckQuery = query(collection(db, 'artifacts', appId, 'decks'), where('id', '==', liveSession.lessonId));
           const unsubDeck = onSnapshot(deckQuery, (snap) => {
               if (!snap.empty) {
-                  setActiveDeck(snap.docs[0].data());
+                  setActiveDeck(snap.docs[0].data() as Record<string, any>);
               }
           });
           return () => unsubDeck();
@@ -1348,21 +1618,17 @@ export default function StudentClassView({
     const list: any[] = [];
     if (Array.isArray(classData?.assignments)) list.push(...classData.assignments);
     if (Array.isArray(classData?.assignedLessons)) list.push(...classData.assignedLessons);
+    if (Array.isArray(classData?.lessons)) list.push(...classData.lessons);
 
-    // Also pull assignments stored directly inside matching cohort objects in classData.cohorts[]
     if (Array.isArray(classData?.cohorts)) {
       classData.cohorts.forEach((c: any) => {
-        const cId = c?.id || c?.cohortId || c?.name;
-        const isMyCohort = !cId || studentCohortIds.includes(String(cId).trim()) || (c?.name && studentCohortIds.includes(String(c.name).trim()));
-        if (isMyCohort) {
-          if (Array.isArray(c?.assignments)) list.push(...c.assignments);
-          if (Array.isArray(c?.lessonIds)) list.push(...c.lessonIds);
-          if (Array.isArray(c?.lessons)) list.push(...c.lessons);
-        }
+        if (Array.isArray(c?.assignments)) list.push(...c.assignments);
+        if (Array.isArray(c?.lessonIds)) list.push(...c.lessonIds);
+        if (Array.isArray(c?.lessons)) list.push(...c.lessons);
       });
     }
     return list;
-  }, [classData, studentCohortIds]);
+  }, [classData]);
 
   const rawCurriculums = useMemo(() => {
     const list: any[] = [];
@@ -1370,31 +1636,53 @@ export default function StudentClassView({
     if (Array.isArray(classData?.curriculums)) list.push(...classData.curriculums);
     if (classData?.curriculumId) list.push(classData.curriculumId);
 
-    // Also pull curriculums stored directly inside matching cohort objects in classData.cohorts[]
     if (Array.isArray(classData?.cohorts)) {
       classData.cohorts.forEach((c: any) => {
-        const cId = c?.id || c?.cohortId || c?.name;
-        const isMyCohort = !cId || studentCohortIds.includes(String(cId).trim()) || (c?.name && studentCohortIds.includes(String(c.name).trim()));
-        if (isMyCohort) {
-          if (Array.isArray(c?.assignedCurriculums)) list.push(...c.assignedCurriculums);
-          if (Array.isArray(c?.curriculumIds)) list.push(...c.curriculumIds);
-          if (c?.curriculumId) list.push(c.curriculumId);
-        }
+        if (Array.isArray(c?.assignedCurriculums)) list.push(...c.assignedCurriculums);
+        if (Array.isArray(c?.curriculumIds)) list.push(...c.curriculumIds);
+        if (c?.curriculumId) list.push(c.curriculumId);
       });
     }
+
+    // Also detect any curriculum IDs saved inside classData.assignments
+    rawAssignments.forEach((a: any) => {
+      const targetId = typeof a === 'string' ? a : (a?.curriculumId || a?.lessonId || a?.contentId || a?.id);
+      if (targetId && curriculums.some((c: any) => c.id === targetId)) {
+        list.push(a);
+      }
+    });
+
     return list;
-  }, [classData, studentCohortIds]);
+  }, [classData, rawAssignments, curriculums]);
 
   const relevantAssignments = rawAssignments.filter(matchesStudentCohort);
   const relevantCurriculums = rawCurriculums.filter(matchesStudentCohort);
 
-  // Deduplicate and populate assignments
+  const assignedCurriculums = useMemo(() => {
+    const seen = new Set<string>();
+    return relevantCurriculums.map((curr: any) => {
+      const targetId = typeof curr === 'string'
+        ? curr
+        : (curr.curriculumId || curr.lessonId || curr.contentId || curr.id);
+      const found = curriculums.find((c: any) => c.id === targetId);
+      const resolved = found
+        ? (typeof curr === 'object' ? { ...found, ...curr, id: found.id } : found)
+        : (typeof curr === 'object' && Array.isArray(curr.lessonIds) ? curr : null);
+
+      if (!resolved || !resolved.id || seen.has(resolved.id)) return null;
+      seen.add(resolved.id);
+      return resolved;
+    }).filter(Boolean);
+  }, [relevantCurriculums, curriculums]);
+
   const populatedAssignments = useMemo(() => {
     const seen = new Set<string>();
     return relevantAssignments.map((assignment: any) => {
       const targetId = typeof assignment === 'string'
         ? assignment
         : (assignment.lessonId || assignment.contentId || assignment.originalId || assignment.id);
+
+      if (curriculums.some((c: any) => c.id === targetId)) return null;
 
       let resolved: any = null;
       const node = lessons.find((l: any) => l.id === targetId);
@@ -1422,27 +1710,8 @@ export default function StudentClassView({
       seen.add(uniqueKey);
       return resolved;
     }).filter(Boolean);
-  }, [relevantAssignments, lessons, allDecks]);
+  }, [relevantAssignments, lessons, allDecks, curriculums]);
 
-  // Deduplicate and populate curriculums
-  const assignedCurriculums = useMemo(() => {
-    const seen = new Set<string>();
-    return relevantCurriculums.map((curr: any) => {
-      const targetId = typeof curr === 'string'
-        ? curr
-        : (curr.curriculumId || curr.contentId || curr.id);
-      const found = curriculums.find((c: any) => c.id === targetId);
-      const resolved = found
-        ? (typeof curr === 'object' ? { ...found, ...curr, id: found.id } : found)
-        : (typeof curr === 'object' && Array.isArray(curr.lessonIds) ? curr : null);
-
-      if (!resolved || !resolved.id || seen.has(resolved.id)) return null;
-      seen.add(resolved.id);
-      return resolved;
-    }).filter(Boolean);
-  }, [relevantCurriculums, curriculums]);
-
-  // Auto-expand the first visible curriculum roadmap for this student
   useEffect(() => {
     if (assignedCurriculums.length > 0) {
       const firstId = assignedCurriculums[0].id;
@@ -1452,7 +1721,7 @@ export default function StudentClassView({
 
   const standaloneLessons = populatedAssignments.filter(
     (a: any) =>
-      !(a.contentType === 'exam' || a.contentType === 'test' || a.type === 'reading') &&
+      !(a.contentType === 'exam' || a.contentType === 'test' || a.type === 'reading' || a.contentType === 'reading') &&
       !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id))
   );
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
@@ -1493,6 +1762,7 @@ export default function StudentClassView({
       return <ReadingAnnotator reading={activeReading} onExit={() => setActiveReading(null)} theme={theme} studentEmail={safeEmail} classId={classData.id} />;
   }
 
+  // 🔥 LIVE PROTOCOL ROUTING (WITH FULL WORDFORGE / MARBLE SCRABBLE SUPPORT)
   if (isImmersiveLiveMode) {
       const handleStudentGameUpdate = async (updates: any) => {
           if (!classData?.id) return;
@@ -1502,14 +1772,21 @@ export default function StudentClassView({
           } catch (err) { console.error("Failed to sync student move:", err); }
       };
 
+      const isWordForgeSession =
+          liveSession?.currentQuestion?.gameType === 'marble-scrabble' ||
+          liveSession?.type === 'marble-scrabble' ||
+          liveSession?.type === 'marble_scrabble' ||
+          Boolean(liveSession?.gameStatus);
+
       return (
           <div className="fixed inset-0 z-[9999] bg-black flex flex-col animate-in slide-in-from-bottom-8 duration-500 font-sans">
               <button onClick={() => setActiveSubTab('lessons')} className="absolute top-6 left-6 z-50 p-2 text-slate-500 hover:text-white rounded-full bg-slate-900 border border-slate-800"><X size={20} /></button>
               
               <div className="flex-1 w-full h-full p-4 md:p-8 pt-20">
-                  {liveSession?.currentQuestion?.gameType === 'marble-scrabble' ? (
+                  {isWordForgeSession ? (
                       <MarbleScrabble 
-                          block={liveSession.currentQuestion} 
+                          block={liveSession.currentQuestion || { gameType: 'marble-scrabble' }} 
+                          classId={classData.id}
                           isProjector={false} 
                           liveState={liveSession} 
                           studentId={safeEmail} 
@@ -1725,27 +2002,34 @@ export default function StudentClassView({
                         <p className="font-black text-xs uppercase tracking-widest leading-loose text-slate-800 dark:text-slate-100">No readings assigned.</p>
                     </div>
                 ) : (
-                    readingsList.map((item: any) => (
-                        <button 
-                            key={item.id} 
-                            onClick={() => setActiveReading(item)}
-                            className={`w-full text-left p-6 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[2.5rem] flex items-start gap-5 transition-all group overflow-hidden relative border border-white/40 dark:border-slate-800 shadow-xl hover:shadow-2xl hover:scale-[1.02]`}
-                        >
-                            <div className={`absolute top-0 right-0 w-32 h-full bg-gradient-to-l to-transparent opacity-10 pointer-events-none ${theme.bg.replace('bg-', 'from-')}`} />
-                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border border-white/20 shadow-lg transition-colors shrink-0 ${theme.bg} text-white`}>
-                                <BookText size={24} strokeWidth={2.5} />
-                            </div>
-                            <div className="flex-1 pr-2 relative z-10 pt-1">
-                                <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase mb-1 block tracking-widest">
-                                    Assigned Reading
-                                </span>
-                                <h4 className="font-black text-slate-800 dark:text-slate-100 text-lg leading-tight tracking-tight mb-2">{item.title}</h4>
-                                <p className="text-xs font-bold text-slate-500 line-clamp-2 leading-relaxed">
-                                    {item.description || "Read and annotate this assigned document."}
-                                </p>
-                            </div>
-                        </button>
-                    ))
+                    readingsList.map((item: any) => {
+                        const isReadingDone = completedItems.includes(item.id);
+                        return (
+                            <button 
+                                key={item.id} 
+                                onClick={() => setActiveReading(item)}
+                                className={`w-full text-left p-6 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[2.5rem] flex items-start gap-5 transition-all group overflow-hidden relative border ${
+                                    isReadingDone
+                                        ? 'border-emerald-200 dark:border-emerald-500/30 opacity-80'
+                                        : 'border-white/40 dark:border-slate-800'
+                                } shadow-xl hover:shadow-2xl hover:scale-[1.02]`}
+                            >
+                                <div className={`absolute top-0 right-0 w-32 h-full bg-gradient-to-l to-transparent opacity-10 pointer-events-none ${theme.bg.replace('bg-', 'from-')}`} />
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border border-white/20 shadow-lg transition-colors shrink-0 ${isReadingDone ? 'bg-emerald-500 text-white' : `${theme.bg} text-white`}`}>
+                                    {isReadingDone ? <CheckCircle2 size={24} strokeWidth={2.5} /> : <BookText size={24} strokeWidth={2.5} />}
+                                </div>
+                                <div className="flex-1 pr-2 relative z-10 pt-1">
+                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase mb-1 block tracking-widest">
+                                        {isReadingDone ? 'Completed Reading' : item.externalUrl ? 'Assigned Reading • External Link' : 'Assigned Reading'}
+                                    </span>
+                                    <h4 translate="no" className="notranslate font-black text-slate-800 dark:text-slate-100 text-lg leading-tight tracking-tight mb-2">{item.title}</h4>
+                                    <p className="text-xs font-bold text-slate-500 line-clamp-2 leading-relaxed">
+                                        {item.subtitle || item.description || "Read and annotate this assigned document."}
+                                    </p>
+                                </div>
+                            </button>
+                        );
+                    })
                 )}
             </section>
         )}
