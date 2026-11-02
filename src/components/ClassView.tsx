@@ -7,12 +7,16 @@ import {
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
     Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation,
     ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen, Volume2,
-    AlertCircle, Download, LayoutGrid, Check, Maximize, Keyboard, Monitor
+    AlertCircle, Download, LayoutGrid, Check, Maximize, Keyboard, Monitor,
+    GitBranch, Tag, Sparkles, BookmarkPlus
 } from 'lucide-react';
+import { collection, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { db, appId } from '../config/firebase';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
 import LiveRoleplayArena from './LiveRoleplayArena';
 import MarbleScrabble from './MarbleScrabble';
+import { KineticCanvasBlock } from './LessonBlocks';
 
 // ============================================================================
 //  TYPES & UTILS
@@ -20,12 +24,90 @@ import MarbleScrabble from './MarbleScrabble';
 type Point = { x: number; y: number };
 type Stroke = { id: string; points: Point[]; color: string; size: number; isEraser: boolean; style: string };
 
+export interface LexiconEntry {
+    term: string;
+    ipa?: string;
+    partOfSpeech: string;
+    translation: string;
+    morphology?: { part: string; meaning: string; type: 'prefix' | 'root' | 'suffix' }[];
+    wordFamily: { word: string; pos: string; meaning: string }[];
+    synonyms: string[];
+    antonyms?: string[];
+    examples: { target: string; translation: string; note?: string }[];
+}
+
 const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
+
+// Built-in seed entries for instant offline/classical demonstration
+const BUILTIN_LEXICON: Record<string, LexiconEntry> = {
+    salve: {
+        term: 'Salvē',
+        ipa: '/ˈsal.weː/',
+        partOfSpeech: 'Verb (Imperative Sg.)',
+        translation: 'Hello! / Be well! / Hail!',
+        morphology: [
+            { part: 'salv-', meaning: 'safe, healthy, unharmed', type: 'root' },
+            { part: '-ē', meaning: '2nd Conj. Present Active Imperative Sg.', type: 'suffix' }
+        ],
+        wordFamily: [
+            { word: 'salvēte', pos: 'Imperative Pl.', meaning: 'Hello (to a group)' },
+            { word: 'salūs, salūtis', pos: 'Noun (f.)', meaning: 'health, safety, greeting' },
+            { word: 'salvus, -a, -um', pos: 'Adjective', meaning: 'safe, unharmed, sound' },
+            { word: 'salvāre', pos: 'Verb', meaning: 'to save, preserve' }
+        ],
+        synonyms: ['avē', 'iubeō tē salvēre'],
+        antonyms: ['valē'],
+        examples: [
+            { target: 'Salvē, Marce! Quid agis?', translation: 'Hello, Marcus! How are you doing?', note: 'Singular imperative used with the vocative case.' },
+            { target: 'Salvēte, discipulī!', translation: 'Hello, students!', note: 'Plural imperative (-te) when addressing a class.' }
+        ]
+    },
+    vale: {
+        term: 'Valē',
+        ipa: '/ˈwa.leː/',
+        partOfSpeech: 'Verb (Imperative Sg.)',
+        translation: 'Goodbye! / Farewell! / Be strong!',
+        morphology: [
+            { part: 'val-', meaning: 'be strong, vigorous', type: 'root' },
+            { part: '-ē', meaning: '2nd Conj. Imperative Sg.', type: 'suffix' }
+        ],
+        wordFamily: [
+            { word: 'valēte', pos: 'Imperative Pl.', meaning: 'Goodbye (to a group)' },
+            { word: 'valēre', pos: 'Verb (2nd Conj.)', meaning: 'to be strong, be well' },
+            { word: 'validus, -a, -um', pos: 'Adjective', meaning: 'strong, mighty, effective' },
+            { word: 'valētūdō, -inis', pos: 'Noun (f.)', meaning: 'health, vigor' }
+        ],
+        synonyms: ['bene ambula', 'cūrā ut valeās'],
+        antonyms: ['salvē', 'avē'],
+        examples: [
+            { target: 'Valē, amīce carissime.', translation: 'Farewell, dearest friend.', note: 'Standard valediction in speech and letters.' }
+        ]
+    },
+    vulnus: {
+        term: 'Vulnus, vulneris',
+        ipa: '/ˈwul.nus/',
+        partOfSpeech: 'Noun (Neuter, 3rd Decl.)',
+        translation: 'Wound, injury, or blow',
+        morphology: [
+            { part: 'vulner-', meaning: 'wound, tear, damage', type: 'root' },
+            { part: '-us / -is', meaning: '3rd Declension Neuter stem', type: 'suffix' }
+        ],
+        wordFamily: [
+            { word: 'vulnerāre', pos: 'Verb (1st Conj.)', meaning: 'to wound, injure, hurt' },
+            { word: 'vulnerātus, -a, -um', pos: 'Participle', meaning: 'wounded, stricken' },
+            { word: 'invulnerābilis', pos: 'Adjective', meaning: 'invulnerable, unhurt' }
+        ],
+        synonyms: ['plāga', 'ictus', 'noxa'],
+        antonyms: ['medēla', 'sānitās'],
+        examples: [
+            { target: 'Vulnus grave in proeliō accēpit.', translation: 'He received a serious wound in battle.', note: 'Accusative singular neuter.' }
+        ]
+    }
+};
 
 // ============================================================================
 //  MEMOIZED PERFORMANCE COMPONENTS (Clock, Footer, Timer)
 // ============================================================================
-
 const LiveClock = memo(() => {
     const [elapsed, setElapsed] = useState(0);
     useEffect(() => {
@@ -40,7 +122,7 @@ const LiveClock = memo(() => {
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode)
 // ============================================================================
-export default function ClassView({ lesson, classId, userData, activeOrg, onExit }: any) {
+export default function ClassView({ lesson, classId, userData, activeOrg, onExit, onSaveCard }: any) {
     const [activePageIdx, setActivePageIdx] = useState(0);
     const [slideDirection, setSlideDirection] = useState<'left'|'right'>('right');
     const [showForum, setShowForum] = useState(false);
@@ -57,6 +139,17 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     const [wbBg, setWbBg] = useState<'dark'|'light'|'grid'|'lined'>('dark');
     const [wbPage, setWbPage] = useState(0);
     const [isIdle, setIsIdle] = useState(false);
+
+    // 🔥 DICTIONARY & TRANSLATION SLIDE-DOWN STATE
+    const [showLexicon, setShowLexicon] = useState(false);
+    const [lexiconQuery, setLexiconQuery] = useState('');
+    const [targetLang, setTargetLang] = useState<string>(lesson?.language || 'en');
+    const [activeLexiconEntry, setActiveLexiconEntry] = useState<LexiconEntry | null>(null);
+    const [isFetchingLexicon, setIsFetchingLexicon] = useState(false);
+    const [isSavingToDeck, setIsSavingToDeck] = useState(false);
+    const [savedTermsSet, setSavedTermsSet] = useState<Set<string>>(new Set());
+    const [lexiconToast, setLexiconToast] = useState<string | null>(null);
+    const lexiconInputRef = useRef<HTMLInputElement>(null);
 
     // Audio Roleplay
     const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null);  
@@ -94,24 +187,85 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
     const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz, updateLiveState } = useLiveClass(classId, true);
 
-    const heroImage = useMemo(() => {
-        if (!lesson?.blocks) return null;
-        const imgBlock = lesson.blocks.find((b: any) => String(b.type) === 'image');
-        return imgBlock ? (imgBlock.url || imgBlock.imageUrl) : null;
+    // Normalize blocks so even raw flashcard decks or readings project cleanly
+    const normalizedBlocks = useMemo(() => {
+        if (Array.isArray(lesson?.blocks) && lesson.blocks.length > 0) return lesson.blocks;
+        if (Array.isArray(lesson?.cards) && lesson.cards.length > 0) {
+            return [{ type: 'vocab-list', title: lesson.title || 'Class Vocabulary', items: lesson.cards.map((c: any) => ({ term: c.front || c.term, definition: c.back || c.definition, ...c })) }];
+        }
+        if (lesson?.content) {
+            return [{ type: 'essay', title: lesson.title || 'Reading', content: lesson.content }];
+        }
+        return [];
     }, [lesson]);
+
+    const heroImage = useMemo(() => {
+        if (!normalizedBlocks.length) return null;
+        const imgBlock = normalizedBlocks.find((b: any) => String(b.type) === 'image');
+        return imgBlock ? (imgBlock.url || imgBlock.imageUrl) : null;
+    }, [normalizedBlocks]);
 
     const lessonVocab = useMemo(() => {
-        if (!lesson?.blocks) return [];
-        return lesson.blocks.filter((b: any) => String(b.type) === 'vocab-list').flatMap((b: any) => b.items || []);
-    }, [lesson]);
+        if (!normalizedBlocks.length) return [];
+        return normalizedBlocks.filter((b: any) => String(b.type) === 'vocab-list').flatMap((b: any) => b.items || []);
+    }, [normalizedBlocks]);
+
+    // Build a fast local dictionary map from the lesson's own vocab cards, glossary, and built-in seed terms
+    const localLexiconMap = useMemo(() => {
+        const map: Record<string, LexiconEntry> = { ...BUILTIN_LEXICON };
+
+        const registerItem = (rawTerm: string, rawDef: string, extra?: any) => {
+            const key = (rawTerm || '').trim().toLowerCase();
+            if (!key) return;
+            map[key] = {
+                term: rawTerm,
+                ipa: extra?.ipa || '',
+                partOfSpeech: (extra?.partOfSpeech || extra?.type || 'Lesson Vocabulary').toUpperCase(),
+                translation: rawDef || '',
+                morphology: Array.isArray(extra?.morphology) ? extra.morphology : undefined,
+                wordFamily: Array.isArray(extra?.wordFamily)
+                    ? extra.wordFamily
+                    : [{ word: rawTerm, pos: extra?.type || 'Base Form', meaning: rawDef }],
+                synonyms: Array.isArray(extra?.synonyms)
+                    ? extra.synonyms
+                    : Array.isArray(extra?.grammar_tags)
+                    ? extra.grammar_tags
+                    : ['Core Curriculum Term'],
+                antonyms: Array.isArray(extra?.antonyms) ? extra.antonyms : [],
+                examples: extra?.usage?.sentence
+                    ? [{ target: extra.usage.sentence, translation: extra.usage.translation || '', note: 'Lesson Context' }]
+                    : Array.isArray(extra?.examples)
+                    ? extra.examples
+                    : [{ target: `${rawTerm} — ${rawDef}`, translation: 'Featured in current Smartboard lesson.' }]
+            };
+        };
+
+        lessonVocab.forEach((v: any) => registerItem(v.term || v.front, v.definition || v.back, v));
+        if (Array.isArray(lesson?.cards)) {
+            lesson.cards.forEach((c: any) => registerItem(c.front || c.term, c.back || c.definition, c));
+        }
+        if (Array.isArray(lesson?.glossary)) {
+            lesson.glossary.forEach((g: any) => registerItem(g.term, g.definition, g));
+        }
+
+        return map;
+    }, [lessonVocab, lesson]);
+
+    const quickReferenceChips = useMemo(() => {
+        return Object.values(localLexiconMap).slice(0, 10);
+    }, [localLexiconMap]);
 
     const pages = useMemo(() => {
-        if (!lesson?.blocks || !Array.isArray(lesson.blocks)) return [];
+        if (!normalizedBlocks.length) return [];
         const grouped: any[] = [];
         let buffer: any[] = [];
-        const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation', 'roleplay', 'audio-story', 'image-hotspot', 'drawing', 'code', 'timeline', 'grammar'];
+        const interactables = [
+            'quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game',
+            'drag-drop', 'pronunciation', 'roleplay', 'audio-story', 'image-hotspot',
+            'drawing', 'code', 'timeline', 'grammar', 'kinetic_canvas'
+        ];
         
-        lesson.blocks.forEach((b: any) => {
+        normalizedBlocks.forEach((b: any) => {
             if (interactables.includes(String(b?.type || ''))) {
                 if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
                 grouped.push({ type: 'interact', blocks: [b] });
@@ -120,7 +274,231 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         });
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         return grouped;
-    }, [lesson]);
+    }, [normalizedBlocks]);
+
+    // ============================================================================
+    //  🔥 LEXICON LOOKUP & TRANSLATION ENGINE + SAVE TO CLASS DECK
+    // ============================================================================
+    const lookupWordInLexicon = useCallback(async (rawInput: string) => {
+        const cleaned = (rawInput || '').replace(/[.,;!?:"'()[\]]/g, '').trim();
+        if (!cleaned) return;
+
+        setLexiconQuery(cleaned);
+        setShowLexicon(true);
+
+        const lower = cleaned.toLowerCase();
+        if (localLexiconMap[lower]) {
+            setActiveLexiconEntry(localLexiconMap[lower]);
+            return;
+        }
+        const partialKey = Object.keys(localLexiconMap).find(k => k.startsWith(lower) || lower.startsWith(k));
+        if (partialKey) {
+            setActiveLexiconEntry(localLexiconMap[partialKey]);
+            return;
+        }
+
+        setIsFetchingLexicon(true);
+        try {
+            const [dictRes, transRes] = await Promise.allSettled([
+                fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(lower)}`),
+                fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleaned)}&langpair=Autodetect|${targetLang}`)
+            ]);
+
+            let translatedText = '';
+            if (transRes.status === 'fulfilled' && transRes.value.ok) {
+                const tData = await transRes.value.json();
+                translatedText = tData?.responseData?.translatedText || '';
+            }
+
+            if (dictRes.status === 'fulfilled' && dictRes.value.ok) {
+                const dData = await dictRes.value.json();
+                const first = dData[0];
+                const meanings = Array.isArray(first?.meanings) ? first.meanings : [];
+                const primaryMeaning = meanings[0] || {};
+                const primaryDef = primaryMeaning.definitions?.[0]?.definition || translatedText || 'Definition available';
+
+                const familyList = meanings.map((m: any) => ({
+                    word: first.word || cleaned,
+                    pos: (m.partOfSpeech || 'form').toUpperCase(),
+                    meaning: m.definitions?.[0]?.definition || ''
+                }));
+
+                const allSynonyms = Array.from(
+                    new Set(
+                        meanings.flatMap((m: any) => [
+                            ...(m.synonyms || []),
+                            ...(m.definitions || []).flatMap((d: any) => d.synonyms || [])
+                        ])
+                    )
+                ).slice(0, 8) as string[];
+
+                const allAntonyms = Array.from(
+                    new Set(
+                        meanings.flatMap((m: any) => [
+                            ...(m.antonyms || []),
+                            ...(m.definitions || []).flatMap((d: any) => d.antonyms || [])
+                        ])
+                    )
+                ).slice(0, 6) as string[];
+
+                const exampleList = meanings
+                    .flatMap((m: any) =>
+                        (m.definitions || [])
+                            .filter((d: any) => d.example)
+                            .map((d: any) => ({
+                                target: d.example,
+                                translation: `(${m.partOfSpeech}) ${d.definition}`,
+                                note: 'Contextual Usage'
+                            }))
+                    )
+                    .slice(0, 3);
+
+                setActiveLexiconEntry({
+                    term: first.word || cleaned,
+                    ipa: first.phonetic || first.phonetics?.find((p: any) => p.text)?.text || '',
+                    partOfSpeech: meanings.map((m: any) => m.partOfSpeech).join(' / ').toUpperCase() || 'LEXICAL ITEM',
+                    translation:
+                        translatedText && translatedText.toLowerCase() !== lower
+                            ? `${translatedText} — ${primaryDef}`
+                            : primaryDef,
+                    wordFamily: familyList.length > 0 ? familyList : [{ word: cleaned, pos: 'Base Form', meaning: primaryDef }],
+                    synonyms: allSynonyms.length > 0 ? allSynonyms : ['Curriculum Term'],
+                    antonyms: allAntonyms,
+                    examples:
+                        exampleList.length > 0
+                            ? exampleList
+                            : [{ target: `"${cleaned}" in classroom context.`, translation: primaryDef, note: 'Smartboard Reference' }]
+                });
+                setIsFetchingLexicon(false);
+                return;
+            }
+
+            // Fallback morphological & translation breakdown for inflected Latin / target-language words
+            let inferredPos = 'Noun / Inflected Form';
+            if (lower.endsWith('re') || lower.endsWith('t') || lower.endsWith('nt')) inferredPos = 'Verb (Inflected / Infinitive)';
+            else if (lower.endsWith('us') || lower.endsWith('a') || lower.endsWith('um') || lower.endsWith('is')) inferredPos = 'Noun / Adjective (Declined)';
+            else if (lower.endsWith('ly') || lower.endsWith('mente') || lower.endsWith('iter')) inferredPos = 'Adverb';
+
+            const stem = cleaned.length > 3 ? cleaned.slice(0, -2) : cleaned;
+            const ending = cleaned.length > 3 ? cleaned.slice(-2) : '';
+
+            setActiveLexiconEntry({
+                term: cleaned,
+                partOfSpeech: inferredPos,
+                translation: translatedText || `Target vocabulary term in "${lesson?.title || 'Lesson'}"`,
+                morphology: [
+                    { part: `${stem}-`, meaning: 'Lexical Stem / Root', type: 'root' },
+                    ...(ending ? [{ part: `-${ending}`, meaning: 'Inflectional Ending', type: 'suffix' as const }] : [])
+                ],
+                wordFamily: [
+                    { word: `${stem}-`, pos: 'Root Stem', meaning: `Core root of ${cleaned}` },
+                    { word: cleaned, pos: inferredPos, meaning: translatedText || 'Inflected classroom form' }
+                ],
+                synonyms: ['Related Stem Form', 'Classroom Key Term'],
+                examples: [
+                    {
+                        target: `In context: "${cleaned}"`,
+                        translation: translatedText || 'Examine the syntactic role of this word in the passage.',
+                        note: 'Morphological Breakdown'
+                    }
+                ]
+            });
+        } catch (err) {
+            console.error('Lexicon lookup error:', err);
+        } finally {
+            setIsFetchingLexicon(false);
+        }
+    }, [localLexiconMap, targetLang, lesson?.title]);
+
+    // 🔥 1-CLICK SAVE TO CLASS FLASHCARD DECK
+    const handleSaveEntryToClassDeck = async () => {
+        if (!activeLexiconEntry || isSavingToDeck) return;
+        setIsSavingToDeck(true);
+        try {
+            const deckId = classId ? `class_deck_${classId}` : 'custom';
+            const deckTitle = lesson?.title ? `${lesson.title} Smartboard Deck` : 'Smartboard Class Deck';
+            const cardId = `card_${Date.now()}`;
+
+            const newCardPayload = {
+                id: cardId,
+                deckId,
+                deckTitle,
+                front: activeLexiconEntry.term,
+                term: activeLexiconEntry.term,
+                back: activeLexiconEntry.translation,
+                definition: activeLexiconEntry.translation,
+                ipa: activeLexiconEntry.ipa || '',
+                type: activeLexiconEntry.partOfSpeech,
+                mastery: 1,
+                morphology: activeLexiconEntry.morphology || [],
+                usage: activeLexiconEntry.examples?.[0]
+                    ? {
+                          sentence: activeLexiconEntry.examples[0].target,
+                          translation: activeLexiconEntry.examples[0].translation
+                      }
+                    : { sentence: activeLexiconEntry.term, translation: activeLexiconEntry.translation },
+                grammar_tags: [
+                    activeLexiconEntry.partOfSpeech,
+                    ...(activeLexiconEntry.synonyms || []).slice(0, 3)
+                ],
+                classId: classId || null,
+                createdAt: Date.now()
+            };
+
+            // 1. Write card to Firestore custom_cards collection
+            await setDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), newCardPayload);
+
+            // 2. If a classId is active, ensure this class deck is assigned to the class so students see it immediately
+            if (classId) {
+                const deckAssignment = {
+                    id: deckId,
+                    lessonId: deckId,
+                    title: deckTitle,
+                    contentType: 'deck',
+                    type: 'deck',
+                    cohortId: null,
+                    assignedAt: Date.now()
+                };
+                await setDoc(
+                    doc(db, 'artifacts', appId, 'classes', classId),
+                    { assignments: arrayUnion(deckAssignment) },
+                    { merge: true }
+                ).catch(() => {});
+            }
+
+            // 3. Also invoke parent callback if provided
+            if (onSaveCard) {
+                onSaveCard(newCardPayload);
+            }
+
+            setSavedTermsSet(prev => new Set(prev).add(activeLexiconEntry.term));
+            setLexiconToast(`Saved "${activeLexiconEntry.term}" to ${deckTitle}!`);
+            setTimeout(() => setLexiconToast(null), 3200);
+        } catch (err) {
+            console.error('Failed to save card to class deck:', err);
+            setLexiconToast('Could not save card to deck.');
+            setTimeout(() => setLexiconToast(null), 3000);
+        } finally {
+            setIsSavingToDeck(false);
+        }
+    };
+
+    const speakLexiconText = (text: string) => {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.92;
+        window.speechSynthesis.speak(u);
+    };
+
+    // Double-click any word on the Smartboard stage to inspect it in the slide-down
+    const handleStageDoubleClick = () => {
+        if (isAnnotating || showWhiteboard) return;
+        const selected = window.getSelection()?.toString().trim();
+        if (selected && selected.length >= 2 && selected.length <= 40) {
+            lookupWordInLexicon(selected);
+        }
+    };
 
     // Wake Lock
     useEffect(() => {
@@ -363,11 +741,28 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         }
     }, [activePageIdx, pages.length, changeSlide]);
 
+    const toggleLexiconDrawer = useCallback(() => {
+        setShowLexicon(prev => {
+            const next = !prev;
+            if (next && !activeLexiconEntry && quickReferenceChips.length > 0) {
+                setActiveLexiconEntry(quickReferenceChips[0]);
+            }
+            if (next) setTimeout(() => lexiconInputRef.current?.focus(), 60);
+            return next;
+        });
+    }, [activeLexiconEntry, quickReferenceChips]);
+
     // Keyboard Shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey && e.code === 'Space') || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) {
+                e.preventDefault();
+                toggleLexiconDrawer();
+                return;
+            }
+
             const tag = (e.target as HTMLElement).tagName;
-            if (['INPUT', 'TEXTAREA'].includes(tag) && e.key !== 'Escape') return; 
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) && e.key !== 'Escape') return; 
             
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault();
@@ -386,6 +781,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 case 'arrowleft':
                     e.preventDefault(); 
                     if (activePageIdx === 0 && !isLobby) setIsLobby(true); else jumpToSlide(activePageIdx - 1);
+                    break;
+                case 'd':
+                    e.preventDefault();
+                    toggleLexiconDrawer();
+                    setShowTools(false);
                     break;
                 case 'f':
                     e.preventDefault(); document.documentElement.requestFullscreen().catch(()=>{}); break;
@@ -414,6 +814,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 case 'escape':
                     e.preventDefault();
                     if (showExitConfirm) { setShowExitConfirm(false); return; }
+                    if (showLexicon) { setShowLexicon(false); return; }
                     if (showShortcuts) { setShowShortcuts(false); return; }
                     if (showGrid) { setShowGrid(false); return; }
                     if (showQR) { setShowQR(false); return; }
@@ -428,10 +829,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activePageIdx, isLobby, jumpToSlide, handleUndo, activeRoleplayBlock, showExitConfirm, showShortcuts, showGrid, showQR, showForum, showTimer, showTools, isAnnotating, isSpotlight, showWhiteboard]);
+    }, [activePageIdx, isLobby, jumpToSlide, handleUndo, activeRoleplayBlock, showExitConfirm, showLexicon, showShortcuts, showGrid, showQR, showForum, showTimer, showTools, isAnnotating, isSpotlight, showWhiteboard, toggleLexiconDrawer]);
 
     const activePage = pages[activePageIdx];
-    if (!lesson || !lesson.blocks?.length) return <div className="h-screen bg-slate-950 flex items-center justify-center text-white text-2xl font-bold">No lesson content found.</div>;
+    if (!lesson || !pages.length) return <div className="h-screen bg-slate-950 flex items-center justify-center text-white text-2xl font-bold">No lesson content found.</div>;
 
     const joinUrl = `${window.location.origin}/play/${classId}`;
     const formatTime = (seconds: number) => {
@@ -440,12 +841,310 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    const isCurrentTermSaved = activeLexiconEntry ? savedTermsSet.has(activeLexiconEntry.term) : false;
+
     return (
         <div 
             ref={classViewRef}
-            className={`fixed inset-0 z-[9999] flex flex-col bg-slate-950 text-white overflow-hidden font-sans selection:bg-indigo-500/30 ${isIdle && !isLobby && !isAnnotating && !showWhiteboard ? 'cursor-none' : ''}`}
+            onDoubleClick={handleStageDoubleClick}
+            className={`fixed inset-0 z-[9999] flex flex-col bg-slate-950 text-white overflow-hidden font-sans selection:bg-indigo-500/30 ${isIdle && !isLobby && !isAnnotating && !showWhiteboard && !showLexicon ? 'cursor-none' : ''}`}
             onContextMenu={(e) => { if (isAnnotating || isSpotlight) e.preventDefault(); }} 
         >
+            {/* Toast Banner for Saved Class Deck Words */}
+            {lexiconToast && (
+                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full bg-emerald-600 text-white font-black text-xs uppercase tracking-widest shadow-2xl border border-white/20 flex items-center gap-2 animate-in slide-in-from-top-4">
+                    <Sparkles size={16} />
+                    <span>{lexiconToast}</span>
+                </div>
+            )}
+
+            {/* ============================================================================ */}
+            {/* 🔥 DICTIONARY & TRANSLATION SLIDE-DOWN DRAWER (WITH + SAVE TO CLASS DECK)    */}
+            {/* ============================================================================ */}
+            <div
+                className={`absolute top-0 left-0 right-0 z-[9400] bg-slate-900/95 backdrop-blur-3xl border-b-2 border-indigo-500/50 shadow-[0_30px_90px_rgba(0,0,0,0.85)] transition-transform duration-500 ease-out pointer-events-auto max-h-[80vh] overflow-y-auto custom-scrollbar ${
+                    showLexicon ? 'translate-y-0' : '-translate-y-full'
+                }`}
+            >
+                <div className="max-w-7xl mx-auto p-6 sm:p-8 space-y-6">
+                    {/* Top Search, Language Picker & Save to Class Deck Row */}
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                                <BookOpen size={24} />
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400 block">
+                                    Smartboard Reference Drawer • Shortcut: D or Double-Click Any Word
+                                </span>
+                                <h3 className="text-xl font-black text-white tracking-tight">
+                                    Lexicon, Morphology & Translation Studio
+                                </h3>
+                            </div>
+                        </div>
+
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                lookupWordInLexicon(lexiconQuery);
+                            }}
+                            className="flex flex-wrap items-center gap-2.5 flex-1 max-w-2xl"
+                        >
+                            <div className="relative flex-1 min-w-[220px]">
+                                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    ref={lexiconInputRef}
+                                    type="text"
+                                    value={lexiconQuery}
+                                    onChange={(e) => setLexiconQuery(e.target.value)}
+                                    placeholder="Search any word for POS, word family, synonyms & examples..."
+                                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-500 text-white font-bold text-sm outline-none"
+                                />
+                            </div>
+
+                            <select
+                                value={targetLang}
+                                onChange={(e) => setTargetLang(e.target.value)}
+                                className="px-3.5 py-3 rounded-2xl bg-slate-950 border-2 border-slate-700 text-xs font-black uppercase text-indigo-300 outline-none"
+                            >
+                                <option value="en">➔ English</option>
+                                <option value="es">➔ Spanish</option>
+                                <option value="la">➔ Latin</option>
+                                <option value="fr">➔ French</option>
+                                <option value="de">➔ German</option>
+                            </select>
+
+                            <button
+                                type="submit"
+                                className="px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95"
+                            >
+                                Lookup
+                            </button>
+                        </form>
+
+                        <div className="flex items-center gap-2.5">
+                            {activeLexiconEntry && (
+                                <button
+                                    type="button"
+                                    disabled={isSavingToDeck || isCurrentTermSaved}
+                                    onClick={handleSaveEntryToClassDeck}
+                                    className={`px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all active:scale-95 border ${
+                                        isCurrentTermSaved
+                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                            : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/40 shadow-emerald-600/30'
+                                    }`}
+                                >
+                                    {isCurrentTermSaved ? (
+                                        <>
+                                            <Check size={16} strokeWidth={3} /> Saved to Class Deck
+                                        </>
+                                    ) : (
+                                        <>
+                                            <BookmarkPlus size={16} /> + Save to Class Deck
+                                        </>
+                                    )}
+                                </button>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={() => setShowLexicon(false)}
+                                className="p-3 rounded-2xl bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white transition-colors"
+                                aria-label="Close Lexicon"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Quick-Reference Lesson Vocabulary Bar */}
+                    {quickReferenceChips.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap pt-1">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">
+                                Quick Demo Terms:
+                            </span>
+                            {quickReferenceChips.map((chip, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                        setLexiconQuery(chip.term);
+                                        setActiveLexiconEntry(chip);
+                                    }}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all border ${
+                                        activeLexiconEntry?.term === chip.term
+                                            ? 'bg-amber-400 text-slate-950 border-amber-300 scale-105 shadow-md'
+                                            : 'bg-slate-800/90 text-slate-300 border-slate-700 hover:border-indigo-400 hover:text-white'
+                                    }`}
+                                >
+                                    {chip.term}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* 3-Column Projector Lexicon Breakdown */}
+                    {isFetchingLexicon ? (
+                        <div className="py-12 text-center text-indigo-400 font-black text-sm uppercase tracking-widest animate-pulse">
+                            Synthesizing Part of Speech, Word Family, Synonyms & Examples...
+                        </div>
+                    ) : activeLexiconEntry ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                            {/* PANEL 1: HEADWORD, POS, TRANSLATION & MORPHOLOGY (4 COLS) */}
+                            <div className="lg:col-span-4 p-6 rounded-[2rem] bg-slate-950/90 border border-slate-800 flex flex-col justify-between space-y-4">
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="px-3.5 py-1 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30 text-xs font-black uppercase tracking-widest">
+                                            {activeLexiconEntry.partOfSpeech}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => speakLexiconText(activeLexiconEntry.term)}
+                                            className="px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-black flex items-center gap-1.5 transition-all"
+                                        >
+                                            <Volume2 size={15} /> Pronounce
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <h4 translate="no" className="notranslate text-4xl font-black text-white tracking-tight">
+                                            {activeLexiconEntry.term}
+                                        </h4>
+                                        {activeLexiconEntry.ipa && (
+                                            <span className="text-sm font-mono text-indigo-400 font-bold block mt-1">
+                                                {activeLexiconEntry.ipa}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="pt-3 border-t border-slate-800">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                                            Translation & Core Meaning
+                                        </span>
+                                        <p className="text-xl font-bold text-emerald-400 leading-snug">
+                                            {activeLexiconEntry.translation}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {activeLexiconEntry.morphology && activeLexiconEntry.morphology.length > 0 && (
+                                    <div className="pt-3 border-t border-slate-800 space-y-2">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                                            Morphology & Roots
+                                        </span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {activeLexiconEntry.morphology.map((m, i) => (
+                                                <div key={i} className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs">
+                                                    <span className="font-black text-amber-300">{m.part}</span>{' '}
+                                                    <span className="text-slate-300 font-medium">({m.meaning})</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* PANEL 2: WORD FAMILY, SYNONYMS & ANTONYMS (4 COLS) */}
+                            <div className="lg:col-span-4 p-6 rounded-[2rem] bg-slate-950/90 border border-slate-800 space-y-4">
+                                <div className="flex items-center gap-2 text-indigo-400 text-xs font-black uppercase tracking-widest">
+                                    <GitBranch size={16} /> Word Family & Derived Forms
+                                </div>
+
+                                <div className="space-y-2">
+                                    {activeLexiconEntry.wordFamily.map((fam, i) => (
+                                        <div
+                                            key={i}
+                                            className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3"
+                                        >
+                                            <div>
+                                                <span translate="no" className="notranslate font-black text-white text-sm block">
+                                                    {fam.word}
+                                                </span>
+                                                <span className="text-xs text-slate-400 font-medium">{fam.meaning}</span>
+                                            </div>
+                                            <span className="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 text-[10px] font-black uppercase shrink-0">
+                                                {fam.pos}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="pt-3 border-t border-slate-800 space-y-2">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        <Tag size={13} className="text-emerald-400" /> Synonyms & Related Terms (Click to Lookup)
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {activeLexiconEntry.synonyms.map((syn, i) => (
+                                            <button
+                                                key={i}
+                                                type="button"
+                                                onClick={() => lookupWordInLexicon(syn)}
+                                                className="px-3 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-black transition-all"
+                                            >
+                                                {syn}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {activeLexiconEntry.antonyms && activeLexiconEntry.antonyms.length > 0 && (
+                                        <div className="pt-2">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 block mb-1">
+                                                Antonyms / Contrasts
+                                            </span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {activeLexiconEntry.antonyms.map((ant, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className="px-3 py-1 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 text-xs font-bold"
+                                                    >
+                                                        {ant}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* PANEL 3: EXAMPLE SENTENCES IN CONTEXT (4 COLS) */}
+                            <div className="lg:col-span-4 p-6 rounded-[2rem] bg-slate-950/90 border border-slate-800 space-y-4">
+                                <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase tracking-widest">
+                                    <MessageSquare size={16} /> Example Sentences in Context
+                                </div>
+
+                                <div className="space-y-3">
+                                    {activeLexiconEntry.examples.map((ex, i) => (
+                                        <div
+                                            key={i}
+                                            className="p-4 rounded-2xl bg-slate-900 border-l-4 border-amber-400 space-y-1.5"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <p translate="no" className="notranslate font-serif font-bold text-white text-base leading-snug">
+                                                    "{ex.target}"
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => speakLexiconText(ex.target)}
+                                                    className="text-slate-400 hover:text-amber-400 shrink-0"
+                                                >
+                                                    <Volume2 size={16} />
+                                                </button>
+                                            </div>
+                                            <p className="text-sm font-medium text-indigo-200">{ex.translation}</p>
+                                            {ex.note && (
+                                                <span className="inline-block text-[10px] font-black uppercase tracking-wider text-amber-400/80 pt-1">
+                                                    💡 {ex.note}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+
             {activeRoleplayBlock && (
                 <LiveRoleplayArena 
                     scenarioPrompt={activeRoleplayBlock.prompt} 
@@ -550,6 +1249,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                         <span className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Smartboard Tools</span>
                         <button aria-label="Close tools" onClick={() => setShowTools(false)} className="text-slate-500 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 rounded"><X size={20} strokeWidth={2.5} /></button>
                     </div>
+                    <button onClick={() => { toggleLexiconDrawer(); setShowTools(false); }} className={`flex items-center min-h-[48px] gap-4 px-6 py-4 rounded-2xl transition-all font-bold border text-left focus-visible:ring-2 focus-visible:ring-white ${showLexicon ? 'bg-indigo-600 text-white border-indigo-500/50' : 'bg-slate-800/50 hover:bg-indigo-600 text-slate-300 hover:text-white border-slate-700/50'}`}>
+                        <BookOpen size={20} /> <span className="flex-1">Lexicon & Translate</span> <span className="text-indigo-400 text-xs font-bold">D</span>
+                    </button>
                     <button onClick={() => { setShowQR(true); setShowTools(false); }} className="flex items-center min-h-[48px] gap-4 px-6 py-4 bg-slate-800/50 hover:bg-indigo-600 text-white rounded-2xl transition-all font-bold border border-slate-700/50 text-left focus-visible:ring-2 focus-visible:ring-white">
                         <QrCode size={20} /> <span className="flex-1">QR Code Menu</span> <span className="text-slate-500 text-xs font-bold">Q</span>
                     </button>
@@ -634,6 +1336,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                         <div className="grid grid-cols-2 gap-x-12 gap-y-6">
                             {[
                                 { k: 'Space / Right', l: 'Next Slide' }, { k: 'Left', l: 'Previous Slide' },
+                                { k: 'D / Ctrl+Space', l: 'Lexicon & Translate' }, { k: 'Double-Click Word', l: 'Inspect Word in Lexicon' },
                                 { k: 'W', l: 'Whiteboard' }, { k: 'A', l: 'Annotate' },
                                 { k: 'S', l: 'Spotlight' }, { k: 'T', l: 'Timer' },
                                 { k: 'Q', l: 'QR Code' }, { k: 'B', l: 'Blackout Screen' },
@@ -717,7 +1420,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 ) : (
                     <div className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
                         <div className="flex flex-col min-h-full w-full items-center px-12 py-12 lg:px-24 pb-32">
-                            {/* Directional transition logic via key */}
                             <div key={`${activePageIdx}`} className={`w-full max-w-7xl my-auto flex flex-col gap-12 animate-in fade-in duration-500 ${slideDirection === 'right' ? 'slide-in-from-right-16' : 'slide-in-from-left-16'}`}>
                                 {activePage.blocks.map((block: any, i: number) => {
                                     if (!block) return null;
@@ -732,7 +1434,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                                                     {blockType === 'essay' && <EssayBlock block={block} />}
                                                     {blockType === 'image' && <ImageBlock block={block} />}
                                                     {blockType === 'dialogue' && <DialogueBlock block={block} />}
-                                                    {blockType === 'vocab-list' && <VocabListBlock block={block} />}
+                                                    {blockType === 'vocab-list' && <VocabListBlock block={block} onInspectWord={lookupWordInLexicon} />}
+                                                    {blockType === 'flashcard' && <FlashcardSlideBlock block={block} onInspectWord={lookupWordInLexicon} />}
+                                                    {blockType === 'kinetic_canvas' && (
+                                                        <div className="w-full pointer-events-auto">
+                                                            <KineticCanvasBlock block={block} onComplete={() => jumpToSlide(activePageIdx + 1)} />
+                                                        </div>
+                                                    )}
                                                     {blockType === 'discussion' && <DiscussionBlock block={block} />}
                                                     {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                                                     {blockType === 'game' && block.gameType === 'marble-scrabble' && (
@@ -775,7 +1483,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             </main>
 
             {/* FOOTER */}
-            <footer className={`absolute bottom-0 left-0 right-0 h-[72px] bg-slate-900/90 backdrop-blur-xl border-t border-slate-800/60 flex items-center justify-between px-6 shrink-0 z-[8800] transition-transform duration-500 ${isIdle && !isLobby && !isAnnotating && !showWhiteboard ? 'translate-y-full' : 'translate-y-0'}`}>
+            <footer className={`absolute bottom-0 left-0 right-0 h-[72px] bg-slate-900/90 backdrop-blur-xl border-t border-slate-800/60 flex items-center justify-between px-6 shrink-0 z-[8800] transition-transform duration-500 ${isIdle && !isLobby && !isAnnotating && !showWhiteboard && !showLexicon ? 'translate-y-full' : 'translate-y-0'}`}>
                 <div className="flex items-center gap-6">
                     <h2 className="text-[clamp(12px,1.8vh,16px)] font-bold text-slate-300 uppercase tracking-wider hidden sm:block">{String(lesson?.title || '')}</h2>
                     <div className="h-5 w-px bg-slate-700 hidden sm:block" />
@@ -788,24 +1496,39 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                     )}
                 </div>
                 
-                <div className="flex items-center gap-4 pointer-events-auto">
+                <div className="flex items-center gap-3 sm:gap-4 pointer-events-auto">
+                    {/* 🔥 1-CLICK LEXICON & TRANSLATION SLIDE-DOWN BUTTON IN FOOTER */}
+                    <button
+                        aria-label="Toggle Lexicon Drawer"
+                        onClick={toggleLexiconDrawer}
+                        className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all text-[clamp(12px,1.5vh,14px)] font-bold uppercase tracking-wider shadow-sm border min-h-[48px] ${
+                            showLexicon
+                                ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-amber-500/20'
+                                : 'bg-indigo-600/90 hover:bg-indigo-500 text-white border-indigo-400/40'
+                        }`}
+                    >
+                        <BookOpen size={17} strokeWidth={2.5} />
+                        <span className="hidden md:inline">Lexicon (D)</span>
+                        {showLexicon ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </button>
+
                     <button aria-label="Toggle Forum" onClick={() => setShowForum(p => !p)} className={`p-3 rounded-xl transition-all shadow-sm border min-w-[48px] min-h-[48px] flex items-center justify-center ${showForum ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'}`}>
                         <MessageSquare size={20} strokeWidth={2.5}/>
                     </button>
                     <button aria-label="Toggle Tools" onClick={() => setShowTools(p => !p)} className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all text-[clamp(12px,1.5vh,14px)] font-bold uppercase tracking-wider shadow-sm border min-h-[48px] ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-500/20' : 'bg-slate-800 hover:bg-indigo-600/80 text-slate-300 hover:text-white border-slate-700'}`}>
-                        <Wrench size={16} strokeWidth={2.5}/> <span className="hidden sm:inline">Tools (W)</span>
+                        <Wrench size={16} strokeWidth={2.5}/> <span className="hidden sm:inline">Tools</span>
                     </button>
                     <button aria-label="End Session" onClick={() => setShowExitConfirm(true)} className="flex items-center gap-2 px-5 py-3 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors border border-rose-500/20 hover:border-rose-500 font-bold text-[clamp(12px,1.5vh,14px)] uppercase tracking-wider min-h-[48px]">
                         <X size={16} strokeWidth={3} /> <span className="hidden sm:inline">End</span>
                     </button>
-                    <div className="h-8 w-px bg-slate-700 mx-2" />
+                    <div className="h-8 w-px bg-slate-700 mx-1 hidden sm:block" />
                     
                     <div className="flex items-center gap-4">
                         <div onClick={(e) => {
                             const rect = e.currentTarget.getBoundingClientRect();
                             const p = (e.clientX - rect.left) / rect.width;
                             jumpToSlide(Math.min(pages.length - 1, Math.floor(p * pages.length)));
-                        }} className="w-32 md:w-64 h-3 bg-slate-800 rounded-full overflow-hidden cursor-pointer group relative border border-slate-700 shadow-inner min-h-[16px]">
+                        }} className="w-24 md:w-56 h-3 bg-slate-800 rounded-full overflow-hidden cursor-pointer group relative border border-slate-700 shadow-inner min-h-[16px]">
                             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                             <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${isLobby ? 0 : ((activePageIdx + 1) / pages.length) * 100}%` }} />
                         </div>
@@ -840,6 +1563,35 @@ const EssayBlock = memo(({ block }: { block: any }) => (
         </div>
     </div>
 ));
+
+const FlashcardSlideBlock = memo(({ block, onInspectWord }: { block: any; onInspectWord?: (word: string) => void }) => {
+    const [flipped, setFlipped] = useState(false);
+    return (
+        <div
+            onClick={() => setFlipped(f => !f)}
+            className="max-w-4xl mx-auto my-12 p-16 rounded-[4rem] bg-slate-900 border-2 border-indigo-500/40 shadow-2xl text-center cursor-pointer pointer-events-auto transition-all hover:border-indigo-400"
+        >
+            <span className="text-[2vh] font-black uppercase tracking-widest text-indigo-400 block mb-6">
+                {flipped ? 'Answer / Definition' : String(block.title || 'Concept Flashcard • Tap to Flip')}
+            </span>
+            <h3 className="text-[6.5vh] font-black text-white leading-tight mb-8">
+                {flipped ? String(block.back || '') : String(block.front || '')}
+            </h3>
+            {onInspectWord && block.front && (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onInspectWord(String(block.front));
+                    }}
+                    className="px-6 py-3 rounded-2xl bg-indigo-500/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 font-bold text-sm uppercase tracking-wider inline-flex items-center gap-2"
+                >
+                    <BookOpen size={18} /> Inspect in Lexicon
+                </button>
+            )}
+        </div>
+    );
+});
 
 const ImageBlock = memo(({ block }: { block: any }) => {
     const [zoomed, setZoomed] = useState(false);
@@ -981,7 +1733,7 @@ const DialogueBlock = memo(({ block }: { block: any }) => {
     );
 });
 
-const VocabListBlock = memo(({ block }: { block: any }) => {
+const VocabListBlock = memo(({ block, onInspectWord }: { block: any; onInspectWord?: (word: string) => void }) => {
     const items = Array.isArray(block.items) ? block.items : [];
     const [revealed, setRevealed] = useState<Record<number, boolean>>({});
     const [page, setPage] = useState(0);
@@ -1001,14 +1753,33 @@ const VocabListBlock = memo(({ block }: { block: any }) => {
                 {currentItems.map((item: any, j: number) => {
                     const absIdx = page * perPage + j;
                     const isRev = revealed[absIdx];
+                    const termStr = String(item.term || item.front || '');
+                    const defStr = String(item.definition || item.back || '');
                     return (
                         <div key={absIdx} onClick={() => setRevealed(p => ({...p, [absIdx]: true}))} className={`p-10 rounded-[3rem] border shadow-xl text-left relative overflow-hidden transition-all duration-300 cursor-pointer min-h-[200px] flex flex-col justify-center ${isRev ? 'bg-slate-900 border-slate-800 hover:-translate-y-1' : 'bg-slate-900/50 border-slate-800/50 hover:bg-slate-800 border-dashed'}`}>
                             {isRev && <div className="absolute -right-8 -top-8 opacity-5 text-indigo-400 rotate-12"><Layers size={200} /></div>}
-                            <div className="flex justify-between items-start relative z-10 mb-4">
-                                <p className={`text-[5vh] font-bold tracking-tight ${isRev ? 'text-indigo-400' : 'text-slate-500'}`}>{String(item.term || '')}</p>
-                                {isRev && <button aria-label="Pronounce" onClick={(e) => playAudio(String(item.term), e)} className="p-4 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-2xl transition-colors"><Volume2 size={32}/></button>}
+                            <div className="flex justify-between items-start relative z-10 mb-4 gap-3">
+                                <p className={`text-[5vh] font-bold tracking-tight ${isRev ? 'text-indigo-400' : 'text-slate-500'}`}>{termStr}</p>
+                                {isRev && (
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {onInspectWord && (
+                                            <button
+                                                aria-label="Inspect in Lexicon"
+                                                title="Open in Lexicon Slide-Down"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onInspectWord(termStr);
+                                                }}
+                                                className="p-4 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 rounded-2xl transition-colors"
+                                            >
+                                                <BookOpen size={28} />
+                                            </button>
+                                        )}
+                                        <button aria-label="Pronounce" onClick={(e) => playAudio(termStr, e)} className="p-4 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-2xl transition-colors"><Volume2 size={32}/></button>
+                                    </div>
+                                )}
                             </div>
-                            <p className="text-[3vh] text-slate-300 font-medium leading-relaxed relative z-10">{isRev ? String(item.definition || '') : 'Click to reveal definition'}</p>
+                            <p className="text-[3vh] text-slate-300 font-medium leading-relaxed relative z-10">{isRev ? defStr : 'Click to reveal definition'}</p>
                         </div>
                     );
                 })}
@@ -1105,7 +1876,7 @@ const TimelineBlock = memo(({ block }: { block: any }) => (
 const QuizBlock = memo(({ block, liveState, triggerQuiz }: { block: any, liveState: any, triggerQuiz: any }) => {
     const answerCount = Object.keys(liveState?.answers || {}).length;
     const totalCount = Object.keys(liveState?.students || {}).length || 1;
-    const options = Array.isArray(block.content?.options) ? block.content.options : [];
+    const options = Array.isArray(block.content?.options) ? block.content.options : (Array.isArray(block.options) ? block.options : []);
     
     const answerCounts: Record<string, number> = {};
     Object.values(liveState?.answers || {}).forEach((ans: any) => { answerCounts[ans.answerId] = (answerCounts[ans.answerId] || 0) + 1; });
@@ -1146,7 +1917,7 @@ const QuizBlock = memo(({ block, liveState, triggerQuiz }: { block: any, liveSta
                         
                         <div className="grid grid-cols-2 gap-6 w-full text-left mb-12">
                             {options.map((opt:any, i:number) => {
-                                const isCorrect = String(opt.id) === String(block.content?.correctId);
+                                const isCorrect = String(opt.id) === String(block.content?.correctId || block.correctId);
                                 const count = answerCounts[opt.id] || 0;
                                 const pct = Math.round((count / Math.max(1, answerCount)) * 100);
                                 return (
@@ -1478,14 +2249,15 @@ const GrammarBlock = memo(({ block }: { block: any }) => {
                     </div>
                     
                     {block.examples?.map((ex: any, idx: number) => {
-                        const parts = ex.en.split(new RegExp(`(${ex.target})`, 'gi'));
+                        const rawEn = String(ex.en || ex.text || '');
+                        const parts = ex.target ? rawEn.split(new RegExp(`(${ex.target})`, 'gi')) : [rawEn];
                         const isRevealed = revealed[idx];
                         
                         return (
                             <div key={idx} className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 p-8 bg-slate-800/40 hover:bg-slate-800/60 rounded-[2.5rem] border border-slate-700/50 transition-colors group">
                                 <p className="text-[4vh] font-medium text-white flex-1 leading-snug cursor-pointer" onClick={() => toggleReveal(idx)}>
                                     {parts.map((part: string, i: number) => 
-                                        part.toLowerCase() === (ex.target || '').toLowerCase() ? (
+                                        ex.target && part.toLowerCase() === String(ex.target).toLowerCase() ? (
                                             <span 
                                                 key={i} 
                                                 className={`inline-block mx-2 font-bold transition-all duration-300 px-4 py-1 rounded-2xl ${isRevealed ? 'text-amber-400 bg-amber-500/10 border-2 border-amber-500/20' : 'text-transparent bg-slate-700/80 hover:bg-slate-700 border-2 border-slate-600/50 min-w-[120px]'}`}
