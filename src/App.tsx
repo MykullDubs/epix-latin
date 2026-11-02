@@ -33,6 +33,7 @@ import AuthView from './components/AuthView';
 import ClassView from './components/ClassView';
 import ExamPlayerView from './components/ExamPlayerView';
 import HoloAvatar from './components/HoloAvatar';
+import MarbleScrabble from './components/MarbleScrabble';
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -136,6 +137,111 @@ const mergeClassRecords = (existing: any, incoming: any) => {
     cohorts: dedupeObjectsOrStrings([...(existing.cohorts || []), ...(incoming.cohorts || [])])
   };
 };
+
+// ============================================================================
+//  🔥 LIVE WORDFORGE / MARBLE SCRABBLE PROJECTOR HOST WRAPPER
+// ============================================================================
+function LiveWordForgeHost({
+  classId,
+  targetContent,
+  onExit
+}: {
+  classId: string;
+  targetContent: any;
+  onExit: () => void;
+}) {
+  const [liveState, setLiveState] = useState<any>({});
+
+  // Extract vocabulary items from targetContent (if a Deck or Lesson was chosen)
+  const gameBlock = useMemo(() => {
+    const items: any[] = [];
+    if (Array.isArray(targetContent?.cards)) {
+      items.push(...targetContent.cards);
+    }
+    if (Array.isArray(targetContent?.vocab)) {
+      items.push(...targetContent.vocab);
+    }
+    if (Array.isArray(targetContent?.blocks)) {
+      targetContent.blocks.forEach((b: any) => {
+        if (Array.isArray(b.items)) items.push(...b.items);
+        if (Array.isArray(b.cards)) items.push(...b.cards);
+      });
+    }
+    return {
+      id: targetContent?.id || 'wordforge_live',
+      title: targetContent?.title || 'WordForge Live Arena',
+      type: 'game',
+      gameType: 'marble-scrabble',
+      classId,
+      items
+    };
+  }, [targetContent, classId]);
+
+  useEffect(() => {
+    if (!classId) return;
+    const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+    const unsub = onSnapshot(sessionRef, (snap) => {
+      if (snap.exists()) {
+        setLiveState(snap.data() as Record<string, any>);
+      }
+    });
+    return () => unsub();
+  }, [classId]);
+
+  const handleUpdateLiveState = useCallback(
+    async (updates: any) => {
+      if (!classId) return;
+      try {
+        const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+        await setDoc(
+          sessionRef,
+          {
+            ...updates,
+            classId,
+            type: 'marble-scrabble',
+            currentQuestion: {
+              ...gameBlock,
+              gameType: 'marble-scrabble'
+            },
+            updatedAt: Date.now()
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        console.error('Failed to update WordForge live session:', e);
+      }
+    },
+    [classId, gameBlock]
+  );
+
+  const handleCloseHost = async () => {
+    if (classId) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'live_sessions', classId)).catch(() => {});
+    }
+    onExit();
+  };
+
+  return (
+    <div className="relative h-screen w-full bg-slate-950 overflow-hidden">
+      <button
+        type="button"
+        onClick={handleCloseHost}
+        className="absolute top-4 left-4 z-[9999] bg-slate-900/85 hover:bg-rose-600 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-700 backdrop-blur-md transition-all flex items-center gap-1.5 shadow-xl active:scale-95"
+      >
+        <ArrowLeft size={14} strokeWidth={2.5} /> End WordForge Session
+      </button>
+
+      <MarbleScrabble
+        block={gameBlock}
+        classId={classId}
+        isProjector={true}
+        liveState={liveState}
+        studentId="projector"
+        onUpdateLiveState={handleUpdateLiveState}
+      />
+    </div>
+  );
+}
 
 // --- ANALYTICS HOOK ---
 const useLearningTimer = (user: any, activityId: string, activityType: string, title: string) => {
@@ -254,7 +360,7 @@ const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
     setStatus(rating);
   };
   return (
-    <div className="my-8 w-full max-w-md mx-auto">
+    <div translate="no" className="notranslate my-8 w-full max-w-md mx-auto">
       {context && (
         <div className="mb-3 flex items-center gap-2 text-indigo-900/70 font-bold text-sm uppercase tracking-wide animate-in fade-in slide-in-from-bottom-2">
           <Zap size={14} className="text-amber-500 fill-amber-500" />
@@ -327,7 +433,7 @@ const JuicyDeckBlock = ({ items, title }: any) => {
     }, 200);
   };
   return (
-    <div className="my-8 w-[90%] max-w-sm mx-auto relative">
+    <div translate="no" className="notranslate my-8 w-[90%] max-w-sm mx-auto relative">
       <div className="flex justify-between items-center mb-4 px-2">
         <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
           <Layers size={14} /> {title || "Flashcards"}
@@ -441,7 +547,7 @@ const QuizBlock = ({ block, onComplete }: any) => {
   const [submitted, setSubmitted] = useState(false);
   const isCorrect = selected === block.correctId;
   return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-8">
+    <div translate="no" className="notranslate bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-8">
       <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-start gap-2">
         <span className="bg-indigo-100 text-indigo-600 p-1 rounded-lg mt-1 shrink-0">
           <HelpCircle size={16} />
@@ -494,7 +600,7 @@ const QuizBlock = ({ block, onComplete }: any) => {
 };
 
 const ChatDialogueBlock = ({ lines }: any) => (
-  <div className="space-y-4 my-8 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+  <div translate="no" className="notranslate space-y-4 my-8 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
     {(lines || []).map((line: any, i: number) => {
       const isA = line.speaker === 'A' || line.side === 'left' || i % 2 === 0;
       return (
@@ -547,6 +653,7 @@ function LessonView({ lesson, onFinish }: any) {
     resetScroll();
   }, []);
   const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
+  const [localGameState, setLocalGameState] = useState<any>(null);
 
   const { normalizedLesson, blocks } = useMemo(() => {
     let obj: any = lesson;
@@ -697,6 +804,41 @@ function LessonView({ lesson, onFinish }: any) {
         );
       case 'kinetic_canvas':
         return <KineticCanvasBlock block={block} onComplete={handleNextBlock} />;
+      case 'game':
+      case 'arcade_game':
+        if (block.gameType === 'marble-scrabble' || block.gameType === 'marble_scrabble' || !block.gameType) {
+          const soloId = (auth.currentUser?.email || 'scholar').replace(/\./g, ',');
+          const defaultSoloState = localGameState || {
+            gameStatus: 'playing',
+            players: { [soloId]: { id: soloId, name: 'Scholar', avatar: '' } },
+            teams: {
+              p_0: {
+                id: 'p_0',
+                order: 0,
+                name: 'Scholar',
+                color: { bg: '#4f46e5', muted: 'rgba(79,70,229,0.15)', border: 'rgba(79,70,229,0.4)' },
+                members: [soloId]
+              }
+            },
+            board: Array(225).fill(null),
+            scores: { p_0: 0 },
+            journals: { p_0: [] },
+            activeTeamIndex: 0,
+            turnEndTime: Date.now() + 180000
+          };
+          return (
+            <div className="my-8 h-[78vh] w-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-800">
+              <MarbleScrabble
+                block={block}
+                isProjector={false}
+                liveState={defaultSoloState}
+                studentId={soloId}
+                onUpdateLiveState={(patch: any) => setLocalGameState((prev: any) => ({ ...(prev || defaultSoloState), ...patch }))}
+              />
+            </div>
+          );
+        }
+        return <div className="p-4 bg-slate-100 rounded text-slate-500 italic font-mono text-xs">Game Block Loaded: {block.gameType}</div>;
       case 'wrap_up_block':
         return (
           <div className="my-8 bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-8 text-slate-800">
@@ -728,7 +870,11 @@ function LessonView({ lesson, onFinish }: any) {
   const isInteractive = activeBlock.type === 'quiz' || activeBlock.type === 'fill-blank' || (activeBlock.type === 'scenario' && activeBlock.nodes);
 
   return (
-    <div id="lesson-scroll-container" className="h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden relative scroll-smooth">
+    <div
+      id="lesson-scroll-container"
+      lang={normalizedLesson.language || 'la'}
+      className="h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden relative scroll-smooth"
+    >
       <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-6 py-4 border-b border-slate-100 shadow-sm">
         <div className="flex justify-between items-center mb-2">
           <button onClick={handleExit} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors">
@@ -864,7 +1010,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
 // ============================================================================
 //  HOME VIEW (WITH COHORT-SAFE ASSIGNMENT RESOLUTION)
 // ============================================================================
-function HomeView({ setActiveTab, lessons, onSelectClass, onSelectLesson, onSelectDeck, onStartExam, userData, assignments, classes, user, allDecks, curriculums }: any) {
+function HomeView({ setActiveTab, lessons, onSelectClass, onSelectLesson, onSelectDeck, onStartExam, userData, assignments, classes, user, allDecks, curriculums, onLogActivity }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -935,6 +1081,7 @@ function HomeView({ setActiveTab, lessons, onSelectClass, onSelectLesson, onSele
         lessons={lessons}
         allDecks={allDecks}
         curriculums={curriculums}
+        onLogActivity={onLogActivity}
       />
     );
   }
@@ -1210,6 +1357,23 @@ function App() {
     return 'Scholar';
   }, [userData, user]);
 
+  // Helper to resolve (arg1, arg2) whether caller passed (contentId, classId) or (classId, contentId)
+  const resolveHostLaunchIds = useCallback(
+    (arg1: string, arg2?: string) => {
+      if (!arg2) {
+        const defaultClsId = enrolledClasses[0]?.id || arg1;
+        return { contentId: arg1, classId: defaultClsId };
+      }
+      const arg1IsClass = enrolledClasses.some((c: any) => c.id === arg1);
+      const arg2IsClass = enrolledClasses.some((c: any) => c.id === arg2);
+      if (arg1IsClass && !arg2IsClass) {
+        return { classId: arg1, contentId: arg2 };
+      }
+      return { contentId: arg1, classId: arg2 };
+    },
+    [enrolledClasses]
+  );
+
   const handleContentSelection = useCallback((rawItem: any) => {
     setActiveExam(null);
     let item = rawItem;
@@ -1243,6 +1407,55 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // 🔥 QR CODE DEEP-LINK DETECTOR (/play/:classId or ?classId=...)
+  useEffect(() => {
+    if (!user?.email) return;
+    const pathMatch = window.location.pathname.match(/\/play\/([^/?#]+)/i);
+    const queryClassId = new URLSearchParams(window.location.search).get('classId');
+    const targetJoinClassId = pathMatch?.[1] || queryClassId;
+    if (!targetJoinClassId) return;
+
+    const existingClass = enrolledClasses.find(
+      (c: any) => c.id === targetJoinClassId || (c.code && c.code.toUpperCase() === targetJoinClassId.toUpperCase())
+    );
+    if (existingClass) {
+      setViewRoleOverride('student');
+      setActiveTab('home');
+      setActiveStudentClass(existingClass);
+      return;
+    }
+
+    // If student scanned QR code for a class they aren't enrolled in yet, fetch & auto-join
+    const joinViaQr = async () => {
+      try {
+        const classRef = doc(db, 'artifacts', appId, 'classes', targetJoinClassId);
+        const snap = await getDoc(classRef);
+        if (snap.exists()) {
+          const data = snap.data() as Record<string, any>;
+          const cleanEmail = user.email.trim();
+          await setDoc(
+            classRef,
+            {
+              studentEmails: arrayUnion(cleanEmail, cleanEmail.toLowerCase()),
+              students: arrayUnion({
+                email: cleanEmail,
+                name: cleanEmail.split('@')[0],
+                joinedAt: Date.now()
+              })
+            },
+            { merge: true }
+          );
+          setViewRoleOverride('student');
+          setActiveTab('home');
+          setActiveStudentClass({ id: snap.id, ...data });
+        }
+      } catch (err) {
+        console.warn('QR auto-join lookup failed:', err);
+      }
+    };
+    joinViaQr();
+  }, [user?.email, enrolledClasses]);
 
   useEffect(() => {
     if (!user) {
@@ -1411,10 +1624,8 @@ function App() {
   const handleCreateCard = useCallback(
     async (c: any) => {
       if (!user) return;
-      const cardId = doc(collection(db, 'artifacts', appId, 'custom_cards')).id;
-      await setDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), { ...c, id: cardId, instructorId: user.uid });
-      setSelectedDeckKey(c.deckId || 'custom');
-      setActiveTab('flashcards');
+      const cardId = c?.id || doc(collection(db, 'artifacts', appId, 'custom_cards')).id;
+      await setDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), { ...c, id: cardId, instructorId: user.uid }, { merge: true });
     },
     [user]
   );
@@ -1456,7 +1667,7 @@ function App() {
         instructorId: user.uid
       };
       if (id) {
-        await updateDoc(doc(db, 'artifacts', appId, 'custom_lessons', id), payload);
+        await setDoc(doc(db, 'artifacts', appId, 'custom_lessons', id), payload, { merge: true });
       } else {
         await addDoc(collection(db, 'artifacts', appId, 'custom_lessons'), payload);
       }
@@ -1684,6 +1895,8 @@ function App() {
       const assignmentObject = {
         id: extractedId,
         lessonId: extractedId,
+        ...(typeof rawPayload === 'object' && rawPayload.title ? { title: rawPayload.title } : {}),
+        ...(typeof rawPayload === 'object' && rawPayload.type ? { type: rawPayload.type, contentType: rawPayload.contentType || rawPayload.type } : {}),
         ...(isCurriculumItem ? { curriculumId: extractedId, contentType: 'curriculum' } : {}),
         cohortId: resolvedCohortId,
         assignedAt: Date.now()
@@ -1743,9 +1956,22 @@ function App() {
     );
   }
 
-  // 1. INTERCEPT LIVE HOST/PROJECTOR VIEWS
+  // 🔥 1. INTERCEPT LIVE HOST/PROJECTOR VIEWS (PRESENTATION & MARBLE SCRABBLE / WORDFORGE)
   if (liveHostConfig) {
-    const targetContent = allDecks[liveHostConfig.contentId] || lessons.find((l) => l.id === liveHostConfig.contentId);
+    const targetContent =
+      allDecks[liveHostConfig.contentId] ||
+      Object.values(allDecks).find((d: any) => d?.id === liveHostConfig.contentId) ||
+      lessons.find((l) => l.id === liveHostConfig.contentId);
+
+    if (liveHostConfig.mode === 'marble_scrabble' || liveHostConfig.mode === 'marble-scrabble') {
+      return (
+        <LiveWordForgeHost
+          classId={liveHostConfig.classId}
+          targetContent={targetContent}
+          onExit={() => setLiveHostConfig(null)}
+        />
+      );
+    }
 
     return (
       <div className="relative min-h-screen w-full bg-slate-950 flex flex-col font-sans overflow-hidden">
@@ -1762,6 +1988,7 @@ function App() {
               classId={liveHostConfig.classId}
               lesson={targetContent}
               userData={userData}
+              onSaveCard={handleCreateCard}
               onExit={() => setLiveHostConfig(null)}
             />
           )}
@@ -1849,13 +2076,15 @@ function App() {
     );
   }
 
-  // 4. PASS LAUNCH CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER
+  // 4. PASS LAUNCH & ASSIGN CALLBACKS TO INSTRUCTOR DASHBOARD & BUILDER
   const commonHandlers = {
     onSaveCard: handleCreateCard,
     onUpdateCard: handleUpdateCard,
     onDeleteCard: handleDeleteCard,
     onSaveLesson: handleCreateLesson,
     onSaveCurriculum: handleCreateCurriculum,
+    onAssign: handleAssign,
+    onRevoke: handleRevoke,
     onSelectLesson: handleContentSelection,
     onLaunchLesson: handleContentSelection,
     onPreviewLesson: handleContentSelection,
@@ -1915,11 +2144,26 @@ function App() {
           onRemoveStudent={handleRemoveStudent}
           onAssign={handleAssign}
           onRevoke={handleRevoke}
-          onStartPresentation={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'presentation', contentId, classId })}
-          onStartVocabGame={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'trivia', contentId, classId })}
-          onStartConnectFour={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'connect_four', contentId, classId })}
-          onStartSlipstream={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'slipstream', contentId, classId })}
-          onStartMarbleScrabble={(contentId: string, classId: string) => setLiveHostConfig({ mode: 'marble_scrabble', contentId, classId })}
+          onStartPresentation={(arg1: string, arg2?: string) => {
+            const { contentId, classId } = resolveHostLaunchIds(arg1, arg2);
+            setLiveHostConfig({ mode: 'presentation', contentId, classId });
+          }}
+          onStartVocabGame={(arg1: string, arg2?: string) => {
+            const { contentId, classId } = resolveHostLaunchIds(arg1, arg2);
+            setLiveHostConfig({ mode: 'trivia', contentId, classId });
+          }}
+          onStartConnectFour={(arg1: string, arg2?: string) => {
+            const { contentId, classId } = resolveHostLaunchIds(arg1, arg2);
+            setLiveHostConfig({ mode: 'connect_four', contentId, classId });
+          }}
+          onStartSlipstream={(arg1: string, arg2?: string) => {
+            const { contentId, classId } = resolveHostLaunchIds(arg1, arg2);
+            setLiveHostConfig({ mode: 'slipstream', contentId, classId });
+          }}
+          onStartMarbleScrabble={(arg1: string, arg2?: string) => {
+            const { contentId, classId } = resolveHostLaunchIds(arg1, arg2);
+            setLiveHostConfig({ mode: 'marble_scrabble', contentId, classId });
+          }}
           onSwitchView={() => setViewRoleOverride('student')}
           onSwitchToBasicView={() => setViewRoleOverride('student')}
           onLogout={() => signOut(auth)}
@@ -1952,6 +2196,7 @@ function App() {
           lessons={lessons}
           allDecks={allDecks}
           curriculums={curriculums}
+          onLogActivity={handleLogSelfStudy}
         />
       );
     } else {
@@ -1972,6 +2217,7 @@ function App() {
               userData={userData}
               user={user}
               curriculums={curriculums}
+              onLogActivity={handleLogSelfStudy}
             />
           );
           break;
