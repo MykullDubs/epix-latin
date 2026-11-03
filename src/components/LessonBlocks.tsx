@@ -1,5 +1,5 @@
 // src/components/LessonBlocks.tsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   RotateCcw, Check, X, Plus, Trash2,
   Maximize2, Minimize2, Lock, Unlock, Magnet, Grid,
@@ -8,7 +8,7 @@ import {
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   Square, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown,
   Layers, GripVertical, PanelTop, PanelBottom, PanelRight,
-  Sliders, CheckSquare, Columns
+  Sliders, CheckSquare, Columns, Keyboard
 } from 'lucide-react';
 
 // ============================================================================
@@ -947,11 +947,17 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 // ============================================================================
 //  2. INSTRUCTOR VISUAL STUDIO: KINETIC CANVAS BUILDER
 //  Features:
+//   - Keyboard Shortcuts:
+//     * Arrow Keys = Nudge 1% (Shift+Arrow = 5%, Alt+Arrow = 0.5%)
+//     * Delete / Backspace = Delete selected items
+//     * Ctrl+D / Cmd+D = Duplicate selected items (Cards, Shapes & Drop Zones)
+//     * Ctrl+A / Cmd+A = Select all cards
+//     * Escape = Clear selection
 //   - Shift+Click Multi-Selection & Synchronized Group Dragging
-//   - Batch Contextual Task Bar Editing (Color, Border, Shape, Dimensions, Category, Align, Delete)
-//   - 4 Dock Modes (Top Ribbon, Bottom Bar, Right Inspector, Pinned/Floating)
+//   - Photoshop Contextual Task Bar (Top Ribbon, Bottom Bar, Right Inspector, Pinned/Floating)
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
+  const builderRootRef = useRef<HTMLDivElement>(null);
   const outerWrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
@@ -961,14 +967,17 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const [stageScale, setStageScale] = useState(0.5);
   const [gridSnap, setGridSnap] = useState<number>(1);
 
-  // 🔥 MULTI-SELECTION STATE (Supports 1 or many selected items via Shift+Click)
+  // MULTI-SELECTION STATE
   const [selectedItems, setSelectedItems] = useState<
     Array<{ kind: 'entity' | 'zone'; id: string }>
   >([]);
 
   const primarySelected = selectedItems[0] || null;
-  const isItemSelected = (kind: 'entity' | 'zone', id: string) =>
-    selectedItems.some((s) => s.kind === kind && s.id === id);
+  const isItemSelected = useCallback(
+    (kind: 'entity' | 'zone', id: string) =>
+      selectedItems.some((s) => s.kind === kind && s.id === id),
+    [selectedItems]
+  );
 
   const selectOrToggleItem = (
     kind: 'entity' | 'zone',
@@ -997,7 +1006,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const [pinnedPos, setPinnedPos] = useState<{ x: number; y: number }>({ x: 50, y: 12 });
   const [isDraggingTaskbar, setIsDraggingTaskbar] = useState<boolean>(false);
 
-  // Supports both single-item and multi-item group dragging
   const [interaction, setInteraction] = useState<{
     mode: 'move' | 'resize';
     kind: 'entity' | 'zone';
@@ -1020,13 +1028,19 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const [showRawJson, setShowRawJson] = useState(false);
   const [rawJsonText, setRawJsonText] = useState('');
 
-  const entities = Array.isArray(block?.entities) ? block.entities : [];
-  const zones = Array.isArray(block?.zones) ? block.zones : [];
+  const entities = useMemo(
+    () => (Array.isArray(block?.entities) ? block.entities : []),
+    [block?.entities]
+  );
+  const zones = useMemo(
+    () => (Array.isArray(block?.zones) ? block.zones : []),
+    [block?.zones]
+  );
 
-  const notifyBuilder = (msg: string) => {
+  const notifyBuilder = useCallback((msg: string) => {
     setBuilderToast(msg);
-    setTimeout(() => setBuilderToast(null), 2600);
-  };
+    setTimeout(() => setBuilderToast(null), 2400);
+  }, []);
 
   useEffect(() => {
     const updateScale = () => {
@@ -1053,10 +1067,203 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   };
 
   // ============================================================================
+  //  BATCH DUPLICATE, DELETE & NUDGE HANDLERS (USED BY BUTTONS + KEYBOARD)
+  // ============================================================================
+  const duplicateSelectedItems = useCallback(() => {
+    if (selectedItems.length === 0) return;
+    const now = Date.now();
+    const selEntIds = new Set(
+      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
+    );
+    const selZoneIds = new Set(
+      selectedItems.filter((s) => s.kind === 'zone').map((s) => s.id)
+    );
+
+    const entityCopies: any[] = [];
+    const zoneCopies: any[] = [];
+    const newSelection: Array<{ kind: 'entity' | 'zone'; id: string }> = [];
+
+    entities.forEach((ent: any, idx: number) => {
+      if (selEntIds.has(ent.id)) {
+        const copyId = `ent_${now}_${idx}`;
+        const nx = Math.min(94, Number((Number(ent.x ?? 50) + 4).toFixed(1)));
+        const ny = Math.min(94, Number((Number(ent.y ?? 50) + 4).toFixed(1)));
+        entityCopies.push({
+          ...ent,
+          id: copyId,
+          x: nx,
+          y: ny,
+          anchorX: nx,
+          anchorY: ny
+        });
+        newSelection.push({ kind: 'entity', id: copyId });
+      }
+    });
+
+    zones.forEach((z: any, idx: number) => {
+      if (selZoneIds.has(z.id)) {
+        const copyId = `zone_${now}_${idx}`;
+        const nx = Math.min(92, Number((Number(z.x ?? 50) + 4).toFixed(1)));
+        const ny = Math.min(92, Number((Number(z.y ?? 30) + 4).toFixed(1)));
+        zoneCopies.push({
+          ...z,
+          id: copyId,
+          x: nx,
+          y: ny
+        });
+        newSelection.push({ kind: 'zone', id: copyId });
+      }
+    });
+
+    if (entityCopies.length > 0 || zoneCopies.length > 0) {
+      onChange({
+        ...block,
+        entities: [...entities, ...entityCopies],
+        zones: [...zones, ...zoneCopies]
+      });
+      setSelectedItems(newSelection);
+      notifyBuilder(
+        `Duplicated ${entityCopies.length + zoneCopies.length} item(s) (Ctrl+D)!`
+      );
+    }
+  }, [selectedItems, entities, zones, block, onChange, notifyBuilder]);
+
+  const deleteSelectedItems = useCallback(() => {
+    if (selectedItems.length === 0) return;
+    const count = selectedItems.length;
+    const selEntIds = new Set(
+      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
+    );
+    const selZoneIds = new Set(
+      selectedItems.filter((s) => s.kind === 'zone').map((s) => s.id)
+    );
+    onChange({
+      ...block,
+      entities: entities.filter((e: any) => !selEntIds.has(e.id)),
+      zones: zones.filter((z: any) => !selZoneIds.has(z.id))
+    });
+    setSelectedItems([]);
+    notifyBuilder(`Deleted ${count} selected item(s).`);
+  }, [selectedItems, entities, zones, block, onChange, notifyBuilder]);
+
+  const nudgeSelectedItems = useCallback(
+    (dx: number, dy: number) => {
+      if (selectedItems.length === 0) return;
+      const selEntIds = new Set(
+        selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
+      );
+      const selZoneIds = new Set(
+        selectedItems.filter((s) => s.kind === 'zone').map((s) => s.id)
+      );
+
+      const nextEntities = entities.map((e: any) => {
+        if (!selEntIds.has(e.id) || e.lockInBuilder) return e;
+        const nx = Math.max(2, Math.min(98, Number((Number(e.x ?? 50) + dx).toFixed(1))));
+        const ny = Math.max(2, Math.min(98, Number((Number(e.y ?? 50) + dy).toFixed(1))));
+        return {
+          ...e,
+          x: nx,
+          y: ny,
+          anchorX: nx,
+          anchorY: ny
+        };
+      });
+
+      const nextZones = zones.map((z: any) => {
+        if (!selZoneIds.has(z.id) || z.lockInBuilder) return z;
+        const nx = Math.max(4, Math.min(96, Number((Number(z.x ?? 50) + dx).toFixed(1))));
+        const ny = Math.max(4, Math.min(96, Number((Number(z.y ?? 30) + dy).toFixed(1))));
+        return {
+          ...z,
+          x: nx,
+          y: ny
+        };
+      });
+
+      onChange({ ...block, entities: nextEntities, zones: nextZones });
+    },
+    [selectedItems, entities, zones, block, onChange]
+  );
+
+  // ============================================================================
+  //  🔥 KEYBOARD SHORTCUT LISTENER (ARROWS, DELETE/BACKSPACE, CTRL+D, CTRL+A, ESC)
+  // ============================================================================
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tagName = target?.tagName || '';
+      const isEditingInput =
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || target?.isContentEditable;
+
+      // Never hijack typing inside text inputs or textareas
+      if (isEditingInput) {
+        if (e.key === 'Escape') {
+          target?.blur();
+        }
+        return;
+      }
+
+      // Only act when at least 1 item is selected on this canvas
+      if (selectedItems.length === 0) return;
+
+      // 1. Ctrl+D / Cmd+D -> Duplicate Selected Items
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        duplicateSelectedItems();
+        return;
+      }
+
+      // 2. Ctrl+A / Cmd+A -> Select All Unlocked Cards on Stage
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        const allCards = entities
+          .filter((ent: any) => ent.entityType !== 'bg_shape' && !ent.lockInBuilder)
+          .map((ent: any) => ({ kind: 'entity' as const, id: ent.id }));
+        setSelectedItems(allCards);
+        notifyBuilder(`Selected all ${allCards.length} cards (Ctrl+A)!`);
+        return;
+      }
+
+      // 3. Delete / Backspace -> Remove Selected Items
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        deleteSelectedItems();
+        return;
+      }
+
+      // 4. Escape -> Deselect All
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSelectedItems([]);
+        return;
+      }
+
+      // 5. Arrow Keys -> Nudge by 1% (Shift = 5%, Alt = 0.5%)
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        const step = e.shiftKey ? 5 : e.altKey ? 0.5 : 1;
+        if (e.key === 'ArrowUp') nudgeSelectedItems(0, -step);
+        if (e.key === 'ArrowDown') nudgeSelectedItems(0, step);
+        if (e.key === 'ArrowLeft') nudgeSelectedItems(-step, 0);
+        if (e.key === 'ArrowRight') nudgeSelectedItems(step, 0);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    selectedItems.length,
+    entities,
+    duplicateSelectedItems,
+    deleteSelectedItems,
+    nudgeSelectedItems,
+    notifyBuilder
+  ]);
+
+  // ============================================================================
   //  1-CLICK AUTO-ALIGN ROW & COLUMN (MULTI-SELECT AWARE)
   // ============================================================================
   const handleAutoAlignRow = () => {
-    // 1. If 2+ items are multi-selected via Shift+Click, align & space ONLY the selected items!
     if (selectedItems.length >= 2) {
       const resolved = selectedItems
         .map((s) => {
@@ -1101,7 +1308,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       }
     }
 
-    // 2. Single item selected -> Align its horizontal row band
     if (primarySelected?.kind === 'zone') {
       const targetZone = zones.find((z: any) => z.id === primarySelected.id);
       if (targetZone) {
@@ -1167,7 +1373,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       }
     }
 
-    // 3. Fallback: Tidy all unanchored draggable cards into 1–2 bottom word-bank rows
     const draggables = entities.filter(
       (e: any) => !e.anchored && e.draggable !== false && e.entityType !== 'bg_shape'
     );
@@ -1204,7 +1409,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   };
 
   const handleAutoAlignColumn = () => {
-    // 1. If 2+ items are multi-selected via Shift+Click, align & space ONLY the selected items vertically!
     if (selectedItems.length >= 2) {
       const resolved = selectedItems
         .map((s) => {
@@ -1249,7 +1453,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       }
     }
 
-    // 2. Single item selected -> Align its vertical column band
     if (primarySelected?.kind === 'entity') {
       const targetEnt = entities.find((e: any) => e.id === primarySelected.id);
       if (targetEnt && targetEnt.entityType !== 'bg_shape') {
@@ -1289,7 +1492,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     notifyBuilder('Shift+Click 2+ items (or select a box in a vertical column) to align vertically.');
   };
 
-  // Start Four-Directions Move (Supports Shift+Click Multi-Selection & Synchronized Group Dragging)
+  // Start Four-Directions Move
   const startMoveItem = (
     e: React.PointerEvent,
     kind: 'entity' | 'zone',
@@ -1353,7 +1556,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  // Start Diagonal Pull-to-Resize
   const startResizeItem = (
     e: React.PointerEvent,
     kind: 'entity' | 'zone',
@@ -1385,7 +1587,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  // Unified Stage Pointer Move (Handles Single/Group Move, Resize, and Floating Taskbar Drag)
   const handleStagePointerMove = (e: React.PointerEvent) => {
     if (!stageRef.current) return;
     const rect = stageRef.current.getBoundingClientRect();
@@ -1403,7 +1604,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       const deltaPctX = ((e.clientX - interaction.startClientX) / rect.width) * 100;
       const deltaPctY = ((e.clientY - interaction.startClientY) / rect.height) * 100;
 
-      // Group Move when 2+ items are selected
       if (interaction.groupInitialCoords.length > 1) {
         const entityMoveMap = new Map<string, { x: number; y: number }>();
         const zoneMoveMap = new Map<string, { x: number; y: number }>();
@@ -1430,7 +1630,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         return;
       }
 
-      // Single Item Move
       const nextX = snapCoord(interaction.initX + deltaPctX);
       const nextY = snapCoord(interaction.initY + deltaPctY);
 
@@ -1489,7 +1688,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     }
   };
 
-  // Batch-Aware Field Updater (Applies to ALL currently selected items!)
   const updateSelectedFields = (patch: Record<string, any>) => {
     const selEntIds = new Set(
       selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
@@ -1581,7 +1779,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     };
     onChange({ ...block, entities: [newShape, ...entities] });
     setSelectedItems([{ kind: 'entity', id: newId }]);
-    notifyBuilder('Added Background Group Shape! Use the Contextual Taskbar to style or lock it.');
+    notifyBuilder('Added Background Group Shape! Use Arrow keys or Taskbar to position it.');
   };
 
   const addMultiColumnGroupPreset = (cols: 2 | 3) => {
@@ -1693,53 +1891,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     }
   };
 
-  const duplicateSelectedItems = () => {
-    const now = Date.now();
-    const selEntIds = new Set(
-      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
-    );
-    const copies: any[] = [];
-    const newSelection: Array<{ kind: 'entity' | 'zone'; id: string }> = [];
-
-    entities.forEach((ent: any, idx: number) => {
-      if (selEntIds.has(ent.id)) {
-        const copyId = `ent_${now}_${idx}`;
-        const nx = Math.min(92, Number((ent.x || 50) + 4));
-        const ny = Math.min(92, Number((ent.y || 50) + 4));
-        copies.push({
-          ...ent,
-          id: copyId,
-          x: nx,
-          y: ny,
-          anchorX: nx,
-          anchorY: ny
-        });
-        newSelection.push({ kind: 'entity', id: copyId });
-      }
-    });
-
-    if (copies.length > 0) {
-      onChange({ ...block, entities: [...entities, ...copies] });
-      setSelectedItems(newSelection);
-      notifyBuilder(`Duplicated ${copies.length} item(s)!`);
-    }
-  };
-
-  const deleteSelectedItems = () => {
-    const selEntIds = new Set(
-      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
-    );
-    const selZoneIds = new Set(
-      selectedItems.filter((s) => s.kind === 'zone').map((s) => s.id)
-    );
-    onChange({
-      ...block,
-      entities: entities.filter((e: any) => !selEntIds.has(e.id)),
-      zones: zones.filter((z: any) => !selZoneIds.has(z.id))
-    });
-    setSelectedItems([]);
-  };
-
   const handleSelectAllCards = () => {
     const allCardSelections = entities
       .filter((e: any) => e.entityType !== 'bg_shape')
@@ -1807,7 +1958,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     THEME_BACKGROUNDS[block?.backgroundTheme || 'physics_lab'] || THEME_BACKGROUNDS.physics_lab;
 
   // ============================================================================
-  //  🔥 PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER (SINGLE + BATCH MULTI-EDIT)
+  //  PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER
   // ============================================================================
   const renderContextualTaskBar = (isFloatingInstance = false) => {
     if (!activeTarget) {
@@ -1815,8 +1966,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         return (
           <div className="px-4 py-2.5 rounded-2xl bg-slate-900/95 text-slate-400 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
             <span className="flex items-center gap-2">
-              <Sliders size={14} className="text-indigo-400" />
-              Click any box to inspect — or <strong className="text-cyan-300">Shift + Click</strong> multiple boxes to batch-style, align, or move them together!
+              <Keyboard size={14} className="text-indigo-400" />
+              Click to select (<strong className="text-cyan-300">Shift+Click</strong> multi-select) • <strong className="text-amber-300">Arrow Keys</strong> nudge 1% (Shift=5%, Alt=0.5%) • <strong className="text-emerald-300">Ctrl+D</strong> duplicate • <strong className="text-rose-400">Del</strong> remove
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -1974,7 +2125,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             )}
           </div>
 
-          {/* 2. Primary Text & Sublabel Inline Inputs (Shown for Single Item or Batch Sublabel) */}
+          {/* 2. Primary Text & Sublabel Inline Inputs */}
           <div className={`flex ${isVertical ? 'flex-col' : 'items-center'} gap-1.5`}>
             {!isMultiSelect && (
               <input
@@ -2012,7 +2163,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </button>
           </div>
 
-          {/* 3. 6-Color Palette Swatches (Batch Applies to All Selected!) */}
+          {/* 3. 6-Color Palette Swatches */}
           <div className="flex items-center gap-1 px-2 border-l border-r border-slate-800">
             {Object.entries(COLOR_STYLES).map(([colorKey, cObj]) => {
               const isPicked = (activeTarget.color || 'indigo') === colorKey;
@@ -2033,7 +2184,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             })}
           </div>
 
-          {/* 4. Border Style & Shape Corner Pickers (Batch Applies to All Selected!) */}
+          {/* 4. Border Style & Shape Corner Pickers */}
           <div className="flex items-center gap-1.5">
             <select
               value={activeTarget.borderStyle || (isEntity ? 'solid' : 'dashed')}
@@ -2347,20 +2498,18 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               {activeTarget.lockInBuilder ? <Lock size={13} /> : <Unlock size={13} />}
             </button>
 
-            {isEntity && (
-              <button
-                type="button"
-                title="Duplicate Selected"
-                onClick={duplicateSelectedItems}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
-              >
-                <Copy size={13} />
-              </button>
-            )}
+            <button
+              type="button"
+              title="Duplicate Selected (Ctrl+D)"
+              onClick={duplicateSelectedItems}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+            >
+              <Copy size={13} />
+            </button>
 
             <button
               type="button"
-              title="Delete Selected"
+              title="Delete Selected (Delete / Backspace)"
               onClick={deleteSelectedItems}
               className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white"
             >
@@ -2420,7 +2569,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </button>
             <button
               type="button"
-              title="Clear Selection"
+              title="Clear Selection (Esc)"
               onClick={() => setSelectedItems([])}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white ml-0.5"
             >
@@ -2433,13 +2582,17 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-500/30 shadow-xl overflow-hidden space-y-4 p-6">
+    <div
+      ref={builderRootRef}
+      tabIndex={-1}
+      className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-500/30 shadow-xl overflow-hidden space-y-4 p-6 outline-none"
+    >
       {/* Top Studio Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-              HD Stage Studio • Shift+Click to Multi-Select ({selectedItems.length} Selected)
+              HD Stage Studio • Shift+Click Multi-Select • Arrows Nudge • Ctrl+D Duplicate ({selectedItems.length} Selected)
             </span>
             {builderToast && (
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase animate-in fade-in">
@@ -2732,6 +2885,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
           <div
             ref={stageRef}
             onPointerDown={(e) => {
+              builderRootRef.current?.focus();
               if (!e.shiftKey) {
                 setSelectedItems([]);
               }
@@ -2764,7 +2918,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 return (
                   <div
                     key={shape.id}
-                    onPointerDown={(e) => startMoveItem(e, 'entity', shape)}
+                    onPointerDown={(e) => {
+                      builderRootRef.current?.focus();
+                      startMoveItem(e, 'entity', shape);
+                    }}
                     style={{
                       left: `${shape.x}%`,
                       top: `${shape.y}%`,
@@ -2782,7 +2939,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       <button
                         type="button"
                         title="Drag to Move (Shift+Click to Multi-Select)"
-                        onPointerDown={(e) => startMoveItem(e, 'entity', shape)}
+                        onPointerDown={(e) => {
+                          builderRootRef.current?.focus();
+                          startMoveItem(e, 'entity', shape);
+                        }}
                         className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-purple-600 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-move z-30"
                       >
                         <Move size={13} />
@@ -2795,6 +2955,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
+                        builderRootRef.current?.focus();
                         selectOrToggleItem('entity', shape.id, e.shiftKey);
                       }}
                       className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
@@ -2810,7 +2971,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       <button
                         type="button"
                         title="Pull Diagonally to Resize Group Shape Width & Height"
-                        onPointerDown={(e) => startResizeItem(e, 'entity', shape)}
+                        onPointerDown={(e) => {
+                          builderRootRef.current?.focus();
+                          startResizeItem(e, 'entity', shape);
+                        }}
                         className="absolute -bottom-3.5 -right-3.5 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
                       >
                         <MoveDiagonal2 size={13} />
@@ -2864,7 +3028,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               return (
                 <div
                   key={z.id}
-                  onPointerDown={(e) => startMoveItem(e, 'zone', z)}
+                  onPointerDown={(e) => {
+                    builderRootRef.current?.focus();
+                    startMoveItem(e, 'zone', z);
+                  }}
                   style={{
                     left: `${z.x}%`,
                     top: `${z.y}%`,
@@ -2883,7 +3050,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     <button
                       type="button"
                       title="Drag to Move Drop Zone (Shift+Click to Multi-Select)"
-                      onPointerDown={(e) => startMoveItem(e, 'zone', z)}
+                      onPointerDown={(e) => {
+                        builderRootRef.current?.focus();
+                        startMoveItem(e, 'zone', z);
+                      }}
                       className="absolute -top-3.5 -left-3.5 w-9 h-9 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-slate-600 flex items-center justify-center shadow-lg cursor-move z-30"
                     >
                       <Move size={15} />
@@ -2896,6 +3066,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
+                      builderRootRef.current?.focus();
                       selectOrToggleItem('zone', z.id, e.shiftKey);
                     }}
                     className={`absolute -top-3.5 -right-3.5 w-9 h-9 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
@@ -2911,7 +3082,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     <button
                       type="button"
                       title="Pull Diagonally to Resize Zone Width & Height"
-                      onPointerDown={(e) => startResizeItem(e, 'zone', z)}
+                      onPointerDown={(e) => {
+                        builderRootRef.current?.focus();
+                        startResizeItem(e, 'zone', z);
+                      }}
                       className="absolute -bottom-3.5 -right-3.5 w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
                     >
                       <MoveDiagonal2 size={15} />
@@ -2943,7 +3117,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 return (
                   <div
                     key={ent.id}
-                    onPointerDown={(e) => startMoveItem(e, 'entity', ent)}
+                    onPointerDown={(e) => {
+                      builderRootRef.current?.focus();
+                      startMoveItem(e, 'entity', ent);
+                    }}
                     style={{
                       left: `${ent.x}%`,
                       top: `${ent.y}%`,
@@ -2970,7 +3147,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       <button
                         type="button"
                         title="Drag in 4 Directions to Move (Moves Entire Selected Group)"
-                        onPointerDown={(e) => startMoveItem(e, 'entity', ent)}
+                        onPointerDown={(e) => {
+                          builderRootRef.current?.focus();
+                          startMoveItem(e, 'entity', ent);
+                        }}
                         className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-white/80 flex items-center justify-center shadow-lg cursor-move z-30"
                       >
                         <Move size={13} />
@@ -2983,6 +3163,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
+                        builderRootRef.current?.focus();
                         selectOrToggleItem('entity', ent.id, e.shiftKey);
                       }}
                       className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
@@ -2998,7 +3179,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       <button
                         type="button"
                         title="Pull Diagonally to Resize Box"
-                        onPointerDown={(e) => startResizeItem(e, 'entity', ent)}
+                        onPointerDown={(e) => {
+                          builderRootRef.current?.focus();
+                          startResizeItem(e, 'entity', ent);
+                        }}
                         className="absolute -bottom-3.5 -right-3.5 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
                       >
                         <MoveDiagonal2 size={13} />
