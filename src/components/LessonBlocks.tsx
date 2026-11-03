@@ -1,11 +1,11 @@
 // src/components/LessonBlocks.tsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  RotateCcw, Check, X, Plus, Trash2, Zap,
+  RotateCcw, Check, X, Plus, Trash2,
   Maximize2, Minimize2, Lock, Magnet, Grid,
   Code, CheckCircle2, Move, Pin, Monitor,
-  MoreHorizontal, MoveDiagonal2, Copy, Palette,
-  Sparkles, Sliders
+  MoreHorizontal, MoveDiagonal2, Copy,
+  AlignHorizontalSpaceAround, Link2
 } from 'lucide-react';
 
 // ============================================================================
@@ -222,22 +222,24 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     setTimeout(() => setStatusBanner(null), 2500);
   };
 
-  // Drag Start (Respects `anchored: true` lock and inline triggers)
+  // Drag Start (Respects `anchored: true` lock, connector nodes, and inline triggers)
   const handlePointerDownEntity = (e: React.PointerEvent, ent: any) => {
     e.stopPropagation();
 
-    if (ent.entityType === 'connector_node') {
+    if (ent.entityType === 'connector_node' || ent.connectTargetId) {
       if (!activeConnectorSourceId) {
         setActiveConnectorSourceId(ent.id);
+        setStatusBanner(`Selected "${ent.label}" — now click its matching target box!`);
       } else if (activeConnectorSourceId !== ent.id) {
         const sourceEnt = entities.find((item) => item.id === activeConnectorSourceId);
         const isCorrect =
           sourceEnt?.connectTargetId === ent.id || ent?.connectTargetId === activeConnectorSourceId;
         setConnections((prev) => [
-          ...prev.filter((c) => c.fromId !== activeConnectorSourceId),
+          ...prev.filter((c) => c.fromId !== activeConnectorSourceId && c.toId !== activeConnectorSourceId),
           { fromId: activeConnectorSourceId, toId: ent.id, isCorrect }
         ]);
         setActiveConnectorSourceId(null);
+        setStatusBanner(isCorrect ? 'Connector line linked!' : 'Connected — check if that pair matches.');
       } else {
         setActiveConnectorSourceId(null);
       }
@@ -251,7 +253,6 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       return;
     }
 
-    // Check inline triggerAction on the entity OR a matching rule in block.rules
     if (ent.triggerEvent === 'on_click' && ent.triggerAction) {
       if (ent.triggerMessage) setStatusBanner(ent.triggerMessage);
       if (ent.triggerAction === 'complete_block' && onComplete) onComplete();
@@ -427,13 +428,29 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 
   const checkMastery = () => {
     const draggablesWithTargets = entities.filter(
-      (e) => !e.anchored && e.draggable !== false && (e.category || e.sequenceIndex !== undefined)
+      (e) =>
+        !e.anchored &&
+        e.draggable !== false &&
+        e.entityType !== 'connector_node' &&
+        (e.category || e.sequenceIndex !== undefined)
     );
     const allDraggablesRight =
       draggablesWithTargets.length === 0 ||
       draggablesWithTargets.every((e) => e.validationStatus === 'correct');
 
-    if (allDraggablesRight) {
+    const connectorNodesWithTargets = entities.filter((e) => e.connectTargetId);
+    const allConnectorsRight =
+      connectorNodesWithTargets.length === 0 ||
+      connectorNodesWithTargets.every((e) =>
+        connections.some(
+          (c) =>
+            c.isCorrect &&
+            ((c.fromId === e.id && c.toId === e.connectTargetId) ||
+              (c.toId === e.id && c.fromId === e.connectTargetId))
+        )
+      );
+
+    if (allDraggablesRight && allConnectorsRight) {
       setStatusBanner('All canvas objectives verified!');
       if (layers.length > 0 && !activeLayer) {
         setActiveLayer(layers[0]);
@@ -441,7 +458,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
         onComplete();
       }
     } else {
-      setStatusBanner('Some items are still unplaced or in the wrong slot. Keep going!');
+      setStatusBanner('Some items or connector lines are still incomplete. Keep going!');
     }
   };
 
@@ -607,6 +624,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
               const borderStyleClass = BORDER_STYLE_CLASSES[ent.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
               const isDragging = draggingId === ent.id;
               const isAnchored = Boolean(ent.anchored || ent.entityType === 'static_anchor');
+              const isConnector = Boolean(ent.entityType === 'connector_node' || ent.connectTargetId);
 
               let ringStyle = '';
               if (ent.validationStatus === 'correct') {
@@ -732,6 +750,8 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                   className={`absolute px-6 py-3.5 rounded-2xl ${borderStyleClass} shadow-xl transition-shadow select-none flex items-center justify-center ${
                     isAnchored
                       ? 'bg-slate-900/90 border-slate-600/80 text-white cursor-default shadow-md'
+                      : isConnector
+                      ? `${palette.bg} ${palette.border} cursor-pointer hover:shadow-2xl`
                       : `${palette.bg} ${palette.border} cursor-grab active:cursor-grabbing hover:shadow-2xl`
                   } ${ringStyle}`}
                 >
@@ -739,6 +759,11 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                     {isAnchored && (
                       <span title="Anchored to Stage" className="inline-flex">
                         <Pin size={14} className="text-amber-400 shrink-0 rotate-45" />
+                      </span>
+                    )}
+                    {isConnector && (
+                      <span title="Tap to Draw Connector Line" className="inline-flex">
+                        <Link2 size={15} className="text-cyan-200 shrink-0" />
                       </span>
                     )}
                     <div className="text-center">
@@ -856,6 +881,8 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 //   - Four-Directions (<Move />) Drag Handle
 //   - Diagonal (<MoveDiagonal2 />) Pull-to-Resize Handle
 //   - Three-Dots (<MoreHorizontal />) In-Place Tooltip Inspector Box
+//   - 1-Click Auto-Align & Distribute Row Toolbar Button
+//   - Link Connector Target Dropdown inside Three-Dots Triggers Tab
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const outerWrapRef = useRef<HTMLDivElement>(null);
@@ -869,8 +896,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const [selectedItem, setSelectedItem] = useState<{ kind: 'entity' | 'zone'; id: string } | null>(
     null
   );
+  const [builderToast, setBuilderToast] = useState<string | null>(null);
 
-  // Dragging & Diagonal Resizing Interaction State
   const [interaction, setInteraction] = useState<{
     mode: 'move' | 'resize';
     kind: 'entity' | 'zone';
@@ -895,8 +922,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
   const entities = Array.isArray(block?.entities) ? block.entities : [];
   const zones = Array.isArray(block?.zones) ? block.zones : [];
-  const layers = Array.isArray(block?.layers) ? block.layers : [];
-  const rules = Array.isArray(block?.rules) ? block.rules : [];
+
+  const notifyBuilder = (msg: string) => {
+    setBuilderToast(msg);
+    setTimeout(() => setBuilderToast(null), 2600);
+  };
 
   useEffect(() => {
     const updateScale = () => {
@@ -920,6 +950,109 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     const clamped = Math.max(minVal, Math.min(maxVal, val));
     if (!gridSnap || gridSnap <= 0) return Number(clamped.toFixed(1));
     return Number((Math.round(clamped / gridSnap) * gridSnap).toFixed(1));
+  };
+
+  // ============================================================================
+  //  1-CLICK AUTO-ALIGN & DISTRIBUTE ROW ENGINE
+  // ============================================================================
+  const handleAutoAlignRow = () => {
+    // Case A: A Drop Zone is selected -> Align all Drop Zones in that horizontal band (±15% Y)
+    if (selectedItem?.kind === 'zone') {
+      const targetZone = zones.find((z: any) => z.id === selectedItem.id);
+      if (targetZone) {
+        const bandY = Number(targetZone.y ?? 30);
+        const rowZones = zones
+          .filter((z: any) => Math.abs(Number(z.y ?? 30) - bandY) <= 15)
+          .sort((a: any, b: any) => (a.x ?? 50) - (b.x ?? 50));
+
+        if (rowZones.length > 1) {
+          const count = rowZones.length;
+          const step = 80 / (count + 1);
+          const idToNewX = new Map<string, number>();
+          rowZones.forEach((z: any, idx: number) => {
+            const evenX = count === 1 ? 50 : Number((14 + (idx * 72) / (count - 1)).toFixed(1));
+            idToNewX.set(z.id, step ? evenX : 50);
+          });
+
+          const nextZones = zones.map((z: any) =>
+            idToNewX.has(z.id)
+              ? { ...z, x: idToNewX.get(z.id), y: Number(bandY.toFixed(1)) }
+              : z
+          );
+          onChange({ ...block, zones: nextZones });
+          notifyBuilder(`Aligned & distributed ${rowZones.length} drop zones along Y=${bandY.toFixed(0)}%!`);
+          return;
+        }
+      }
+    }
+
+    // Case B: An Entity is selected -> Align all sibling Entities in that horizontal band (±14% Y)
+    if (selectedItem?.kind === 'entity') {
+      const targetEnt = entities.find((e: any) => e.id === selectedItem.id);
+      if (targetEnt) {
+        const bandY = Number(targetEnt.y ?? 82);
+        const rowEnts = entities
+          .filter((e: any) => Math.abs(Number(e.y ?? 82) - bandY) <= 14)
+          .sort((a: any, b: any) => (a.x ?? 50) - (b.x ?? 50));
+
+        if (rowEnts.length > 1) {
+          const count = rowEnts.length;
+          const idToNewX = new Map<string, number>();
+          rowEnts.forEach((e: any, idx: number) => {
+            const evenX = count === 1 ? 50 : Number((12 + (idx * 76) / (count - 1)).toFixed(1));
+            idToNewX.set(e.id, evenX);
+          });
+
+          const nextEntities = entities.map((e: any) =>
+            idToNewX.has(e.id)
+              ? {
+                  ...e,
+                  x: idToNewX.get(e.id),
+                  y: Number(bandY.toFixed(1)),
+                  anchorX: idToNewX.get(e.id),
+                  anchorY: Number(bandY.toFixed(1))
+                }
+              : e
+          );
+          onChange({ ...block, entities: nextEntities });
+          notifyBuilder(`Aligned & evenly spaced ${rowEnts.length} boxes along Y=${bandY.toFixed(0)}%!`);
+          return;
+        }
+      }
+    }
+
+    // Case C: Nothing selected (or single item) -> Tidy all unanchored draggable cards into 1–2 bottom word-bank rows
+    const draggables = entities.filter((e: any) => !e.anchored && e.draggable !== false);
+    if (draggables.length === 0) return;
+
+    const maxPerRow = 6;
+    const updatedMap = new Map<string, { x: number; y: number }>();
+    draggables.forEach((ent: any, idx: number) => {
+      const rowIdx = Math.floor(idx / maxPerRow);
+      const colIdx = idx % maxPerRow;
+      const itemsInThisRow = Math.min(maxPerRow, draggables.length - rowIdx * maxPerRow);
+      const evenX =
+        itemsInThisRow === 1
+          ? 50
+          : Number((12 + (colIdx * 76) / (itemsInThisRow - 1)).toFixed(1));
+      const rowY = draggables.length > maxPerRow ? (rowIdx === 0 ? 80 : 91) : 85;
+      updatedMap.set(ent.id, { x: evenX, y: rowY });
+    });
+
+    const nextEntities = entities.map((e: any) => {
+      const coords = updatedMap.get(e.id);
+      if (!coords) return e;
+      return {
+        ...e,
+        x: coords.x,
+        y: coords.y,
+        anchorX: coords.x,
+        anchorY: coords.y
+      };
+    });
+
+    onChange({ ...block, entities: nextEntities });
+    notifyBuilder(`Auto-aligned ${draggables.length} cards into an evenly spaced word bank!`);
   };
 
   // Start Four-Directions Move
@@ -968,7 +1101,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  // Unified Stage Pointer Move (Handles Both 4-Direction Move & Diagonal Resize)
   const handleStagePointerMove = (e: React.PointerEvent) => {
     if (!interaction || !stageRef.current) return;
     const rect = stageRef.current.getBoundingClientRect();
@@ -1002,7 +1134,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         );
         onChange({ ...block, zones: nextZones });
       } else {
-        // Diagonal pull on an entity smoothly scales it (and updates width/height if box sizing is used)
         const diagonalDelta = (deltaPctX + deltaPctY) / 25;
         const nextScale = Number(
           Math.max(0.5, Math.min(2.6, interaction.initScale + diagonalDelta)).toFixed(2)
@@ -1068,6 +1199,35 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     });
   };
 
+  // Link or Unlink two entities as an SVG Connector-Line pair
+  const handleLinkConnectorTarget = (sourceId: string, targetId: string) => {
+    const nextEntities = entities.map((e: any) => {
+      if (e.id === sourceId) {
+        return {
+          ...e,
+          connectTargetId: targetId || undefined,
+          entityType: targetId ? 'connector_node' : 'draggable',
+          draggable: !targetId && !e.anchored
+        };
+      }
+      if (targetId && e.id === targetId) {
+        return {
+          ...e,
+          entityType: 'connector_node',
+          draggable: false
+        };
+      }
+      return e;
+    });
+    onChange({ ...block, entities: nextEntities });
+    if (targetId) {
+      const targetObj = entities.find((e: any) => e.id === targetId);
+      notifyBuilder(`Linked connector line to "${targetObj?.label || targetId}"!`);
+    } else {
+      notifyBuilder('Removed connector link.');
+    }
+  };
+
   const updateZoneField = (id: string, patch: Record<string, any>) => {
     onChange({
       ...block,
@@ -1100,18 +1260,25 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-500/30 shadow-xl overflow-hidden space-y-6 p-6">
-      {/* Top Studio Controls: Resolution Picker, Grid Snap & Add Buttons */}
+      {/* Top Studio Controls: Resolution Picker, Grid Snap, Auto-Align Row & Add Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 block">
-            High-Definition Kinetic Stage Editor • Drag <Move size={11} className="inline" /> to Move • Pull <MoveDiagonal2 size={11} className="inline" /> to Resize • Click ••• for Tooltip
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+              High-Definition Kinetic Stage Editor • Drag <Move size={11} className="inline" /> to Move • Pull <MoveDiagonal2 size={11} className="inline" /> to Resize • Click ••• for Tooltip
+            </span>
+            {builderToast && (
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase animate-in fade-in">
+                {builderToast}
+              </span>
+            )}
+          </div>
           <input
             type="text"
             value={block?.title || ''}
             onChange={(e) => onChange({ ...block, title: e.target.value })}
             placeholder="Canvas Slide Title..."
-            className="text-lg font-black bg-transparent text-slate-900 dark:text-white outline-none border-b border-transparent focus:border-indigo-500"
+            className="text-lg font-black bg-transparent text-slate-900 dark:text-white outline-none border-b border-transparent focus:border-indigo-500 mt-0.5"
           />
         </div>
 
@@ -1146,6 +1313,16 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               <option value={5}>Snap: Coarse Grid (5%)</option>
             </select>
           </div>
+
+          {/* 🔥 1-CLICK AUTO-ALIGN & DISTRIBUTE ROW BUTTON */}
+          <button
+            type="button"
+            onClick={handleAutoAlignRow}
+            title="Auto-align and evenly space selected row of cards/zones (or tidy entire word bank)"
+            className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+          >
+            <AlignHorizontalSpaceAround size={13} /> Align Row
+          </button>
 
           <button
             type="button"
@@ -1230,6 +1407,32 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
           }}
           className={`relative shrink-0 select-none overflow-hidden ${activeThemeClass}`}
         >
+          {/* ============================================================================ */}
+          {/* LIVE SVG CONNECTOR-PAIR PREVIEW LINES ON BUILDER STAGE                       */}
+          {/* ============================================================================ */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+            {entities
+              .filter((e: any) => e.connectTargetId)
+              .map((srcEnt: any) => {
+                const targetEnt = entities.find((t: any) => t.id === srcEnt.connectTargetId);
+                if (!targetEnt) return null;
+                return (
+                  <g key={`link_${srcEnt.id}_${targetEnt.id}`}>
+                    <line
+                      x1={`${srcEnt.x}%`}
+                      y1={`${srcEnt.y}%`}
+                      x2={`${targetEnt.x}%`}
+                      y2={`${targetEnt.y}%`}
+                      stroke="#22d3ee"
+                      strokeWidth="4"
+                      strokeDasharray="10,8"
+                      opacity="0.85"
+                    />
+                  </g>
+                );
+              })}
+          </svg>
+
           {/* ============================================================================ */}
           {/* DROP ZONES / BUCKETS ON BUILDER STAGE                                        */}
           {/* ============================================================================ */}
@@ -1380,7 +1583,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       <Pin size={15} className="text-amber-400 rotate-45" />
                     </span>
                   )}
-                  {ent.returnToAnchor && !ent.anchored && (
+                  {ent.connectTargetId && (
+                    <span title="Linked Connector Node" className="inline-flex">
+                      <Link2 size={15} className="text-cyan-200" />
+                    </span>
+                  )}
+                  {ent.returnToAnchor && !ent.anchored && !ent.connectTargetId && (
                     <span title="Magnetic Return to Home Anchor" className="inline-flex">
                       <Magnet size={14} className="text-cyan-200" />
                     </span>
@@ -1398,7 +1606,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
           {/* ============================================================================ */}
           {/* IN-PLACE THREE-DOTS (•••) FLOATING TOOLTIP INSPECTOR POPOVER                 */}
-          {/* Appears directly next to the selected Entity or Drop Zone on the canvas      */}
           {/* ============================================================================ */}
           {(activeMenuEntity || activeMenuZone) && (
             <div
@@ -1406,10 +1613,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               onClick={(e) => e.stopPropagation()}
               style={{
                 left: `${Math.min(72, Math.max(28, (activeMenuEntity || activeMenuZone).x))}%`,
-                top: `${Math.min(68, Math.max(22, (activeMenuEntity || activeMenuZone).y))}%`,
+                top: `${Math.min(66, Math.max(24, (activeMenuEntity || activeMenuZone).y))}%`,
                 transform: 'translate(-50%, -50%)'
               }}
-              className="absolute z-[200] w-[420px] rounded-3xl bg-slate-900/98 backdrop-blur-2xl border-2 border-indigo-400/60 shadow-[0_25px_70px_rgba(0,0,0,0.85)] text-white p-5 space-y-4 animate-in zoom-in-95 duration-150"
+              className="absolute z-[200] w-[430px] rounded-3xl bg-slate-900/98 backdrop-blur-2xl border-2 border-indigo-400/60 shadow-[0_25px_70px_rgba(0,0,0,0.85)] text-white p-5 space-y-4 animate-in zoom-in-95 duration-150"
             >
               {/* Popover Header */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1463,12 +1670,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 </div>
               </div>
 
-              {/* Tooltip Sub-Tabs: Style (Color/Border) | Text & Tags | Triggers & Anchors */}
+              {/* Tooltip Sub-Tabs: Style (Color/Border) | Text & Tags | Triggers & Pin */}
               <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-slate-950 border border-slate-800">
                 {[
                   { id: 'style', label: 'Color & Border' },
                   { id: 'text', label: 'Text & Match' },
-                  { id: 'triggers', label: 'Triggers & Pin' }
+                  { id: 'triggers', label: 'Triggers & Link' }
                 ].map((t) => (
                   <button
                     key={t.id}
@@ -1706,11 +1913,34 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 </div>
               )}
 
-              {/* TAB 3: ANCHORING & INTERACTION TRIGGERS */}
+              {/* TAB 3: ANCHORING, LINK CONNECTOR TARGET & INTERACTION TRIGGERS */}
               {menuTab === 'triggers' && (
                 <div className="space-y-3">
                   {activeMenuEntity ? (
                     <>
+                      {/* 🔥 LINK CONNECTOR TARGET DROPDOWN */}
+                      <div className="p-3 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-cyan-300 flex items-center gap-1.5">
+                          <Link2 size={13} /> Link Connector Target (Draw Matching Line)
+                        </label>
+                        <select
+                          value={activeMenuEntity.connectTargetId || ''}
+                          onChange={(e) =>
+                            handleLinkConnectorTarget(activeMenuEntity.id, e.target.value)
+                          }
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-xs font-bold text-white outline-none"
+                        >
+                          <option value="">None (Standard Draggable / Anchored Box)</option>
+                          {entities
+                            .filter((other: any) => other.id !== activeMenuEntity.id)
+                            .map((other: any) => (
+                              <option key={other.id} value={other.id}>
+                                Connect to: {other.label} ({other.sublabel || other.id})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
                       <div className="flex flex-col gap-2">
                         <button
                           type="button"
@@ -1721,7 +1951,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                               draggable: !nextAnchored
                             });
                           }}
-                          className={`w-full py-2.5 px-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-between border ${
+                          className={`w-full py-2 px-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-between border ${
                             activeMenuEntity.anchored
                               ? 'bg-amber-500 text-slate-950 border-amber-300'
                               : 'bg-slate-950 text-slate-300 border-slate-800'
@@ -1733,7 +1963,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                           <span>{activeMenuEntity.anchored ? 'LOCKED' : 'OFF'}</span>
                         </button>
 
-                        {!activeMenuEntity.anchored && (
+                        {!activeMenuEntity.anchored && !activeMenuEntity.connectTargetId && (
                           <button
                             type="button"
                             onClick={() =>
@@ -1743,7 +1973,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                                 anchorY: activeMenuEntity.y
                               })
                             }
-                            className={`w-full py-2.5 px-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-between border ${
+                            className={`w-full py-2 px-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-between border ${
                               activeMenuEntity.returnToAnchor
                                 ? 'bg-cyan-600 text-white border-cyan-400'
                                 : 'bg-slate-950 text-slate-300 border-slate-800'
