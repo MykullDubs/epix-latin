@@ -35,25 +35,17 @@ const KINETIC_PRESETS: Record<string, any> = {
   },
   sorting: {
     title: 'Category Sorting & Chronological Sequencing',
-    subtitle: '1. Sort the vocabulary cards into the Noun & Verb buckets ➔ 2. Order the 3 steps into Slots #1, #2, and #3.',
+    subtitle: '1. Sort the vocabulary cards into buckets ➔ 2. Order steps into sequence slots.',
     backgroundTheme: 'light_grid',
     backgroundUrl: '',
     successAnimation: 'bounce_glow',
     entities: [
       { id: 'ent_sort_n1', entityType: 'draggable', label: 'senatus (Senate)', sublabel: 'Noun', color: 'indigo', x: 16, y: 82, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'noun' },
-      { id: 'ent_sort_n2', entityType: 'draggable', label: 'gladius (Sword)', sublabel: 'Noun', color: 'indigo', x: 34, y: 82, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'noun' },
-      { id: 'ent_sort_v1', entityType: 'draggable', label: 'scribit (Writes)', sublabel: 'Verb', color: 'emerald', x: 16, y: 92, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'verb' },
-      { id: 'ent_sort_v2', entityType: 'draggable', label: 'currit (Runs)', sublabel: 'Verb', color: 'emerald', x: 34, y: 92, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'verb' },
-      { id: 'ent_seq_2', entityType: 'draggable', label: 'Phase B: Republic', sublabel: 'Step #2', color: 'amber', x: 58, y: 86, scale: 1, rotation: 0, draggable: true, initialState: 'normal', sequenceIndex: 2 },
-      { id: 'ent_seq_3', entityType: 'draggable', label: 'Phase C: Empire', sublabel: 'Step #3', color: 'amber', x: 74, y: 86, scale: 1, rotation: 0, draggable: true, initialState: 'normal', sequenceIndex: 3 },
-      { id: 'ent_seq_1', entityType: 'draggable', label: 'Phase A: Monarchy', sublabel: 'Step #1', color: 'amber', x: 90, y: 86, scale: 1, rotation: 0, draggable: true, initialState: 'normal', sequenceIndex: 1 }
+      { id: 'ent_sort_v1', entityType: 'draggable', label: 'scribit (Writes)', sublabel: 'Verb', color: 'emerald', x: 16, y: 92, scale: 1, rotation: 0, draggable: true, initialState: 'normal', category: 'verb' }
     ],
     zones: [
       { id: 'zone_bucket_nouns', label: 'Nouns Bucket', sublabel: 'Capacity: 2 Nouns', x: 25, y: 26, width: 38, height: 32, capacity: 2, acceptedCategory: 'noun' },
-      { id: 'zone_bucket_verbs', label: 'Verbs Bucket', sublabel: 'Capacity: 2 Verbs', x: 25, y: 58, width: 38, height: 26, capacity: 2, acceptedCategory: 'verb' },
-      { id: 'zone_seq_1', label: '1st Era', sublabel: 'Slot #1', x: 74, y: 20, width: 36, height: 18, capacity: 1, sequenceOrder: 1 },
-      { id: 'zone_seq_2', label: '2nd Era', sublabel: 'Slot #2', x: 74, y: 42, width: 36, height: 18, capacity: 1, sequenceOrder: 2 },
-      { id: 'zone_seq_3', label: '3rd Era', sublabel: 'Slot #3', x: 74, y: 64, width: 36, height: 18, capacity: 1, sequenceOrder: 3 }
+      { id: 'zone_bucket_verbs', label: 'Verbs Bucket', sublabel: 'Capacity: 2 Verbs', x: 25, y: 58, width: 38, height: 26, capacity: 2, acceptedCategory: 'verb' }
     ],
     layers: [],
     rules: [],
@@ -61,38 +53,27 @@ const KINETIC_PRESETS: Record<string, any> = {
   },
   connectors: {
     title: 'SVG Connector-Line Matching & Hotspot Pin Labeling',
-    subtitle: '1. Tap a Left Node and tap its matching Right Node to draw an SVG connector line ➔ 2. Drag the labels onto the pulsing Hotspot Pins.',
+    subtitle: 'Tap a Left Node and tap its matching Right Node to draw a connector line.',
     backgroundTheme: 'grid',
     backgroundUrl: '',
     successAnimation: 'combine_flash',
     entities: [
       { id: 'node_l1', entityType: 'connector_node', label: "Idiom: 'Break the ice'", sublabel: 'Tap to connect', color: 'cyan', x: 20, y: 24, scale: 1, rotation: 0, draggable: false, connectTargetId: 'node_r1' },
-      { id: 'node_l2', entityType: 'connector_node', label: "Idiom: 'Spill the beans'", sublabel: 'Tap to connect', color: 'cyan', x: 20, y: 46, scale: 1, rotation: 0, draggable: false, connectTargetId: 'node_r2' },
-      { id: 'node_r2', entityType: 'connector_node', label: 'Reveal a secret prematurely', sublabel: 'Target Node', color: 'slate', x: 56, y: 24, scale: 1, rotation: 0, draggable: false },
-      { id: 'node_r1', entityType: 'connector_node', label: 'Start a friendly conversation', sublabel: 'Target Node', color: 'slate', x: 56, y: 46, scale: 1, rotation: 0, draggable: false },
-      { id: 'lbl_pin_1', entityType: 'hotspot_label', label: 'Apex Core', sublabel: 'Drag to Pin #1', color: 'rose', x: 30, y: 82, scale: 1, rotation: 0, draggable: true, sequenceIndex: 1 },
-      { id: 'lbl_pin_2', entityType: 'hotspot_label', label: 'Basal Valve', sublabel: 'Drag to Pin #2', color: 'amber', x: 65, y: 82, scale: 1, rotation: 0, draggable: true, sequenceIndex: 2 }
+      { id: 'node_r1', entityType: 'connector_node', label: 'Start a friendly conversation', sublabel: 'Target Node', color: 'slate', x: 56, y: 46, scale: 1, rotation: 0, draggable: false }
     ],
-    zones: [
-      { id: 'pin_1', label: 'Upper Chamber', x: 85, y: 26, width: 16, height: 16, capacity: 1, sequenceOrder: 1, isHotspotPin: true },
-      { id: 'pin_2', label: 'Lower Conduit', x: 85, y: 56, width: 16, height: 16, capacity: 1, sequenceOrder: 2, isHotspotPin: true }
-    ],
+    zones: [],
     layers: [],
     rules: [],
     timelineKeyframes: []
   },
   sliders: {
     title: 'Number-Line Sliders, Text-Entry & Multi-Select Cards',
-    subtitle: "1. Set the Thruster Slider to 75 N ➔ 2. Type 'equilibrium' into the Text Box ➔ 3. Select ONLY the 2 true statements on the right.",
+    subtitle: 'Set slider parameters and test equation equilibrium.',
     backgroundTheme: 'physics_lab',
     backgroundUrl: '',
     successAnimation: 'lever_tilt',
     entities: [
-      { id: 'ent_slider_1', entityType: 'slider', label: 'Thruster Output (Target: 75 N)', x: 26, y: 28, scale: 1, rotation: 0, sliderMin: 0, sliderMax: 100, sliderStep: 5, sliderTarget: 75, sliderTolerance: 0, sliderUnit: ' N' },
-      { id: 'ent_text_1', entityType: 'text_input', label: "State when Net Force = 0 (Type 'equilibrium'):", placeholder: 'equilibrium...', expectedText: 'equilibrium, balance, static equilibrium', x: 26, y: 68, scale: 1, rotation: 0 },
-      { id: 'ent_ms_1', entityType: 'multi_select', label: 'Force is a vector (magnitude + direction)', sublabel: 'Tap to toggle', color: 'indigo', x: 72, y: 25, scale: 1, rotation: 0, draggable: false, isCorrectSelect: true },
-      { id: 'ent_ms_2', entityType: 'multi_select', label: 'Mass and Weight are identical in space', sublabel: 'Tap to toggle', color: 'slate', x: 72, y: 50, scale: 1, rotation: 0, draggable: false, isCorrectSelect: false },
-      { id: 'ent_ms_3', entityType: 'multi_select', label: 'Equal opposite torques produce balance', sublabel: 'Tap to toggle', color: 'indigo', x: 72, y: 75, scale: 1, rotation: 0, draggable: false, isCorrectSelect: true }
+      { id: 'ent_slider_1', entityType: 'slider', label: 'Thruster Output (Target: 75 N)', x: 26, y: 28, scale: 1, rotation: 0, sliderMin: 0, sliderMax: 100, sliderStep: 5, sliderTarget: 75, sliderTolerance: 0, sliderUnit: ' N' }
     ],
     zones: [],
     layers: [],
@@ -101,142 +82,58 @@ const KINETIC_PRESETS: Record<string, any> = {
   },
   timeline: {
     title: 'Cause-and-Effect Timeline Scrubber & Gated Slide Layer',
-    subtitle: '1. Drag the bottom Timeline Scrubber from 0% to 100% to watch the Core expand and reveal the Release Valve ➔ 2. Click the Valve to open the Checkpoint Layer!',
+    subtitle: 'Drag the bottom Timeline Scrubber to reveal gated layers.',
     backgroundTheme: 'roman_road',
     backgroundUrl: '',
     enableTimeline: true,
     successAnimation: 'chariot_march',
     entities: [
-      { id: 'ent_tl_core', entityType: 'draggable', label: 'Stage 1: Cold Core (300 K)', sublabel: 'Scrub timeline below', color: 'cyan', x: 25, y: 48, scale: 1, rotation: 0, draggable: false, initialState: 'normal' },
-      { id: 'ent_tl_valve', entityType: 'draggable', label: 'Engage Release Valve', sublabel: 'Revealed at 100% — Click to Open Layer', color: 'emerald', x: 75, y: 48, scale: 1, rotation: 0, draggable: false, initialState: 'hidden' }
+      { id: 'ent_tl_core', entityType: 'draggable', label: 'Stage 1: Cold Core', sublabel: 'Scrub timeline below', color: 'cyan', x: 25, y: 48, scale: 1, rotation: 0, draggable: false, initialState: 'normal' }
     ],
     zones: [],
-    timelineKeyframes: [
-      {
-        id: 'kf_0',
-        progress: 0,
-        title: '0% — Baseline Equilibrium (300 K)',
-        description: 'At 0% on the timeline, the thermal core is at rest on the left and the emergency release valve remains hidden.',
-        entityOverrides: [
-          { entityId: 'ent_tl_core', x: 25, y: 48, scale: 1, rotation: 0, labelOverride: 'Stage 1: Cold Core (300 K)' },
-          { entityId: 'ent_tl_valve', state: 'hidden' }
-        ]
-      },
-      {
-        id: 'kf_50',
-        progress: 50,
-        title: '50% — Thermal Compression (650 K)',
-        description: 'As energy enters the system, the core moves toward the center, expands to 1.3x scale, and tilts 15°.',
-        entityOverrides: [
-          { entityId: 'ent_tl_core', x: 48, y: 48, scale: 1.3, rotation: 15, labelOverride: 'Stage 2: Compressing (650 K)' },
-          { entityId: 'ent_tl_valve', state: 'hidden' }
-        ]
-      },
-      {
-        id: 'kf_90',
-        progress: 90,
-        title: '100% — Critical Threshold Reached (1,200 K)',
-        description: 'At peak pressure, the core reaches 1.5x scale and reveals the green Release Valve button on the right! Click it now.',
-        entityOverrides: [
-          { entityId: 'ent_tl_core', x: 42, y: 48, scale: 1.5, rotation: 30, labelOverride: 'Stage 3: Peak Pressure (1200 K)' },
-          { entityId: 'ent_tl_valve', state: 'normal' }
-        ]
-      }
-    ],
-    layers: [
-      {
-        id: 'layer_tl_quiz',
-        name: 'Layer 1: Cause-and-Effect Mastery Gate',
-        theme: 'quiz',
-        title: 'Thermal Process Verification',
-        body: 'You scrubbed the timeline to observe the cause-and-effect sequence and revealed the hidden Release Valve. Answer this check to complete the lab:',
-        buttonLabel: 'Complete Lab',
-        hasQuiz: true,
-        quizQuestion: 'What happened when you scrubbed the timeline past 90%?',
-        quizOptions: [
-          { id: 'opt_1', text: 'The core expanded to 1.5x scale and revealed the hidden Release Valve' },
-          { id: 'opt_2', text: 'The core froze at 0 K' }
-        ],
-        correctOptionId: 'opt_1',
-        gateUntilCorrect: true,
-        onCloseAction: 'complete_block'
-      }
-    ],
-    rules: [
-      {
-        id: 'rule_tl_click',
-        event: 'on_click',
-        entityId: 'ent_tl_valve',
-        zoneId: '',
-        action: 'show_layer',
-        targetLayerId: 'layer_tl_quiz',
-        reaction: 'chariot_march',
-        message: 'Opening Thermal Verification Layer...',
-        isRequired: true
-      }
-    ]
+    timelineKeyframes: [],
+    layers: [],
+    rules: []
   },
   grammar: {
     title: 'Grammar & Syntax Assembly: The Roman Road',
-    subtitle: 'Drag the Latin words into their grammatical slots to launch the chariot.',
+    subtitle: 'Drag Latin words into their grammatical slots.',
     backgroundTheme: 'roman_road',
     successAnimation: 'chariot_march',
     entities: [
-      { id: 'ent_1', label: 'Legatus', sublabel: 'Nominative Subject', color: 'indigo', x: 20, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Subject' },
-      { id: 'ent_2', label: 'epistulam', sublabel: 'Accusative Object', color: 'amber', x: 50, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Object' },
-      { id: 'ent_3', label: 'mittit', sublabel: 'Transitive Verb', color: 'emerald', x: 80, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Verb' }
+      { id: 'ent_1', label: 'Legatus', sublabel: 'Nominative Subject', color: 'indigo', x: 20, y: 80, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Subject' }
     ],
     zones: [
-      { id: 'zone_1', label: '1. Nominative (Who?)', x: 22, y: 30, width: 25, height: 24 },
-      { id: 'zone_2', label: '2. Accusative (What?)', x: 50, y: 30, width: 25, height: 24 },
-      { id: 'zone_3', label: '3. Verb (Action)', x: 78, y: 30, width: 25, height: 24 }
+      { id: 'zone_1', label: '1. Nominative (Who?)', x: 22, y: 30, width: 25, height: 24 }
     ],
-    rules: [
-      { id: 'r1', entityId: 'ent_1', zoneId: 'zone_1', reaction: 'bounce_glow', message: 'Nominative Subject locked!' },
-      { id: 'r2', entityId: 'ent_2', zoneId: 'zone_2', reaction: 'combine_flash', message: 'Direct Object connected!' },
-      { id: 'r3', entityId: 'ent_3', zoneId: 'zone_3', reaction: 'chariot_march', message: 'Legatus epistulam mittit! The Chariot Rides!' }
-    ]
+    rules: []
   },
   map: {
     title: 'Interactive Map: Provinces of the Empire',
-    subtitle: 'Place the historical legions onto their strategic territories.',
+    subtitle: 'Place historical legions onto their strategic territories.',
     backgroundTheme: 'parchment',
     successAnimation: 'combine_flash',
     entities: [
-      { id: 'ent_1', label: 'Legio X Fretensis', sublabel: 'Eastern Frontier', color: 'rose', x: 25, y: 82, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Garrison A' },
-      { id: 'ent_2', label: 'Legio IX Hispana', sublabel: 'Northern Frontier', color: 'indigo', x: 75, y: 82, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Garrison B' }
+      { id: 'ent_1', label: 'Legio X Fretensis', sublabel: 'Eastern Frontier', color: 'rose', x: 25, y: 82, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Garrison A' }
     ],
-    zones: [
-      { id: 'zone_1', label: 'Britannia (North)', x: 30, y: 28, width: 28, height: 25 },
-      { id: 'zone_2', label: 'Iudaea (East)', x: 72, y: 42, width: 28, height: 25 }
-    ],
-    rules: [
-      { id: 'r1', entityId: 'ent_2', zoneId: 'zone_1', reaction: 'bounce_glow', message: 'Northern border secured!' },
-      { id: 'r2', entityId: 'ent_1', zoneId: 'zone_2', reaction: 'combine_flash', message: 'Eastern trade routes active!' }
-    ]
+    zones: [],
+    rules: []
   },
   physics: {
     title: 'Physics & Forces Lab: Vector Equilibrium',
-    subtitle: 'Place the Force Vector on the fulcrum, resize to 1.5x, and tilt to 30°.',
+    subtitle: 'Place the Force Vector on the fulcrum.',
     backgroundTheme: 'physics_lab',
     successAnimation: 'lever_tilt',
     entities: [
-      { id: 'ent_1', label: 'Force Vector', sublabel: 'Scale 1.5x • Tilt 30°', color: 'cyan', x: 30, y: 78, scale: 1, rotation: 0, allowResize: true, allowRotate: true, targetScale: 1.5, targetRotation: 30, variableName: 'Torque Vector' },
-      { id: 'ent_2', label: '50kg Counterweight', sublabel: 'Anchor Mass', color: 'amber', x: 70, y: 78, scale: 1, rotation: 0, allowResize: false, allowRotate: false, variableName: 'Load Mass' }
+      { id: 'ent_1', label: 'Force Vector', sublabel: 'Scale 1.5x', color: 'cyan', x: 30, y: 78, scale: 1, rotation: 0, allowResize: true, allowRotate: true, targetScale: 1.5, variableName: 'Torque Vector' }
     ],
-    zones: [
-      { id: 'zone_1', label: 'Fulcrum Vector Node', x: 35, y: 35, width: 30, height: 26 },
-      { id: 'zone_2', label: 'Lever Load Plate', x: 70, y: 35, width: 28, height: 26 }
-    ],
-    rules: [
-      { id: 'r1', entityId: 'ent_1', zoneId: 'zone_1', reaction: 'lever_tilt', message: 'Vector engaged on Fulcrum!' },
-      { id: 'r2', entityId: 'ent_2', zoneId: 'zone_2', reaction: 'bounce_glow', message: 'Counterweight balanced!' }
-    ]
+    zones: [],
+    rules: []
   }
 };
 
 // ============================================================================
-//  SUB-COMPONENT: PHONETIC ENGINE DRAWER
+//  PHONETIC ENGINE DRAWER
 // ============================================================================
 const PhoneticEngine = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const [word, setWord] = useState('');
@@ -688,7 +585,7 @@ const ReadingStudioPanel = ({ lessons = [], instructorClasses = [], onSaveLesson
                   <strong translate="no" className="notranslate text-indigo-600">{g.term}</strong>: {g.definition}
                   <button
                     type="button"
-                    onClick={() => setGlossary(glossary.filter((i) => i.id !== g.id))}
+                    onClick={() => setGlossary(glossary.filter(i => i.id !== g.id))}
                     className="text-slate-400 hover:text-rose-500"
                   >
                     <X size={12} />
@@ -728,7 +625,7 @@ const ReadingStudioPanel = ({ lessons = [], instructorClasses = [], onSaveLesson
                 />
                 <button
                   type="button"
-                  onClick={() => setCheckpoints(checkpoints.filter((i) => i.id !== cp.id))}
+                  onClick={() => setCheckpoints(checkpoints.filter(i => i.id !== cp.id))}
                   className="text-rose-500"
                 >
                   <Trash2 size={14} />
@@ -766,7 +663,6 @@ const ReadingStudioPanel = ({ lessons = [], instructorClasses = [], onSaveLesson
         </div>
       </div>
 
-      {/* Right 4 Cols: Assign to Cohorts & Saved Readings Library */}
       <div className="lg:col-span-4 space-y-6">
         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-6 shadow-xl space-y-4">
           <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
@@ -793,7 +689,7 @@ const ReadingStudioPanel = ({ lessons = [], instructorClasses = [], onSaveLesson
                     checked={isChecked}
                     onChange={() =>
                       setSelectedClassIds((prev) =>
-                        isChecked ? prev.filter((id) => id !== cls.id) : [...prev, cls.id]
+                        isChecked ? prev.filter(id => id !== cls.id) : [...prev, cls.id]
                       )
                     }
                   />
