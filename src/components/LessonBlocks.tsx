@@ -4,10 +4,11 @@ import {
   RotateCcw, Check, X, Plus, Trash2,
   Maximize2, Minimize2, Lock, Unlock, Magnet, Grid,
   Code, CheckCircle2, Move, Pin, Monitor,
-  MoreHorizontal, MoveDiagonal2, Copy,
-  AlignHorizontalSpaceAround, Link2, Layers,
+  MoreHorizontal, MoveDiagonal2, Copy, Link2,
+  AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   Square, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown,
-  Eye, EyeOff
+  Layers, GripVertical, PanelTop, PanelBottom, PanelRight,
+  Sliders, Sparkles
 } from 'lucide-react';
 
 // ============================================================================
@@ -184,7 +185,6 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     setActiveLayer(null);
   }, [initialEntities]);
 
-  // Responsive Virtual Resolution Scaler
   useEffect(() => {
     const updateScale = () => {
       if (!outerWrapRef.current) return;
@@ -206,7 +206,6 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     };
   }, [resolution.width, resolution.height, isFullscreen]);
 
-  // Apply Timeline Scrubber Keyframe Overrides
   useEffect(() => {
     if (!block?.enableTimeline || keyframes.length === 0) return;
     const sorted = [...keyframes].sort((a, b) => a.progress - b.progress);
@@ -948,11 +947,11 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 // ============================================================================
 //  2. INSTRUCTOR VISUAL STUDIO: KINETIC CANVAS BUILDER
 //  Features:
+//   - Photoshop / Figma Contextual Task Bar (Floating, Pinned, Top Ribbon, Bottom Dock, Right Inspector)
 //   - True 2D Box Resizing (Width % × Height %) for Empty Blocks, Shapes & Cards
 //   - Background Group Shape Generator (+ Group Shape)
-//   - Interactive Layer & Z-Order Toolbar Drawer (Bring to Front / Send to Back / Lock)
-//   - Three-Dots (•••) In-Place Tooltip Inspector
-//   - 1-Click Auto-Align & Distribute Row Button
+//   - Interactive Layer & Z-Order Toolbar Drawer
+//   - 1-Click Auto-Align Row & Auto-Align Column Buttons
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const outerWrapRef = useRef<HTMLDivElement>(null);
@@ -969,6 +968,14 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const [showLayerToolbar, setShowLayerToolbar] = useState(false);
   const [builderToast, setBuilderToast] = useState<string | null>(null);
 
+  // 🔥 PHOTOSHOP CONTEXTUAL TASK BAR STATE
+  // dockMode: 'floating' | 'top' | 'bottom' | 'right'
+  const [taskbarDock, setTaskbarDock] = useState<'floating' | 'top' | 'bottom' | 'right'>('top');
+  const [isTaskbarPinned, setIsTaskbarPinned] = useState<boolean>(false);
+  const [pinnedPos, setPinnedPos] = useState<{ x: number; y: number }>({ x: 50, y: 12 });
+  const [isDraggingTaskbar, setIsDraggingTaskbar] = useState<boolean>(false);
+  const [showAdvancedPopover, setShowAdvancedPopover] = useState<boolean>(false);
+
   const [interaction, setInteraction] = useState<{
     mode: 'move' | 'resize';
     kind: 'entity' | 'zone';
@@ -981,12 +988,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     initWidth: number;
     initHeight: number;
   } | null>(null);
-
-  // Three-Dots (•••) In-Place Tooltip Popover State
-  const [openMenuFor, setOpenMenuFor] = useState<{ kind: 'entity' | 'zone'; id: string } | null>(
-    null
-  );
-  const [menuTab, setMenuTab] = useState<'style' | 'text' | 'triggers'>('style');
 
   const [showRawJson, setShowRawJson] = useState(false);
   const [rawJsonText, setRawJsonText] = useState('');
@@ -1015,7 +1016,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       ro.disconnect();
       window.removeEventListener('resize', updateScale);
     };
-  }, [resolution.width, showLayerToolbar]);
+  }, [resolution.width, showLayerToolbar, taskbarDock]);
 
   const snapCoord = (val: number, minVal = 3, maxVal = 97) => {
     const clamped = Math.max(minVal, Math.min(maxVal, val));
@@ -1024,7 +1025,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   };
 
   // ============================================================================
-  //  1-CLICK AUTO-ALIGN & DISTRIBUTE ROW ENGINE
+  //  1-CLICK AUTO-ALIGN ROW & AUTO-ALIGN COLUMN ENGINES
   // ============================================================================
   const handleAutoAlignRow = () => {
     if (selectedItem?.kind === 'zone') {
@@ -1127,6 +1128,46 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     notifyBuilder(`Auto-aligned ${draggables.length} cards into an evenly spaced word bank!`);
   };
 
+  const handleAutoAlignColumn = () => {
+    if (selectedItem?.kind === 'entity') {
+      const targetEnt = entities.find((e: any) => e.id === selectedItem.id);
+      if (targetEnt && targetEnt.entityType !== 'bg_shape') {
+        const bandX = Number(targetEnt.x ?? 25);
+        const colEnts = entities
+          .filter(
+            (e: any) =>
+              e.entityType !== 'bg_shape' && Math.abs(Number(e.x ?? 25) - bandX) <= 15
+          )
+          .sort((a: any, b: any) => (a.y ?? 50) - (b.y ?? 50));
+
+        if (colEnts.length > 1) {
+          const count = colEnts.length;
+          const idToNewY = new Map<string, number>();
+          colEnts.forEach((e: any, idx: number) => {
+            const evenY = Number((20 + (idx * 60) / (count - 1)).toFixed(1));
+            idToNewY.set(e.id, evenY);
+          });
+
+          const nextEntities = entities.map((e: any) =>
+            idToNewY.has(e.id)
+              ? {
+                  ...e,
+                  x: Number(bandX.toFixed(1)),
+                  y: idToNewY.get(e.id),
+                  anchorX: Number(bandX.toFixed(1)),
+                  anchorY: idToNewY.get(e.id)
+                }
+              : e
+          );
+          onChange({ ...block, entities: nextEntities });
+          notifyBuilder(`Aligned ${colEnts.length} boxes vertically along X=${bandX.toFixed(0)}%!`);
+          return;
+        }
+      }
+    }
+    notifyBuilder('Select a box in a vertical column first, then click Align Col.');
+  };
+
   // Start Four-Directions Move
   const startMoveItem = (
     e: React.PointerEvent,
@@ -1152,7 +1193,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  // Start Diagonal Pull-to-Resize (2D Width × Height for Empty Blocks, Shapes, Zones & Custom-Sized Cards)
+  // Start Diagonal Pull-to-Resize
   const startResizeItem = (
     e: React.PointerEvent,
     kind: 'entity' | 'zone',
@@ -1181,9 +1222,19 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
+  // Unified Stage Pointer Move (Handles Object Move, Object Resize, and Floating Taskbar Drag)
   const handleStagePointerMove = (e: React.PointerEvent) => {
-    if (!interaction || !stageRef.current) return;
+    if (!stageRef.current) return;
     const rect = stageRef.current.getBoundingClientRect();
+
+    if (isDraggingTaskbar) {
+      const nextX = Math.max(15, Math.min(85, ((e.clientX - rect.left) / rect.width) * 100));
+      const nextY = Math.max(8, Math.min(90, ((e.clientY - rect.top) / rect.height) * 100));
+      setPinnedPos({ x: Number(nextX.toFixed(1)), y: Number(nextY.toFixed(1)) });
+      return;
+    }
+
+    if (!interaction) return;
 
     if (interaction.mode === 'move') {
       const nextX = snapCoord(((e.clientX - rect.left) / rect.width) * 100);
@@ -1244,7 +1295,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     }
   };
 
-  // Add Card or Anchored Empty/Text Frame
   const addEntity = (isAnchoredProp: boolean) => {
     const newId = `ent_${Date.now()}`;
     const newEnt = {
@@ -1272,10 +1322,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     };
     onChange({ ...block, entities: [...entities, newEnt] });
     setSelectedItem({ kind: 'entity', id: newId });
-    setOpenMenuFor({ kind: 'entity', id: newId });
   };
 
-  // 🔥 ADD BACKGROUND GROUPING SHAPE (Sent to Back by Default)
   const addBackgroundShape = () => {
     const newId = `shape_${Date.now()}`;
     const newShape = {
@@ -1300,8 +1348,39 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     };
     onChange({ ...block, entities: [newShape, ...entities] });
     setSelectedItem({ kind: 'entity', id: newId });
-    setOpenMenuFor({ kind: 'entity', id: newId });
-    notifyBuilder('Added Background Group Shape (Layer Z=2)! Pull bottom-right corner to resize.');
+    notifyBuilder('Added Background Group Shape! Use the Contextual Taskbar to style or lock it.');
+  };
+
+  const addMultiColumnGroupPreset = (cols: 2 | 3) => {
+    const now = Date.now();
+    const paletteCycle = ['indigo', 'emerald', 'amber'];
+    const newShapes = Array.from({ length: cols }).map((_, idx) => {
+      const width = cols === 2 ? 43 : 29;
+      const x = cols === 2 ? (idx === 0 ? 27 : 73) : idx === 0 ? 18 : idx === 1 ? 50 : 82;
+      return {
+        id: `shape_${now}_${idx}`,
+        entityType: 'bg_shape',
+        label: `Group Column ${idx + 1}`,
+        sublabel: 'Background Container',
+        color: paletteCycle[idx % paletteCycle.length],
+        borderStyle: 'solid',
+        shapeVariant: 'rounded',
+        opacity: 18,
+        x,
+        y: 42,
+        width,
+        height: 62,
+        resizeMode: 'box',
+        rotation: 0,
+        zOrder: 2,
+        draggable: false,
+        anchored: true,
+        lockInBuilder: false
+      };
+    });
+    onChange({ ...block, entities: [...newShapes, ...entities] });
+    setSelectedItem({ kind: 'entity', id: newShapes[0].id });
+    notifyBuilder(`Added ${cols}-Column Background Group Layout!`);
   };
 
   const addZone = () => {
@@ -1323,7 +1402,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     };
     onChange({ ...block, zones: [...zones, newZone] });
     setSelectedItem({ kind: 'zone', id: newId });
-    setOpenMenuFor({ kind: 'zone', id: newId });
   };
 
   const updateEntityField = (id: string, patch: Record<string, any>) => {
@@ -1340,7 +1418,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     });
   };
 
-  // Layer Z-Order Controls (Send to Back, Step Backward, Step Forward, Bring to Front)
   const adjustLayerZOrder = (
     kind: 'entity' | 'zone',
     id: string,
@@ -1404,10 +1481,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     };
     onChange({ ...block, entities: [...entities, copy] });
     setSelectedItem({ kind: 'entity', id: copyId });
-    setOpenMenuFor({ kind: 'entity', id: copyId });
   };
 
-  // Unified Layer Stack for the Layer Toolbar (Sorted Top-to-Bottom by zOrder)
   const unifiedLayerStack = useMemo(() => {
     const list: Array<{
       kind: 'entity' | 'zone';
@@ -1420,8 +1495,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     }> = [];
 
     entities.forEach((e: any) => {
-      const defaultZ =
-        e.entityType === 'bg_shape' ? 2 : e.anchored ? 15 : 30;
+      const defaultZ = e.entityType === 'bg_shape' ? 2 : e.anchored ? 15 : 30;
       list.push({
         kind: 'entity',
         id: e.id,
@@ -1453,22 +1527,645 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     return list.sort((a, b) => b.zOrder - a.zOrder);
   }, [entities, zones]);
 
-  const activeMenuEntity =
-    openMenuFor?.kind === 'entity' ? entities.find((e: any) => e.id === openMenuFor.id) : null;
-  const activeMenuZone =
-    openMenuFor?.kind === 'zone' ? zones.find((z: any) => z.id === openMenuFor.id) : null;
+  const activeSelectedEntity =
+    selectedItem?.kind === 'entity' ? entities.find((e: any) => e.id === selectedItem.id) : null;
+  const activeSelectedZone =
+    selectedItem?.kind === 'zone' ? zones.find((z: any) => z.id === selectedItem.id) : null;
+  const activeTarget = activeSelectedEntity || activeSelectedZone;
 
   const activeThemeClass =
     THEME_BACKGROUNDS[block?.backgroundTheme || 'physics_lab'] || THEME_BACKGROUNDS.physics_lab;
 
+  // ============================================================================
+  //  🔥 PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER
+  //  Adapts layout for Top Ribbon, Bottom Dock, Right Inspector, or Pinned/Floating
+  // ============================================================================
+  const renderContextualTaskBar = (isFloatingInstance = false) => {
+    if (!activeTarget) {
+      if (taskbarDock === 'top' || taskbarDock === 'bottom') {
+        return (
+          <div className="px-4 py-2.5 rounded-2xl bg-slate-900/95 text-slate-400 border border-slate-800 flex items-center justify-between text-xs font-bold">
+            <span className="flex items-center gap-2">
+              <Sliders size={14} className="text-indigo-400" />
+              Click any Card, Group Shape, or Drop Bucket on the canvas to inspect and style it in this Contextual Task Bar.
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-slate-500 mr-1">Dock:</span>
+              <button
+                type="button"
+                title="Dock to Top Ribbon"
+                onClick={() => setTaskbarDock('top')}
+                className={`p-1.5 rounded-lg ${taskbarDock === 'top' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+              >
+                <PanelTop size={13} />
+              </button>
+              <button
+                type="button"
+                title="Dock to Bottom Bar"
+                onClick={() => setTaskbarDock('bottom')}
+                className={`p-1.5 rounded-lg ${taskbarDock === 'bottom' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+              >
+                <PanelBottom size={13} />
+              </button>
+              <button
+                type="button"
+                title="Dock to Right Inspector Sidebar"
+                onClick={() => setTaskbarDock('right')}
+                className="p-1.5 rounded-lg hover:bg-slate-800"
+              >
+                <PanelRight size={13} />
+              </button>
+              <button
+                type="button"
+                title="Float Over Canvas"
+                onClick={() => setTaskbarDock('floating')}
+                className="p-1.5 rounded-lg hover:bg-slate-800"
+              >
+                <Move size={13} />
+              </button>
+            </div>
+          </div>
+        );
+      }
+      return null;
+    }
+
+    const isVertical = taskbarDock === 'right' && !isFloatingInstance;
+    const isEntity = Boolean(activeSelectedEntity);
+    const isBgShape = activeSelectedEntity?.entityType === 'bg_shape';
+
+    // Compute floating coordinates if in floating mode
+    const floatX = isTaskbarPinned
+      ? pinnedPos.x
+      : Math.min(76, Math.max(24, Number(activeTarget.x ?? 50)));
+    const rawTargetY = Number(activeTarget.y ?? 50);
+    const floatY = isTaskbarPinned
+      ? pinnedPos.y
+      : rawTargetY > 32
+      ? Math.max(10, rawTargetY - 16)
+      : Math.min(88, rawTargetY + 18);
+
+    const wrapperStyle: React.CSSProperties = isFloatingInstance
+      ? {
+          position: 'absolute',
+          left: `${floatX}%`,
+          top: `${floatY}%`,
+          transform: 'translate(-50%, -50%)',
+          zIndex: 220
+        }
+      : {};
+
+    return (
+      <div
+        style={wrapperStyle}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        className={`${
+          isFloatingInstance
+            ? 'max-w-[94%] w-max rounded-2xl bg-slate-900/95 backdrop-blur-2xl border-2 border-indigo-400/70 shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-2.5 text-white animate-in zoom-in-95 duration-150'
+            : isVertical
+            ? 'w-full lg:w-80 shrink-0 rounded-3xl bg-slate-900 text-white border border-slate-800 p-4 space-y-4 self-start shadow-xl'
+            : 'w-full rounded-2xl bg-slate-900 text-white border border-slate-800 px-3.5 py-2.5 shadow-lg'
+        }`}
+      >
+        <div
+          className={`flex ${
+            isVertical ? 'flex-col gap-3.5' : 'flex-wrap items-center gap-2.5'
+          }`}
+        >
+          {/* 1. Drag Grip + Pin Toggle + Type Badge */}
+          <div className="flex items-center gap-1.5 pr-2 border-r border-slate-700/80">
+            {isFloatingInstance && (
+              <button
+                type="button"
+                title="Drag to Reposition Floating Task Bar (Auto-Pins Position)"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setIsTaskbarPinned(true);
+                  setIsDraggingTaskbar(true);
+                  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                }}
+                onPointerUp={(e) => {
+                  e.stopPropagation();
+                  setIsDraggingTaskbar(false);
+                  try {
+                    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                  } catch {}
+                }}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white cursor-grab active:cursor-grabbing"
+              >
+                <GripVertical size={14} />
+              </button>
+            )}
+
+            <span className="px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
+              {isBgShape ? 'Group Shape' : isEntity ? 'Card / Box' : 'Drop Bucket'}
+            </span>
+
+            {isFloatingInstance && (
+              <button
+                type="button"
+                title={
+                  isTaskbarPinned
+                    ? 'Pinned in Place (Click to Follow Selected Object)'
+                    : 'Pin Task Bar at Current Position'
+                }
+                onClick={() => {
+                  if (!isTaskbarPinned) {
+                    setPinnedPos({ x: floatX, y: floatY });
+                  }
+                  setIsTaskbarPinned((p) => !p);
+                }}
+                className={`p-1.5 rounded-lg border transition-colors ${
+                  isTaskbarPinned
+                    ? 'bg-amber-400 text-slate-950 border-amber-300'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                }`}
+              >
+                <Pin size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* 2. Primary Text & Sublabel Inline Inputs */}
+          <div className={`flex ${isVertical ? 'flex-col' : 'items-center'} gap-1.5`}>
+            <input
+              type="text"
+              value={activeTarget.label || ''}
+              placeholder="(Empty Box — No Text)"
+              onChange={(e) =>
+                isEntity
+                  ? updateEntityField(activeTarget.id, { label: e.target.value })
+                  : updateZoneField(activeTarget.id, { label: e.target.value })
+              }
+              className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-400 text-xs font-black text-white outline-none w-40"
+              title="Primary Label (Clear text to make an Empty Frame)"
+            />
+            <input
+              type="text"
+              value={activeTarget.sublabel || ''}
+              placeholder="Subtitle / hint..."
+              onChange={(e) =>
+                isEntity
+                  ? updateEntityField(activeTarget.id, { sublabel: e.target.value })
+                  : updateZoneField(activeTarget.id, { sublabel: e.target.value })
+              }
+              className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-400 text-[11px] font-bold text-slate-300 outline-none w-32"
+              title="Subtitle / Hint"
+            />
+            <button
+              type="button"
+              title="Clear Text (Convert to Empty Resizable Box)"
+              onClick={() =>
+                isEntity
+                  ? updateEntityField(activeTarget.id, {
+                      label: '',
+                      sublabel: '',
+                      width: activeTarget.width ?? 24,
+                      height: activeTarget.height ?? 16,
+                      resizeMode: 'box'
+                    })
+                  : updateZoneField(activeTarget.id, { label: '', sublabel: '' })
+              }
+              className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-[9px] font-black uppercase text-slate-300 transition-colors whitespace-nowrap"
+            >
+              Empty
+            </button>
+          </div>
+
+          {/* 3. 6-Color Palette Swatches */}
+          <div className="flex items-center gap-1 px-2 border-l border-r border-slate-800">
+            {Object.entries(COLOR_STYLES).map(([colorKey, cObj]) => {
+              const isPicked = (activeTarget.color || 'indigo') === colorKey;
+              return (
+                <button
+                  key={colorKey}
+                  type="button"
+                  title={`Color: ${colorKey}`}
+                  onClick={() =>
+                    isEntity
+                      ? updateEntityField(activeTarget.id, { color: colorKey })
+                      : updateZoneField(activeTarget.id, { color: colorKey })
+                  }
+                  style={{ backgroundColor: cObj.hex }}
+                  className={`w-5 h-5 rounded-full border transition-transform ${
+                    isPicked
+                      ? 'border-white scale-125 ring-2 ring-white/60'
+                      : 'border-transparent opacity-75 hover:opacity-100'
+                  }`}
+                />
+              );
+            })}
+          </div>
+
+          {/* 4. Border Style & Shape Corner Pickers */}
+          <div className="flex items-center gap-1.5">
+            <select
+              value={activeTarget.borderStyle || (isEntity ? 'solid' : 'dashed')}
+              onChange={(e) =>
+                isEntity
+                  ? updateEntityField(activeTarget.id, { borderStyle: e.target.value })
+                  : updateZoneField(activeTarget.id, { borderStyle: e.target.value })
+              }
+              title="Border Style"
+              className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
+            >
+              <option value="solid">Border: Solid</option>
+              <option value="dashed">Border: Dashed</option>
+              <option value="dotted">Border: Dotted</option>
+              <option value="double">Border: Double</option>
+              <option value="glow">Border: Glow</option>
+              <option value="none">Border: None</option>
+            </select>
+
+            {isEntity && (
+              <select
+                value={activeTarget.shapeVariant || 'banner'}
+                onChange={(e) =>
+                  updateEntityField(activeTarget.id, { shapeVariant: e.target.value })
+                }
+                title="Corner Geometry"
+                className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
+              >
+                <option value="banner">Shape: Card</option>
+                <option value="rounded">Shape: Group Box</option>
+                <option value="sharp">Shape: Rectangle</option>
+                <option value="pill">Shape: Pill / Oval</option>
+              </select>
+            )}
+          </div>
+
+          {/* 5. Compact W% × H% Dimensions & Opacity / Scale */}
+          <div className="flex items-center gap-1.5 px-2 border-l border-slate-800">
+            <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+              <span className="text-[9px] font-black text-slate-400">W%</span>
+              <input
+                type="number"
+                min={5}
+                max={96}
+                value={activeTarget.width ?? (isEntity ? 20 : 28)}
+                onChange={(e) => {
+                  const w = Math.max(5, Math.min(96, Number(e.target.value) || 15));
+                  isEntity
+                    ? updateEntityField(activeTarget.id, {
+                        width: w,
+                        height: activeTarget.height ?? 14,
+                        resizeMode: 'box'
+                      })
+                    : updateZoneField(activeTarget.id, { width: w });
+                }}
+                className="w-10 bg-transparent text-xs font-mono font-black text-emerald-400 outline-none text-center"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+              <span className="text-[9px] font-black text-slate-400">H%</span>
+              <input
+                type="number"
+                min={5}
+                max={96}
+                value={activeTarget.height ?? (isEntity ? 12 : 24)}
+                onChange={(e) => {
+                  const h = Math.max(5, Math.min(96, Number(e.target.value) || 12));
+                  isEntity
+                    ? updateEntityField(activeTarget.id, {
+                        height: h,
+                        width: activeTarget.width ?? 20,
+                        resizeMode: 'box'
+                      })
+                    : updateZoneField(activeTarget.id, { height: h });
+                }}
+                className="w-10 bg-transparent text-xs font-mono font-black text-emerald-400 outline-none text-center"
+              />
+            </div>
+
+            {isBgShape && (
+              <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800" title="Background Fill Opacity %">
+                <span className="text-[9px] font-black text-purple-300">α%</span>
+                <input
+                  type="number"
+                  min={5}
+                  max={95}
+                  step={5}
+                  value={activeTarget.opacity ?? 22}
+                  onChange={(e) =>
+                    updateEntityField(activeTarget.id, {
+                      opacity: Math.max(5, Math.min(95, Number(e.target.value) || 20))
+                    })
+                  }
+                  className="w-10 bg-transparent text-xs font-mono font-black text-purple-300 outline-none text-center"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 6. Category / Sequence / Connector Target Controls */}
+          <div className="flex items-center gap-1.5">
+            {isEntity && !isBgShape ? (
+              <>
+                <input
+                  type="text"
+                  placeholder="Category (e.g. ed)"
+                  value={activeTarget.category || ''}
+                  onChange={(e) =>
+                    updateEntityField(activeTarget.id, { category: e.target.value })
+                  }
+                  title="Category Match Tag"
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-28"
+                />
+                <input
+                  type="number"
+                  placeholder="Seq #"
+                  value={activeTarget.sequenceIndex ?? ''}
+                  onChange={(e) =>
+                    updateEntityField(activeTarget.id, {
+                      sequenceIndex: e.target.value ? Number(e.target.value) : undefined
+                    })
+                  }
+                  title="Sequence Order Slot #"
+                  className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-amber-300 outline-none w-16"
+                />
+                <select
+                  value={activeTarget.connectTargetId || ''}
+                  onChange={(e) => handleLinkConnectorTarget(activeTarget.id, e.target.value)}
+                  title="Link SVG Connector Line Target"
+                  className="px-2 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-[10px] font-bold text-cyan-300 outline-none max-w-[140px]"
+                >
+                  <option value="">Link Line: None</option>
+                  {entities
+                    .filter(
+                      (other: any) =>
+                        other.id !== activeTarget.id && other.entityType !== 'bg_shape'
+                    )
+                    .map((other: any) => (
+                      <option key={other.id} value={other.id}>
+                        ➔ {other.label || other.id}
+                      </option>
+                    ))}
+                </select>
+              </>
+            ) : !isEntity ? (
+              <>
+                <input
+                  type="text"
+                  placeholder="Accepts Cat (e.g. ed)"
+                  value={activeTarget.acceptedCategory || ''}
+                  onChange={(e) =>
+                    updateZoneField(activeTarget.id, { acceptedCategory: e.target.value })
+                  }
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-32"
+                />
+                <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+                  <span className="text-[9px] font-black text-slate-400">Cap</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={activeTarget.capacity ?? 2}
+                    onChange={(e) =>
+                      updateZoneField(activeTarget.id, {
+                        capacity: Math.max(1, Number(e.target.value) || 1)
+                      })
+                    }
+                    className="w-8 bg-transparent text-xs font-mono font-black text-white outline-none text-center"
+                  />
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          {/* 7. Quick Toggles: Background Shape Toggle, Student Anchor, Editor Lock, Z-Order, Duplicate & Delete */}
+          <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
+            {isEntity && (
+              <>
+                <button
+                  type="button"
+                  title={
+                    isBgShape
+                      ? 'Currently a Background Group Shape (Click to Make Draggable Card)'
+                      : 'Convert to Background Group Shape (Sends Behind Cards)'
+                  }
+                  onClick={() =>
+                    updateEntityField(activeTarget.id, {
+                      entityType: isBgShape ? 'draggable' : 'bg_shape',
+                      zOrder: isBgShape ? 30 : 2,
+                      width: activeTarget.width ?? 42,
+                      height: activeTarget.height ?? 34,
+                      opacity: activeTarget.opacity ?? 20,
+                      anchored: !isBgShape,
+                      draggable: isBgShape
+                    })
+                  }
+                  className={`p-1.5 rounded-lg border text-[10px] font-black uppercase flex items-center gap-1 ${
+                    isBgShape
+                      ? 'bg-purple-600 text-white border-purple-400'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                >
+                  <Square size={12} />
+                </button>
+
+                <button
+                  type="button"
+                  title={
+                    activeTarget.anchored
+                      ? 'Anchored on Student Stage (Students Cannot Drag)'
+                      : 'Draggable by Students (Click to Anchor in Place)'
+                  }
+                  onClick={() =>
+                    updateEntityField(activeTarget.id, {
+                      anchored: !activeTarget.anchored,
+                      draggable: Boolean(activeTarget.anchored)
+                    })
+                  }
+                  className={`p-1.5 rounded-lg border ${
+                    activeTarget.anchored
+                      ? 'bg-amber-500 text-slate-950 border-amber-300'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                >
+                  <Pin size={12} />
+                </button>
+
+                {!activeTarget.anchored && (
+                  <button
+                    type="button"
+                    title={
+                      activeTarget.returnToAnchor
+                        ? 'Magnetic Home Return: ON'
+                        : 'Magnetic Home Return: OFF'
+                    }
+                    onClick={() =>
+                      updateEntityField(activeTarget.id, {
+                        returnToAnchor: !activeTarget.returnToAnchor,
+                        anchorX: activeTarget.x,
+                        anchorY: activeTarget.y
+                      })
+                    }
+                    className={`p-1.5 rounded-lg border ${
+                      activeTarget.returnToAnchor
+                        ? 'bg-cyan-600 text-white border-cyan-400'
+                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    <Magnet size={12} />
+                  </button>
+                )}
+              </>
+            )}
+
+            <button
+              type="button"
+              title="Send to Back (Behind All Cards)"
+              onClick={() =>
+                adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'back')
+              }
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+            >
+              <ChevronsDown size={13} />
+            </button>
+            <button
+              type="button"
+              title="Bring to Front"
+              onClick={() =>
+                adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'front')
+              }
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+            >
+              <ChevronsUp size={13} />
+            </button>
+
+            <button
+              type="button"
+              title={
+                activeTarget.lockInBuilder
+                  ? 'Locked in Editor (Click to Unlock)'
+                  : 'Lock Position in Editor'
+              }
+              onClick={() =>
+                isEntity
+                  ? updateEntityField(activeTarget.id, {
+                      lockInBuilder: !activeTarget.lockInBuilder
+                    })
+                  : updateZoneField(activeTarget.id, {
+                      lockInBuilder: !activeTarget.lockInBuilder
+                    })
+              }
+              className={`p-1.5 rounded-lg ${
+                activeTarget.lockInBuilder
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              {activeTarget.lockInBuilder ? <Lock size={13} /> : <Unlock size={13} />}
+            </button>
+
+            {isEntity && (
+              <button
+                type="button"
+                title="Duplicate Box"
+                onClick={() => duplicateEntity(activeTarget)}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+              >
+                <Copy size={13} />
+              </button>
+            )}
+
+            <button
+              type="button"
+              title="Delete Selected Item"
+              onClick={() => {
+                if (isEntity) {
+                  onChange({
+                    ...block,
+                    entities: entities.filter((e: any) => e.id !== activeTarget.id)
+                  });
+                } else {
+                  onChange({
+                    ...block,
+                    zones: zones.filter((z: any) => z.id !== activeTarget.id)
+                  });
+                }
+                setSelectedItem(null);
+              }}
+              className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+
+          {/* 8. Workspace Dock Mode Switcher (Top Ribbon | Bottom Bar | Right Inspector | Floating) */}
+          <div className="flex items-center gap-1 pl-2 border-l border-slate-800 ml-auto">
+            <button
+              type="button"
+              title="Dock Task Bar to Top Ribbon (Photoshop Style)"
+              onClick={() => setTaskbarDock('top')}
+              className={`p-1.5 rounded-lg ${
+                taskbarDock === 'top'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <PanelTop size={13} />
+            </button>
+            <button
+              type="button"
+              title="Dock Task Bar to Bottom Tray"
+              onClick={() => setTaskbarDock('bottom')}
+              className={`p-1.5 rounded-lg ${
+                taskbarDock === 'bottom'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <PanelBottom size={13} />
+            </button>
+            <button
+              type="button"
+              title="Dock Task Bar to Right Inspector Sidebar"
+              onClick={() => setTaskbarDock('right')}
+              className={`p-1.5 rounded-lg ${
+                taskbarDock === 'right'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <PanelRight size={13} />
+            </button>
+            <button
+              type="button"
+              title="Float Task Bar Over Canvas"
+              onClick={() => setTaskbarDock('floating')}
+              className={`p-1.5 rounded-lg ${
+                taskbarDock === 'floating'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <Move size={13} />
+            </button>
+            <button
+              type="button"
+              title="Deselect"
+              onClick={() => setSelectedItem(null)}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white ml-0.5"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-500/30 shadow-xl overflow-hidden space-y-5 p-6">
+    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-500/30 shadow-xl overflow-hidden space-y-4 p-6">
       {/* Top Studio Controls: Resolution Picker, Grid Snap, Layer Toolbar & Add Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-              HD Stage Editor • Drag <Move size={11} className="inline" /> to Move • Pull <MoveDiagonal2 size={11} className="inline" /> to Resize Box • Click ••• for Options
+              HD Stage Studio • Contextual Task Bar ({taskbarDock.toUpperCase()})
             </span>
             {builderToast && (
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase animate-in fade-in">
@@ -1517,7 +2214,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </select>
           </div>
 
-          {/* 1-CLICK AUTO-ALIGN & DISTRIBUTE ROW BUTTON */}
+          {/* 1-CLICK AUTO-ALIGN ROW & COLUMN BUTTONS */}
           <button
             type="button"
             onClick={handleAutoAlignRow}
@@ -1527,7 +2224,16 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <AlignHorizontalSpaceAround size={13} /> Align Row
           </button>
 
-          {/* 🔥 ADD BACKGROUND GROUP SHAPE BUTTON */}
+          <button
+            type="button"
+            onClick={handleAutoAlignColumn}
+            title="Auto-align selected vertical column of boxes"
+            className="px-3 py-2 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+          >
+            <AlignVerticalSpaceAround size={13} /> Align Col
+          </button>
+
+          {/* ADD BACKGROUND GROUP SHAPE BUTTON */}
           <button
             type="button"
             onClick={addBackgroundShape}
@@ -1562,7 +2268,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <Plus size={12} /> Drop Bucket
           </button>
 
-          {/* 🔥 TOGGLE LAYER & Z-ORDER MANAGER TOOLBAR */}
+          {/* TOGGLE LAYER & Z-ORDER MANAGER TOOLBAR */}
           <button
             type="button"
             onClick={() => setShowLayerToolbar((l) => !l)}
@@ -1588,28 +2294,33 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         </div>
       </div>
 
-      {/* ============================================================================ */}
-      {/* 🔥 VISUAL LAYER & Z-ORDER TOOLBAR PANEL                                      */}
-      {/* ============================================================================ */}
+      {/* 🔥 DOCK POSITION 1: TOP PHOTOSHOP OPTIONS RIBBON */}
+      {taskbarDock === 'top' && renderContextualTaskBar(false)}
+
+      {/* VISUAL LAYER & Z-ORDER TOOLBAR PANEL */}
       {showLayerToolbar && (
         <div className="p-4 rounded-3xl bg-slate-900 text-white border border-slate-700 shadow-xl space-y-3 animate-in slide-in-from-top-2">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
             <div className="flex items-center gap-2">
               <Layers size={15} className="text-amber-400" />
               <span className="text-xs font-black uppercase tracking-widest">
-                Layer Stack & Background Shape Organizer
-              </span>
-              <span className="text-[10px] font-bold text-slate-400">
-                (Lower Z-Order sits behind cards; lock background shapes so you don't nudge them)
+                Layer Stack & Background Group Presets
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={addBackgroundShape}
+                onClick={() => addMultiColumnGroupPreset(2)}
+                className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
+              >
+                <Columns size={11} /> + 2-Column Group Layout
+              </button>
+              <button
+                type="button"
+                onClick={() => addMultiColumnGroupPreset(3)}
                 className="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
               >
-                <Plus size={11} /> Add Background Group Shape
+                <Columns size={11} /> + 3-Column Group Layout
               </button>
               <button
                 type="button"
@@ -1699,17 +2410,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     >
                       {item.locked ? <Lock size={13} /> : <Unlock size={13} />}
                     </button>
-                    <button
-                      type="button"
-                      title="Open Options Tooltip"
-                      onClick={() => {
-                        setSelectedItem({ kind: item.kind, id: item.id });
-                        setOpenMenuFor({ kind: item.kind, id: item.id });
-                      }}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-400 text-slate-300 hover:text-slate-950"
-                    >
-                      <MoreHorizontal size={13} />
-                    </button>
                   </div>
                 </div>
               );
@@ -1744,865 +2444,324 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         </div>
       )}
 
-      {/* Interactive HD Stage Preview with Direct-Manipulation Handles & In-Place Tooltip */}
-      <div
-        ref={outerWrapRef}
-        style={{ height: `${Math.round(resolution.height * stageScale)}px` }}
-        className="relative w-full overflow-hidden rounded-3xl border-2 border-slate-300 dark:border-slate-700 bg-slate-950 flex justify-center"
-      >
+      {/* Main Workspace Container (Supports Right-Hand Docked Inspector or Full-Width Stage) */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div
-          ref={stageRef}
-          onPointerDown={() => setOpenMenuFor(null)}
-          onPointerMove={handleStagePointerMove}
-          onPointerUp={() => setInteraction(null)}
-          style={{
-            width: `${resolution.width}px`,
-            height: `${resolution.height}px`,
-            transform: `scale(${stageScale})`,
-            transformOrigin: 'top center'
-          }}
-          className={`relative shrink-0 select-none overflow-hidden ${activeThemeClass}`}
+          ref={outerWrapRef}
+          style={{ height: `${Math.round(resolution.height * stageScale)}px` }}
+          className="relative flex-1 w-full overflow-hidden rounded-3xl border-2 border-slate-300 dark:border-slate-700 bg-slate-950 flex justify-center"
         >
-          {/* ============================================================================ */}
-          {/* 1. BACKGROUND GROUP SHAPES ON BUILDER STAGE                                  */}
-          {/* ============================================================================ */}
-          {entities
-            .filter((e: any) => e.entityType === 'bg_shape')
-            .map((shape: any) => {
-              const isSelected = selectedItem?.kind === 'entity' && selectedItem.id === shape.id;
-              const isMenuOpen = openMenuFor?.kind === 'entity' && openMenuFor.id === shape.id;
-              const palette = COLOR_STYLES[shape.color || 'indigo'] || COLOR_STYLES.indigo;
-              const borderStyleClass =
-                BORDER_STYLE_CLASSES[shape.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
-              const radiusClass =
-                SHAPE_RADIUS_CLASSES[shape.shapeVariant || 'rounded'] || SHAPE_RADIUS_CLASSES.rounded;
-              const fillAlpha = (shape.opacity ?? 22) / 100;
+          {/* 🔥 DOCK POSITION 4: FLOATING / PINNABLE OVER-CANVAS TASK BAR */}
+          {taskbarDock === 'floating' && renderContextualTaskBar(true)}
 
-              return (
-                <div
-                  key={shape.id}
-                  onPointerDown={(e) => startMoveItem(e, 'entity', shape)}
-                  style={{
-                    left: `${shape.x}%`,
-                    top: `${shape.y}%`,
-                    width: `${shape.width || 44}%`,
-                    height: `${shape.height || 36}%`,
-                    backgroundColor: `${palette.softBg}${fillAlpha})`,
-                    transform: `translate(-50%, -50%) rotate(${shape.rotation || 0}deg)`,
-                    zIndex: isMenuOpen ? 85 : shape.zOrder ?? 2
-                  }}
-                  className={`group absolute ${radiusClass} ${borderStyleClass} ${palette.border} p-6 flex flex-col items-start justify-start transition-shadow ${
-                    shape.lockInBuilder ? 'cursor-default' : 'cursor-move'
-                  } ${isSelected ? 'ring-4 ring-amber-400' : ''}`}
-                >
-                  {!shape.lockInBuilder && (
-                    <button
-                      type="button"
-                      title="Drag in 4 Directions to Move Group Shape"
-                      onPointerDown={(e) => startMoveItem(e, 'entity', shape)}
-                      className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-purple-600 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-move z-30"
-                    >
-                      <Move size={13} />
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    title="Customize Group Shape (Color, Opacity, Border, Layer)"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedItem({ kind: 'entity', id: shape.id });
-                      setOpenMenuFor(isMenuOpen ? null : { kind: 'entity', id: shape.id });
-                    }}
-                    className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
-                      isMenuOpen
-                        ? 'bg-amber-400 text-slate-950 border-white'
-                        : 'bg-slate-900 hover:bg-purple-600 text-white border-white'
-                    }`}
-                  >
-                    <MoreHorizontal size={15} />
-                  </button>
-
-                  {!shape.lockInBuilder && (
-                    <button
-                      type="button"
-                      title="Pull Diagonally to Resize Group Shape Width & Height"
-                      onPointerDown={(e) => startResizeItem(e, 'entity', shape)}
-                      className="absolute -bottom-3.5 -right-3.5 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
-                    >
-                      <MoveDiagonal2 size={13} />
-                    </button>
-                  )}
-
-                  {shape.label && (
-                    <span className="text-sm font-black uppercase tracking-widest text-white bg-black/30 px-3.5 py-1 rounded-full">
-                      {shape.label}
-                    </span>
-                  )}
-                  {shape.sublabel && (
-                    <span className="text-xs font-bold text-white/70 mt-1.5 px-1">
-                      {shape.sublabel} ({shape.width || 44}% × {shape.height || 36}%)
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-
-          {/* ============================================================================ */}
-          {/* 2. LIVE SVG CONNECTOR-PAIR PREVIEW LINES ON BUILDER STAGE                    */}
-          {/* ============================================================================ */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none z-20">
+          <div
+            ref={stageRef}
+            onPointerDown={() => {
+              if (!isTaskbarPinned && taskbarDock === 'floating') {
+                setSelectedItem(null);
+              }
+            }}
+            onPointerMove={handleStagePointerMove}
+            onPointerUp={() => {
+              setInteraction(null);
+              setIsDraggingTaskbar(false);
+            }}
+            style={{
+              width: `${resolution.width}px`,
+              height: `${resolution.height}px`,
+              transform: `scale(${stageScale})`,
+              transformOrigin: 'top center'
+            }}
+            className={`relative shrink-0 select-none overflow-hidden ${activeThemeClass}`}
+          >
+            {/* 1. BACKGROUND GROUP SHAPES ON BUILDER STAGE */}
             {entities
-              .filter((e: any) => e.connectTargetId)
-              .map((srcEnt: any) => {
-                const targetEnt = entities.find((t: any) => t.id === srcEnt.connectTargetId);
-                if (!targetEnt) return null;
+              .filter((e: any) => e.entityType === 'bg_shape')
+              .map((shape: any) => {
+                const isSelected = selectedItem?.kind === 'entity' && selectedItem.id === shape.id;
+                const palette = COLOR_STYLES[shape.color || 'indigo'] || COLOR_STYLES.indigo;
+                const borderStyleClass =
+                  BORDER_STYLE_CLASSES[shape.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
+                const radiusClass =
+                  SHAPE_RADIUS_CLASSES[shape.shapeVariant || 'rounded'] || SHAPE_RADIUS_CLASSES.rounded;
+                const fillAlpha = (shape.opacity ?? 22) / 100;
+
                 return (
-                  <g key={`link_${srcEnt.id}_${targetEnt.id}`}>
-                    <line
-                      x1={`${srcEnt.x}%`}
-                      y1={`${srcEnt.y}%`}
-                      x2={`${targetEnt.x}%`}
-                      y2={`${targetEnt.y}%`}
-                      stroke="#22d3ee"
-                      strokeWidth="4"
-                      strokeDasharray="10,8"
-                      opacity="0.85"
-                    />
-                  </g>
+                  <div
+                    key={shape.id}
+                    onPointerDown={(e) => startMoveItem(e, 'entity', shape)}
+                    style={{
+                      left: `${shape.x}%`,
+                      top: `${shape.y}%`,
+                      width: `${shape.width || 44}%`,
+                      height: `${shape.height || 36}%`,
+                      backgroundColor: `${palette.softBg}${fillAlpha})`,
+                      transform: `translate(-50%, -50%) rotate(${shape.rotation || 0}deg)`,
+                      zIndex: shape.zOrder ?? 2
+                    }}
+                    className={`group absolute ${radiusClass} ${borderStyleClass} ${palette.border} p-6 flex flex-col items-start justify-start transition-shadow ${
+                      shape.lockInBuilder ? 'cursor-default' : 'cursor-move'
+                    } ${isSelected ? 'ring-4 ring-amber-400' : ''}`}
+                  >
+                    {!shape.lockInBuilder && (
+                      <button
+                        type="button"
+                        title="Drag in 4 Directions to Move Group Shape"
+                        onPointerDown={(e) => startMoveItem(e, 'entity', shape)}
+                        className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-purple-600 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-move z-30"
+                      >
+                        <Move size={13} />
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      title="Select & Focus in Contextual Task Bar"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedItem({ kind: 'entity', id: shape.id });
+                      }}
+                      className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
+                        isSelected
+                          ? 'bg-amber-400 text-slate-950 border-white'
+                          : 'bg-slate-900 hover:bg-purple-600 text-white border-white'
+                      }`}
+                    >
+                      <MoreHorizontal size={15} />
+                    </button>
+
+                    {!shape.lockInBuilder && (
+                      <button
+                        type="button"
+                        title="Pull Diagonally to Resize Group Shape Width & Height"
+                        onPointerDown={(e) => startResizeItem(e, 'entity', shape)}
+                        className="absolute -bottom-3.5 -right-3.5 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
+                      >
+                        <MoveDiagonal2 size={13} />
+                      </button>
+                    )}
+
+                    {shape.label && (
+                      <span className="text-sm font-black uppercase tracking-widest text-white bg-black/30 px-3.5 py-1 rounded-full">
+                        {shape.label}
+                      </span>
+                    )}
+                    {shape.sublabel && (
+                      <span className="text-xs font-bold text-white/70 mt-1.5 px-1">
+                        {shape.sublabel} ({shape.width || 44}% × {shape.height || 36}%)
+                      </span>
+                    )}
+                  </div>
                 );
               })}
-          </svg>
 
-          {/* ============================================================================ */}
-          {/* 3. DROP ZONES / BUCKETS ON BUILDER STAGE                                     */}
-          {/* ============================================================================ */}
-          {zones.map((z: any) => {
-            const isSelected = selectedItem?.kind === 'zone' && selectedItem.id === z.id;
-            const isMenuOpen = openMenuFor?.kind === 'zone' && openMenuFor.id === z.id;
-            const zBorderClass = BORDER_STYLE_CLASSES[z.borderStyle || 'dashed'] || 'border-4 border-dashed';
-            const zPalette = COLOR_STYLES[z.color || 'indigo'] || COLOR_STYLES.indigo;
+            {/* 2. LIVE SVG CONNECTOR-PAIR PREVIEW LINES */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-20">
+              {entities
+                .filter((e: any) => e.connectTargetId)
+                .map((srcEnt: any) => {
+                  const targetEnt = entities.find((t: any) => t.id === srcEnt.connectTargetId);
+                  if (!targetEnt) return null;
+                  return (
+                    <g key={`link_${srcEnt.id}_${targetEnt.id}`}>
+                      <line
+                        x1={`${srcEnt.x}%`}
+                        y1={`${srcEnt.y}%`}
+                        x2={`${targetEnt.x}%`}
+                        y2={`${targetEnt.y}%`}
+                        stroke="#22d3ee"
+                        strokeWidth="4"
+                        strokeDasharray="10,8"
+                        opacity="0.85"
+                      />
+                    </g>
+                  );
+                })}
+            </svg>
 
-            return (
-              <div
-                key={z.id}
-                onPointerDown={(e) => startMoveItem(e, 'zone', z)}
-                style={{
-                  left: `${z.x}%`,
-                  top: `${z.y}%`,
-                  width: `${z.width || 24}%`,
-                  height: `${z.height || 24}%`,
-                  transform: 'translate(-50%, -50%)',
-                  zIndex: isMenuOpen ? 85 : z.zOrder ?? (isSelected ? 25 : 10)
-                }}
-                className={`group absolute rounded-[2rem] ${zBorderClass} p-5 flex flex-col items-center justify-start cursor-move transition-colors ${
-                  isSelected
-                    ? 'border-amber-400 bg-amber-500/15 ring-2 ring-amber-400/50'
-                    : `${zPalette.border} bg-slate-900/35`
-                }`}
-              >
-                {!z.lockInBuilder && (
-                  <button
-                    type="button"
-                    title="Drag to Move Drop Zone"
-                    onPointerDown={(e) => startMoveItem(e, 'zone', z)}
-                    className="absolute -top-3.5 -left-3.5 w-9 h-9 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-slate-600 flex items-center justify-center shadow-lg cursor-move z-30"
-                  >
-                    <Move size={15} />
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  title="Customize Zone Style, Capacity & Category"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedItem({ kind: 'zone', id: z.id });
-                    setOpenMenuFor(isMenuOpen ? null : { kind: 'zone', id: z.id });
-                  }}
-                  className={`absolute -top-3.5 -right-3.5 w-9 h-9 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
-                    isMenuOpen
-                      ? 'bg-amber-400 text-slate-950 border-white'
-                      : 'bg-slate-900 hover:bg-indigo-600 text-white border-slate-600'
-                  }`}
-                >
-                  <MoreHorizontal size={16} />
-                </button>
-
-                {!z.lockInBuilder && (
-                  <button
-                    type="button"
-                    title="Pull Diagonally to Resize Zone Width & Height"
-                    onPointerDown={(e) => startResizeItem(e, 'zone', z)}
-                    className="absolute -bottom-3.5 -right-3.5 w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
-                  >
-                    <MoveDiagonal2 size={15} />
-                  </button>
-                )}
-
-                <div className="flex items-center gap-2">
-                  {z.anchored && <Lock size={14} className="text-amber-400" />}
-                  <span className="text-lg font-black uppercase">{z.label}</span>
-                </div>
-                <span className="text-xs font-bold opacity-75">
-                  {z.sublabel} • ({z.width || 24}% × {z.height || 24}%)
-                </span>
-              </div>
-            );
-          })}
-
-          {/* ============================================================================ */}
-          {/* 4. DRAGGABLE & ANCHORED ENTITIES ON BUILDER STAGE                            */}
-          {/* ============================================================================ */}
-          {entities
-            .filter((e: any) => e.entityType !== 'bg_shape')
-            .map((ent: any) => {
-              const isSelected = selectedItem?.kind === 'entity' && selectedItem.id === ent.id;
-              const isMenuOpen = openMenuFor?.kind === 'entity' && openMenuFor.id === ent.id;
-              const palette = COLOR_STYLES[ent.color || 'indigo'] || COLOR_STYLES.indigo;
-              const borderStyleClass =
-                BORDER_STYLE_CLASSES[ent.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
-              const radiusClass =
-                SHAPE_RADIUS_CLASSES[ent.shapeVariant || 'banner'] || 'rounded-2xl';
+            {/* 3. DROP ZONES / BUCKETS ON BUILDER STAGE */}
+            {zones.map((z: any) => {
+              const isSelected = selectedItem?.kind === 'zone' && selectedItem.id === z.id;
+              const zBorderClass = BORDER_STYLE_CLASSES[z.borderStyle || 'dashed'] || 'border-4 border-dashed';
+              const zPalette = COLOR_STYLES[z.color || 'indigo'] || COLOR_STYLES.indigo;
 
               return (
                 <div
-                  key={ent.id}
-                  onPointerDown={(e) => startMoveItem(e, 'entity', ent)}
+                  key={z.id}
+                  onPointerDown={(e) => startMoveItem(e, 'zone', z)}
                   style={{
-                    left: `${ent.x}%`,
-                    top: `${ent.y}%`,
-                    width: ent.width ? `${ent.width}%` : undefined,
-                    height: ent.height ? `${ent.height}%` : undefined,
-                    transform: `translate(-50%, -50%) scale(${ent.scale || 1}) rotate(${
-                      ent.rotation || 0
-                    }deg)`,
-                    zIndex: isMenuOpen ? 90 : ent.zOrder ?? (isSelected ? 50 : 35)
+                    left: `${z.x}%`,
+                    top: `${z.y}%`,
+                    width: `${z.width || 24}%`,
+                    height: `${z.height || 24}%`,
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: z.zOrder ?? (isSelected ? 25 : 10)
                   }}
-                  className={`group absolute px-7 py-4 ${radiusClass} ${borderStyleClass} shadow-xl cursor-move flex items-center justify-center ${
-                    ent.anchored
-                      ? 'bg-slate-900 border-amber-400 text-white'
-                      : `${palette.bg} ${palette.border}`
-                  } ${isSelected ? 'ring-4 ring-white' : ''}`}
+                  className={`group absolute rounded-[2rem] ${zBorderClass} p-5 flex flex-col items-center justify-start cursor-move transition-colors ${
+                    isSelected
+                      ? 'border-amber-400 bg-amber-500/15 ring-2 ring-amber-400/50'
+                      : `${zPalette.border} bg-slate-900/35`
+                  }`}
                 >
-                  {!ent.lockInBuilder && (
+                  {!z.lockInBuilder && (
                     <button
                       type="button"
-                      title="Drag in 4 Directions to Move"
-                      onPointerDown={(e) => startMoveItem(e, 'entity', ent)}
-                      className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-white/80 flex items-center justify-center shadow-lg cursor-move z-30"
+                      title="Drag to Move Drop Zone"
+                      onPointerDown={(e) => startMoveItem(e, 'zone', z)}
+                      className="absolute -top-3.5 -left-3.5 w-9 h-9 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-slate-600 flex items-center justify-center shadow-lg cursor-move z-30"
                     >
-                      <Move size={13} />
+                      <Move size={15} />
                     </button>
                   )}
 
                   <button
                     type="button"
-                    title="Open Box Options (Color, Border, Text, Triggers)"
+                    title="Select Zone in Contextual Task Bar"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedItem({ kind: 'entity', id: ent.id });
-                      setOpenMenuFor(isMenuOpen ? null : { kind: 'entity', id: ent.id });
+                      setSelectedItem({ kind: 'zone', id: z.id });
                     }}
-                    className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
-                      isMenuOpen
+                    className={`absolute -top-3.5 -right-3.5 w-9 h-9 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
+                      isSelected
                         ? 'bg-amber-400 text-slate-950 border-white'
-                        : 'bg-slate-900 hover:bg-indigo-600 text-white border-white/80'
+                        : 'bg-slate-900 hover:bg-indigo-600 text-white border-slate-600'
                     }`}
                   >
-                    <MoreHorizontal size={15} />
+                    <MoreHorizontal size={16} />
                   </button>
 
-                  {!ent.lockInBuilder && (
+                  {!z.lockInBuilder && (
                     <button
                       type="button"
-                      title="Pull Diagonally to Resize Box"
-                      onPointerDown={(e) => startResizeItem(e, 'entity', ent)}
-                      className="absolute -bottom-3.5 -right-3.5 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
+                      title="Pull Diagonally to Resize Zone Width & Height"
+                      onPointerDown={(e) => startResizeItem(e, 'zone', z)}
+                      className="absolute -bottom-3.5 -right-3.5 w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
                     >
-                      <MoveDiagonal2 size={13} />
+                      <MoveDiagonal2 size={15} />
                     </button>
                   )}
 
                   <div className="flex items-center gap-2">
-                    {ent.anchored && (
-                      <span title="Anchored to Stage" className="inline-flex">
-                        <Pin size={15} className="text-amber-400 rotate-45" />
-                      </span>
-                    )}
-                    {ent.connectTargetId && (
-                      <span title="Linked Connector Node" className="inline-flex">
-                        <Link2 size={15} className="text-cyan-200" />
-                      </span>
-                    )}
-                    {ent.returnToAnchor && !ent.anchored && !ent.connectTargetId && (
-                      <span title="Magnetic Return to Home Anchor" className="inline-flex">
-                        <Magnet size={14} className="text-cyan-200" />
-                      </span>
-                    )}
-                    <div className="text-center">
-                      <div className="text-lg font-black">{ent.label || '(Empty Block)'}</div>
-                      <div className="text-[11px] font-bold opacity-80">
-                        {ent.sublabel}{' '}
-                        {ent.width
-                          ? `• (${ent.width}% × ${ent.height || 10}%)`
-                          : `• ${Math.round((ent.scale || 1) * 100)}%`}
-                      </div>
-                    </div>
+                    {z.anchored && <Lock size={14} className="text-amber-400" />}
+                    <span className="text-lg font-black uppercase">{z.label}</span>
                   </div>
+                  <span className="text-xs font-bold opacity-75">
+                    {z.sublabel} • ({z.width || 24}% × {z.height || 24}%)
+                  </span>
                 </div>
               );
             })}
 
-          {/* ============================================================================ */}
-          {/* IN-PLACE THREE-DOTS (•••) FLOATING TOOLTIP INSPECTOR POPOVER                 */}
-          {/* ============================================================================ */}
-          {(activeMenuEntity || activeMenuZone) && (
-            <div
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                left: `${Math.min(72, Math.max(28, (activeMenuEntity || activeMenuZone).x))}%`,
-                top: `${Math.min(64, Math.max(26, (activeMenuEntity || activeMenuZone).y))}%`,
-                transform: 'translate(-50%, -50%)'
-              }}
-              className="absolute z-[200] w-[440px] rounded-3xl bg-slate-900/98 backdrop-blur-2xl border-2 border-indigo-400/60 shadow-[0_25px_70px_rgba(0,0,0,0.85)] text-white p-5 space-y-4 animate-in zoom-in-95 duration-150"
-            >
-              {/* Popover Header */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-black uppercase tracking-widest">
-                    {activeMenuEntity?.entityType === 'bg_shape'
-                      ? 'Group Shape'
-                      : activeMenuEntity
-                      ? 'Box Properties'
-                      : 'Zone Properties'}
-                  </span>
-                  <span className="text-sm font-black truncate max-w-[160px]">
-                    {(activeMenuEntity || activeMenuZone).label || '(Empty Block)'}
-                  </span>
-                </div>
+            {/* 4. DRAGGABLE & ANCHORED ENTITIES ON BUILDER STAGE */}
+            {entities
+              .filter((e: any) => e.entityType !== 'bg_shape')
+              .map((ent: any) => {
+                const isSelected = selectedItem?.kind === 'entity' && selectedItem.id === ent.id;
+                const palette = COLOR_STYLES[ent.color || 'indigo'] || COLOR_STYLES.indigo;
+                const borderStyleClass =
+                  BORDER_STYLE_CLASSES[ent.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
+                const radiusClass =
+                  SHAPE_RADIUS_CLASSES[ent.shapeVariant || 'banner'] || 'rounded-2xl';
 
-                {/* Quick Layer Order & Actions in Header */}
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    title="Send to Back"
-                    onClick={() =>
-                      adjustLayerZOrder(
-                        activeMenuEntity ? 'entity' : 'zone',
-                        (activeMenuEntity || activeMenuZone).id,
-                        'back'
-                      )
-                    }
-                    className="p-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+                return (
+                  <div
+                    key={ent.id}
+                    onPointerDown={(e) => startMoveItem(e, 'entity', ent)}
+                    style={{
+                      left: `${ent.x}%`,
+                      top: `${ent.y}%`,
+                      width: ent.width ? `${ent.width}%` : undefined,
+                      height: ent.height ? `${ent.height}%` : undefined,
+                      transform: `translate(-50%, -50%) scale(${ent.scale || 1}) rotate(${
+                        ent.rotation || 0
+                      }deg)`,
+                      zIndex: ent.zOrder ?? (isSelected ? 55 : 35)
+                    }}
+                    className={`group absolute px-7 py-4 ${radiusClass} ${borderStyleClass} shadow-xl cursor-move flex items-center justify-center ${
+                      ent.anchored
+                        ? 'bg-slate-900 border-amber-400 text-white'
+                        : `${palette.bg} ${palette.border}`
+                    } ${isSelected ? 'ring-4 ring-amber-400' : ''}`}
                   >
-                    <ChevronsDown size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    title="Bring to Front"
-                    onClick={() =>
-                      adjustLayerZOrder(
-                        activeMenuEntity ? 'entity' : 'zone',
-                        (activeMenuEntity || activeMenuZone).id,
-                        'front'
-                      )
-                    }
-                    className="p-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
-                  >
-                    <ChevronsUp size={14} />
-                  </button>
-                  {activeMenuEntity && (
+                    {!ent.lockInBuilder && (
+                      <button
+                        type="button"
+                        title="Drag in 4 Directions to Move"
+                        onPointerDown={(e) => startMoveItem(e, 'entity', ent)}
+                        className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-white/80 flex items-center justify-center shadow-lg cursor-move z-30"
+                      >
+                        <Move size={13} />
+                      </button>
+                    )}
+
                     <button
                       type="button"
-                      title="Duplicate"
-                      onClick={() => duplicateEntity(activeMenuEntity)}
-                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+                      title="Select & Edit in Contextual Task Bar"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedItem({ kind: 'entity', id: ent.id });
+                      }}
+                      className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
+                        isSelected
+                          ? 'bg-amber-400 text-slate-950 border-white'
+                          : 'bg-slate-900 hover:bg-indigo-600 text-white border-white/80'
+                      }`}
                     >
-                      <Copy size={14} />
+                      <MoreHorizontal size={15} />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    title="Delete"
-                    onClick={() => {
-                      if (activeMenuEntity) {
-                        onChange({
-                          ...block,
-                          entities: entities.filter((e: any) => e.id !== activeMenuEntity.id)
-                        });
-                      } else if (activeMenuZone) {
-                        onChange({
-                          ...block,
-                          zones: zones.filter((z: any) => z.id !== activeMenuZone.id)
-                        });
-                      }
-                      setOpenMenuFor(null);
-                    }}
-                    className="p-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOpenMenuFor(null)}
-                    className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-              </div>
 
-              {/* Tooltip Sub-Tabs */}
-              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-slate-950 border border-slate-800">
-                {[
-                  { id: 'style', label: 'Color & Size' },
-                  { id: 'text', label: 'Text & Match' },
-                  { id: 'triggers', label: 'Layer & Link' }
-                ].map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setMenuTab(t.id as any)}
-                    className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
-                      menuTab === t.id
-                        ? 'bg-indigo-600 text-white shadow'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* TAB 1: COLOR PALETTE, BORDER STYLE, SHAPE GEOMETRY & 2D DIMENSIONS */}
-              {menuTab === 'style' && (
-                <div className="space-y-3.5">
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">
-                      Color Theme
-                    </label>
-                    <div className="grid grid-cols-6 gap-2">
-                      {Object.entries(COLOR_STYLES).map(([colorKey, cObj]) => {
-                        const target = activeMenuEntity || activeMenuZone;
-                        const isPicked = (target.color || 'indigo') === colorKey;
-                        return (
-                          <button
-                            key={colorKey}
-                            type="button"
-                            onClick={() =>
-                              activeMenuEntity
-                                ? updateEntityField(activeMenuEntity.id, { color: colorKey })
-                                : updateZoneField(activeMenuZone.id, { color: colorKey })
-                            }
-                            style={{ backgroundColor: cObj.hex }}
-                            className={`h-8 rounded-xl border-2 capitalize text-[10px] font-black flex items-center justify-center transition-transform ${
-                              isPicked
-                                ? 'border-white scale-110 ring-2 ring-white/50'
-                                : 'border-transparent opacity-80 hover:opacity-100'
-                            }`}
-                          >
-                            {isPicked && <Check size={14} className="text-white drop-shadow" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">
-                      Border Style
-                    </label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {['solid', 'dashed', 'dotted', 'double', 'glow', 'none'].map((bStyle) => {
-                        const target = activeMenuEntity || activeMenuZone;
-                        const currentBS = target.borderStyle || (activeMenuZone ? 'dashed' : 'solid');
-                        return (
-                          <button
-                            key={bStyle}
-                            type="button"
-                            onClick={() =>
-                              activeMenuEntity
-                                ? updateEntityField(activeMenuEntity.id, { borderStyle: bStyle })
-                                : updateZoneField(activeMenuZone.id, { borderStyle: bStyle })
-                            }
-                            className={`py-1.5 px-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider border ${
-                              currentBS === bStyle
-                                ? 'bg-indigo-600/30 border-indigo-400 text-white'
-                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            {bStyle}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {activeMenuEntity && (
-                    <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">
-                        Shape Corner Geometry
-                      </label>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {[
-                          { id: 'rounded', label: 'Rounded' },
-                          { id: 'sharp', label: 'Rectangle' },
-                          { id: 'pill', label: 'Pill / Oval' },
-                          { id: 'banner', label: 'Card' }
-                        ].map((sh) => (
-                          <button
-                            key={sh.id}
-                            type="button"
-                            onClick={() =>
-                              updateEntityField(activeMenuEntity.id, { shapeVariant: sh.id })
-                            }
-                            className={`py-1.5 px-2 rounded-xl text-[10px] font-black uppercase border ${
-                              (activeMenuEntity.shapeVariant || 'banner') === sh.id
-                                ? 'bg-purple-600/30 border-purple-400 text-white'
-                                : 'bg-slate-950 border-slate-800 text-slate-400'
-                            }`}
-                          >
-                            {sh.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Width % × Height % Sliders (Works on Empty Blocks, Group Shapes & Drop Zones) */}
-                  <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-800">
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                        Box Width ({(activeMenuEntity || activeMenuZone).width ?? 24}%)
-                      </label>
-                      <input
-                        type="range"
-                        min={6}
-                        max={94}
-                        step={1}
-                        value={(activeMenuEntity || activeMenuZone).width ?? 24}
-                        onChange={(e) => {
-                          const w = Number(e.target.value);
-                          activeMenuEntity
-                            ? updateEntityField(activeMenuEntity.id, {
-                                width: w,
-                                height: activeMenuEntity.height ?? 14,
-                                resizeMode: 'box'
-                              })
-                            : updateZoneField(activeMenuZone.id, { width: w });
-                        }}
-                        className="w-full accent-emerald-500 cursor-pointer"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                        Box Height ({(activeMenuEntity || activeMenuZone).height ?? 18}%)
-                      </label>
-                      <input
-                        type="range"
-                        min={6}
-                        max={90}
-                        step={1}
-                        value={(activeMenuEntity || activeMenuZone).height ?? 18}
-                        onChange={(e) => {
-                          const h = Number(e.target.value);
-                          activeMenuEntity
-                            ? updateEntityField(activeMenuEntity.id, {
-                                height: h,
-                                width: activeMenuEntity.width ?? 24,
-                                resizeMode: 'box'
-                              })
-                            : updateZoneField(activeMenuZone.id, { height: h });
-                        }}
-                        className="w-full accent-emerald-500 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  {activeMenuEntity?.entityType === 'bg_shape' && (
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                        Background Fill Opacity ({activeMenuEntity.opacity ?? 22}%)
-                      </label>
-                      <input
-                        type="range"
-                        min={5}
-                        max={95}
-                        step={5}
-                        value={activeMenuEntity.opacity ?? 22}
-                        onChange={(e) =>
-                          updateEntityField(activeMenuEntity.id, {
-                            opacity: Number(e.target.value)
-                          })
-                        }
-                        className="w-full accent-purple-500 cursor-pointer"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 2: TEXT, SUBLABEL (LEAVE BLANK FOR EMPTY BLOCK) & CATEGORY / SEQUENCE */}
-              {menuTab === 'text' && (
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">
-                        Primary Text / Header (Leave empty for a blank frame)
-                      </label>
+                    {!ent.lockInBuilder && (
                       <button
                         type="button"
-                        onClick={() =>
-                          activeMenuEntity
-                            ? updateEntityField(activeMenuEntity.id, {
-                                label: '',
-                                sublabel: '',
-                                width: activeMenuEntity.width ?? 24,
-                                height: activeMenuEntity.height ?? 16,
-                                resizeMode: 'box'
-                              })
-                            : updateZoneField(activeMenuZone.id, { label: '', sublabel: '' })
-                        }
-                        className="text-[9px] font-black uppercase text-amber-400 hover:underline"
+                        title="Pull Diagonally to Resize Box"
+                        onPointerDown={(e) => startResizeItem(e, 'entity', ent)}
+                        className="absolute -bottom-3.5 -right-3.5 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
                       >
-                        Clear Text (Make Empty Box)
+                        <MoveDiagonal2 size={13} />
                       </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={(activeMenuEntity || activeMenuZone).label || ''}
-                      placeholder="(Empty Block — no label)"
-                      onChange={(e) =>
-                        activeMenuEntity
-                          ? updateEntityField(activeMenuEntity.id, { label: e.target.value })
-                          : updateZoneField(activeMenuZone.id, { label: e.target.value })
-                      }
-                      className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-black text-white outline-none focus:border-indigo-500"
-                    />
-                  </div>
+                    )}
 
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                      Subtitle / Hint Note
-                    </label>
-                    <input
-                      type="text"
-                      value={(activeMenuEntity || activeMenuZone).sublabel || ''}
-                      placeholder="Optional subtitle..."
-                      onChange={(e) =>
-                        activeMenuEntity
-                          ? updateEntityField(activeMenuEntity.id, { sublabel: e.target.value })
-                          : updateZoneField(activeMenuZone.id, { sublabel: e.target.value })
-                      }
-                      className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-slate-200 outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  {activeMenuEntity && activeMenuEntity.entityType !== 'bg_shape' && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                          Category Tag (Bucket Match)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. ed_feeling"
-                          value={activeMenuEntity.category || ''}
-                          onChange={(e) =>
-                            updateEntityField(activeMenuEntity.id, { category: e.target.value })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-emerald-300 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                          Sequence Slot #
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="1, 2, 3..."
-                          value={activeMenuEntity.sequenceIndex ?? ''}
-                          onChange={(e) =>
-                            updateEntityField(activeMenuEntity.id, {
-                              sequenceIndex: e.target.value ? Number(e.target.value) : undefined
-                            })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-amber-300 outline-none"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {activeMenuZone && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                          Accepts Category
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. ed_feeling"
-                          value={activeMenuZone.acceptedCategory || ''}
-                          onChange={(e) =>
-                            updateZoneField(activeMenuZone.id, { acceptedCategory: e.target.value })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-emerald-300 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                          Sequence Order #
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="1, 2..."
-                          value={activeMenuZone.sequenceOrder ?? ''}
-                          onChange={(e) =>
-                            updateZoneField(activeMenuZone.id, {
-                              sequenceOrder: e.target.value ? Number(e.target.value) : undefined
-                            })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-amber-300 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                          Max Capacity
-                        </label>
-                        <input
-                          type="number"
-                          value={activeMenuZone.capacity ?? 2}
-                          onChange={(e) =>
-                            updateZoneField(activeMenuZone.id, {
-                              capacity: Math.max(1, Number(e.target.value) || 1)
-                            })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-black text-white outline-none"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 3: LAYER ORDER, ANCHORING, LINK CONNECTOR TARGET & TRIGGERS */}
-              {menuTab === 'triggers' && (
-                <div className="space-y-3">
-                  {/* Convert Any Box into a Background Grouping Shape or Draggable Card */}
-                  {activeMenuEntity && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateEntityField(activeMenuEntity.id, {
-                            entityType:
-                              activeMenuEntity.entityType === 'bg_shape'
-                                ? 'draggable'
-                                : 'bg_shape',
-                            zOrder: activeMenuEntity.entityType === 'bg_shape' ? 30 : 2,
-                            width: activeMenuEntity.width ?? 40,
-                            height: activeMenuEntity.height ?? 32,
-                            opacity: activeMenuEntity.opacity ?? 22,
-                            anchored: activeMenuEntity.entityType !== 'bg_shape',
-                            draggable: activeMenuEntity.entityType === 'bg_shape'
-                          })
-                        }
-                        className={`py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider border flex items-center justify-center gap-1.5 ${
-                          activeMenuEntity.entityType === 'bg_shape'
-                            ? 'bg-purple-600 text-white border-purple-400'
-                            : 'bg-slate-950 text-slate-300 border-slate-800'
-                        }`}
-                      >
-                        <Square size={12} />
-                        {activeMenuEntity.entityType === 'bg_shape'
-                          ? 'Background Group Shape'
-                          : 'Set as Background Shape'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextAnchored = !activeMenuEntity.anchored;
-                          updateEntityField(activeMenuEntity.id, {
-                            anchored: nextAnchored,
-                            draggable: !nextAnchored
-                          });
-                        }}
-                        className={`py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider border flex items-center justify-center gap-1.5 ${
-                          activeMenuEntity.anchored
-                            ? 'bg-amber-500 text-slate-950 border-amber-300'
-                            : 'bg-slate-950 text-slate-300 border-slate-800'
-                        }`}
-                      >
-                        <Pin size={12} />
-                        {activeMenuEntity.anchored ? 'Anchored (Fixed)' : 'Pin in Place'}
-                      </button>
-                    </div>
-                  )}
-
-                  {activeMenuEntity && activeMenuEntity.entityType !== 'bg_shape' && (
-                    <>
-                      <div className="p-3 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 space-y-1.5">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-cyan-300 flex items-center gap-1.5">
-                          <Link2 size={13} /> Link Connector Target (Draw Matching Line)
-                        </label>
-                        <select
-                          value={activeMenuEntity.connectTargetId || ''}
-                          onChange={(e) =>
-                            handleLinkConnectorTarget(activeMenuEntity.id, e.target.value)
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-xs font-bold text-white outline-none"
-                        >
-                          <option value="">None (Standard Draggable / Anchored Box)</option>
-                          {entities
-                            .filter(
-                              (other: any) =>
-                                other.id !== activeMenuEntity.id &&
-                                other.entityType !== 'bg_shape'
-                            )
-                            .map((other: any) => (
-                              <option key={other.id} value={other.id}>
-                                Connect to: {other.label} ({other.sublabel || other.id})
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-
-                      {!activeMenuEntity.anchored && !activeMenuEntity.connectTargetId && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateEntityField(activeMenuEntity.id, {
-                              returnToAnchor: !activeMenuEntity.returnToAnchor,
-                              anchorX: activeMenuEntity.x,
-                              anchorY: activeMenuEntity.y
-                            })
-                          }
-                          className={`w-full py-2 px-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-between border ${
-                            activeMenuEntity.returnToAnchor
-                              ? 'bg-cyan-600 text-white border-cyan-400'
-                              : 'bg-slate-950 text-slate-300 border-slate-800'
-                          }`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <Magnet size={14} /> Snap Back to Home Anchor if Missed
-                          </span>
-                          <span>{activeMenuEntity.returnToAnchor ? 'ON' : 'OFF'}</span>
-                        </button>
+                    <div className="flex items-center gap-2">
+                      {ent.anchored && (
+                        <span title="Anchored to Stage" className="inline-flex">
+                          <Pin size={15} className="text-amber-400 rotate-45" />
+                        </span>
                       )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                      {ent.connectTargetId && (
+                        <span title="Linked Connector Node" className="inline-flex">
+                          <Link2 size={15} className="text-cyan-200" />
+                        </span>
+                      )}
+                      {ent.returnToAnchor && !ent.anchored && !ent.connectTargetId && (
+                        <span title="Magnetic Return to Home Anchor" className="inline-flex">
+                          <Magnet size={14} className="text-cyan-200" />
+                        </span>
+                      )}
+                      <div className="text-center">
+                        <div className="text-lg font-black">{ent.label || '(Empty Block)'}</div>
+                        <div className="text-[11px] font-bold opacity-80">
+                          {ent.sublabel}{' '}
+                          {ent.width
+                            ? `• (${ent.width}% × ${ent.height || 10}%)`
+                            : `• ${Math.round((ent.scale || 1) * 100)}%`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </div>
+
+        {/* 🔥 DOCK POSITION 3: RIGHT-HAND INSPECTOR SIDEBAR */}
+        {taskbarDock === 'right' && renderContextualTaskBar(false)}
       </div>
+
+      {/* 🔥 DOCK POSITION 2: BOTTOM DOCKED CONTEXTUAL BAR */}
+      {taskbarDock === 'bottom' && renderContextualTaskBar(false)}
     </div>
   );
 };
