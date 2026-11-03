@@ -6,9 +6,10 @@ import {
   Code, CheckCircle2, Move, Pin, Monitor,
   MoreHorizontal, MoveDiagonal2, Copy, Link2,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
-  Square, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown,
-  Layers, GripVertical, PanelTop, PanelBottom, PanelRight,
-  Sliders, CheckSquare, Columns, Keyboard
+  Square, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+  ChevronsUp, ChevronsDown, Layers, GripVertical,
+  PanelTop, PanelBottom, PanelRight,
+  CheckSquare, Columns, Keyboard, Tablet
 } from 'lucide-react';
 
 // ============================================================================
@@ -133,6 +134,45 @@ const THEME_BACKGROUNDS: Record<string, string> = {
 };
 
 // ============================================================================
+//  TABLET / TOUCH ENVIRONMENT DETECTOR HOOK
+// ============================================================================
+function useTabletTouchDetector() {
+  const [isAutoTouchTablet, setIsAutoTouchTablet] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkDevice = () => {
+      const hasCoarsePointer =
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(pointer: coarse)').matches;
+      const hasTouchPoints =
+        typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
+      const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      const isIPadOrTabletUA =
+        /iPad|Android|Tablet|PlayBook|Silk/i.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isTabletWidth =
+        typeof window !== 'undefined' &&
+        window.innerWidth >= 600 &&
+        window.innerWidth <= 1366;
+
+      setIsAutoTouchTablet(
+        Boolean(
+          isIPadOrTabletUA ||
+            (hasCoarsePointer && isTabletWidth) ||
+            (hasTouchPoints && hasCoarsePointer)
+        )
+      );
+    };
+
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, []);
+
+  return isAutoTouchTablet;
+}
+
+// ============================================================================
 //  1. STUDENT & SMARTBOARD PLAYER: KINETIC CANVAS BLOCK (HD + ANCHORED + SHAPES)
 // ============================================================================
 export const KineticCanvasBlock = ({ block, onComplete }: any) => {
@@ -247,7 +287,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     if (ent.entityType === 'connector_node' || ent.connectTargetId) {
       if (!activeConnectorSourceId) {
         setActiveConnectorSourceId(ent.id);
-        setStatusBanner(`Selected "${ent.label}" — now click its matching target box!`);
+        setStatusBanner(`Selected "${ent.label}" — now tap its matching target box!`);
       } else if (activeConnectorSourceId !== ent.id) {
         const sourceEnt = entities.find((item) => item.id === activeConnectorSourceId);
         const isCorrect =
@@ -551,7 +591,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
         <div
           ref={outerWrapRef}
           style={{ height: `${Math.round(resolution.height * stageScale)}px` }}
-          className="relative w-full overflow-hidden bg-slate-950 flex justify-center"
+          className="relative w-full overflow-hidden bg-slate-950 flex justify-center touch-none"
         >
           <div
             ref={stageRef}
@@ -563,7 +603,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
               transform: `scale(${stageScale})`,
               transformOrigin: 'top center'
             }}
-            className={`relative shrink-0 select-none overflow-hidden ${activeThemeClass}`}
+            className={`relative shrink-0 select-none overflow-hidden touch-none ${activeThemeClass}`}
           >
             {block?.backgroundUrl && (
               <img
@@ -816,7 +856,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                       }) rotate(${ent.rotation || 0}deg)`,
                       zIndex: isDragging ? 75 : ent.zOrder ?? (isAnchored ? 15 : 30)
                     }}
-                    className={`absolute px-6 py-3.5 ${radiusClass} ${borderStyleClass} shadow-xl transition-shadow select-none flex items-center justify-center ${
+                    className={`absolute px-6 py-3.5 ${radiusClass} ${borderStyleClass} shadow-xl transition-shadow select-none touch-none flex items-center justify-center ${
                       isAnchored
                         ? 'bg-slate-900/90 border-slate-600/80 text-white cursor-default shadow-md'
                         : isConnector
@@ -945,21 +985,23 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 };
 
 // ============================================================================
-//  2. INSTRUCTOR VISUAL STUDIO: KINETIC CANVAS BUILDER
-//  Features:
-//   - Keyboard Shortcuts:
-//     * Arrow Keys = Nudge 1% (Shift+Arrow = 5%, Alt+Arrow = 0.5%)
-//     * Delete / Backspace = Delete selected items
-//     * Ctrl+D / Cmd+D = Duplicate selected items (Cards, Shapes & Drop Zones)
-//     * Ctrl+A / Cmd+A = Select all cards
-//     * Escape = Clear selection
-//   - Shift+Click Multi-Selection & Synchronized Group Dragging
-//   - Photoshop Contextual Task Bar (Top Ribbon, Bottom Bar, Right Inspector, Pinned/Floating)
+//  2. INSTRUCTOR VISUAL STUDIO: KINETIC CANVAS BUILDER (DESKTOP + TABLET TOUCH UI)
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const builderRootRef = useRef<HTMLDivElement>(null);
   const outerWrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+
+  // Automatic Tablet & Touch Detection + Manual Override
+  const isAutoTouchTablet = useTabletTouchDetector();
+  const [tabletModeOverride, setTabletModeOverride] = useState<boolean | null>(null);
+  const isTabletMode =
+    tabletModeOverride !== null ? tabletModeOverride : isAutoTouchTablet;
+
+  // Touch-Friendly Multi-Select Toggle (No Shift key needed on iPad/Android tablets!)
+  const [touchMultiSelectActive, setTouchMultiSelectActive] = useState<boolean>(false);
+  // Touch D-Pad Nudge Step (0.5%, 1%, or 5%)
+  const [touchNudgeStep, setTouchNudgeStep] = useState<number>(1);
 
   const resKey = block?.canvasResolution || 'fhd_1080';
   const resolution = CANVAS_RESOLUTIONS[resKey] || CANVAS_RESOLUTIONS.fhd_1080;
@@ -984,7 +1026,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     id: string,
     isShiftHeld: boolean
   ) => {
-    if (isShiftHeld) {
+    const shouldMultiToggle = isShiftHeld || touchMultiSelectActive;
+    if (shouldMultiToggle) {
       setSelectedItems((prev) => {
         const exists = prev.some((s) => s.kind === kind && s.id === id);
         if (exists) {
@@ -1067,7 +1110,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   };
 
   // ============================================================================
-  //  BATCH DUPLICATE, DELETE & NUDGE HANDLERS (USED BY BUTTONS + KEYBOARD)
+  //  BATCH DUPLICATE, DELETE & NUDGE HANDLERS (USED BY TOUCH D-PAD + KEYBOARD)
   // ============================================================================
   const duplicateSelectedItems = useCallback(() => {
     if (selectedItems.length === 0) return;
@@ -1122,9 +1165,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         zones: [...zones, ...zoneCopies]
       });
       setSelectedItems(newSelection);
-      notifyBuilder(
-        `Duplicated ${entityCopies.length + zoneCopies.length} item(s) (Ctrl+D)!`
-      );
+      notifyBuilder(`Duplicated ${entityCopies.length + zoneCopies.length} item(s)!`);
     }
   }, [selectedItems, entities, zones, block, onChange, notifyBuilder]);
 
@@ -1186,7 +1227,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   );
 
   // ============================================================================
-  //  🔥 KEYBOARD SHORTCUT LISTENER (ARROWS, DELETE/BACKSPACE, CTRL+D, CTRL+A, ESC)
+  //  KEYBOARD SHORTCUT LISTENER (ARROWS, DELETE/BACKSPACE, CTRL+D, CTRL+A, ESC)
   // ============================================================================
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1195,7 +1236,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       const isEditingInput =
         ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || target?.isContentEditable;
 
-      // Never hijack typing inside text inputs or textareas
       if (isEditingInput) {
         if (e.key === 'Escape') {
           target?.blur();
@@ -1203,17 +1243,14 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         return;
       }
 
-      // Only act when at least 1 item is selected on this canvas
       if (selectedItems.length === 0) return;
 
-      // 1. Ctrl+D / Cmd+D -> Duplicate Selected Items
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         duplicateSelectedItems();
         return;
       }
 
-      // 2. Ctrl+A / Cmd+A -> Select All Unlocked Cards on Stage
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         const allCards = entities
@@ -1224,21 +1261,19 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         return;
       }
 
-      // 3. Delete / Backspace -> Remove Selected Items
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         deleteSelectedItems();
         return;
       }
 
-      // 4. Escape -> Deselect All
       if (e.key === 'Escape') {
         e.preventDefault();
         setSelectedItems([]);
+        setTouchMultiSelectActive(false);
         return;
       }
 
-      // 5. Arrow Keys -> Nudge by 1% (Shift = 5%, Alt = 0.5%)
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
         const step = e.shiftKey ? 5 : e.altKey ? 0.5 : 1;
@@ -1489,10 +1524,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         }
       }
     }
-    notifyBuilder('Shift+Click 2+ items (or select a box in a vertical column) to align vertically.');
+    notifyBuilder('Tap Multi-Select (or Shift+Click 2+ items) to align vertically.');
   };
 
-  // Start Four-Directions Move
+  // Start Four-Directions Move (Supports Touch Multi-Select Toggle & Shift+Click)
   const startMoveItem = (
     e: React.PointerEvent,
     kind: 'entity' | 'zone',
@@ -1502,8 +1537,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
     const alreadySelected = isItemSelected(kind, item.id);
     let nextSelection = selectedItems;
+    const isMultiTrigger = e.shiftKey || touchMultiSelectActive;
 
-    if (e.shiftKey) {
+    if (isMultiTrigger) {
       if (alreadySelected) {
         nextSelection = selectedItems.filter((s) => !(s.kind === kind && s.id === item.id));
         setSelectedItems(nextSelection);
@@ -1779,7 +1815,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     };
     onChange({ ...block, entities: [newShape, ...entities] });
     setSelectedItems([{ kind: 'entity', id: newId }]);
-    notifyBuilder('Added Background Group Shape! Use Arrow keys or Taskbar to position it.');
+    notifyBuilder('Added Background Group Shape!');
   };
 
   const addMultiColumnGroupPreset = (cols: 2 | 3) => {
@@ -1811,7 +1847,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     });
     onChange({ ...block, entities: [...newShapes, ...entities] });
     setSelectedItems(newShapes.map((s) => ({ kind: 'entity' as const, id: s.id })));
-    notifyBuilder(`Added ${cols}-Column Background Group Layout (All ${cols} Selected)!`);
+    notifyBuilder(`Added ${cols}-Column Background Group Layout!`);
   };
 
   const addZone = () => {
@@ -1957,58 +1993,102 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const activeThemeClass =
     THEME_BACKGROUNDS[block?.backgroundTheme || 'physics_lab'] || THEME_BACKGROUNDS.physics_lab;
 
+  // Dynamic Handle Sizing for Tablet Touch vs Desktop Pointer
+  const handleBtnSize = isTabletMode
+    ? 'w-12 h-12 -top-5 -left-5'
+    : 'w-8 h-8 -top-3.5 -left-3.5';
+  const menuBtnSize = isTabletMode
+    ? 'w-12 h-12 -top-5 -right-5'
+    : 'w-8 h-8 -top-3.5 -right-3.5';
+  const resizeBtnSize = isTabletMode
+    ? 'w-12 h-12 -bottom-5 -right-5'
+    : 'w-8 h-8 -bottom-3.5 -right-3.5';
+  const handleIconPx = isTabletMode ? 18 : 13;
+
   // ============================================================================
-  //  PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER
+  //  PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER (WITH TOUCH D-PAD)
   // ============================================================================
   const renderContextualTaskBar = (isFloatingInstance = false) => {
     if (!activeTarget) {
       if (taskbarDock === 'top' || taskbarDock === 'bottom') {
         return (
-          <div className="px-4 py-2.5 rounded-2xl bg-slate-900/95 text-slate-400 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+          <div className="px-4 py-3 rounded-2xl bg-slate-900/95 text-slate-300 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
             <span className="flex items-center gap-2">
-              <Keyboard size={14} className="text-indigo-400" />
-              Click to select (<strong className="text-cyan-300">Shift+Click</strong> multi-select) • <strong className="text-amber-300">Arrow Keys</strong> nudge 1% (Shift=5%, Alt=0.5%) • <strong className="text-emerald-300">Ctrl+D</strong> duplicate • <strong className="text-rose-400">Del</strong> remove
+              {isTabletMode ? (
+                <>
+                  <Tablet size={16} className="text-emerald-400" />
+                  <span>
+                    <strong className="text-emerald-300">Tablet Touch Studio Active:</strong> Tap any box to edit — or toggle{' '}
+                    <strong className="text-cyan-300">Multi-Select</strong> to tap multiple items with your finger!
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Keyboard size={14} className="text-indigo-400" />
+                  <span>
+                    Click to select (<strong className="text-cyan-300">Shift+Click</strong> multi-select) •{' '}
+                    <strong className="text-amber-300">Arrow Keys</strong> nudge 1% •{' '}
+                    <strong className="text-emerald-300">Ctrl+D</strong> duplicate •{' '}
+                    <strong className="text-rose-400">Del</strong> remove
+                  </span>
+                </>
+              )}
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              {/* Touch Multi-Select Toggle */}
+              <button
+                type="button"
+                onClick={() => setTouchMultiSelectActive((m) => !m)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border transition-all ${
+                  touchMultiSelectActive
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-lg shadow-cyan-500/20'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+                }`}
+              >
+                <CheckSquare size={13} />
+                Multi-Select: {touchMultiSelectActive ? 'ON' : 'OFF'}
+              </button>
+
               <button
                 type="button"
                 onClick={handleSelectAllCards}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-[10px] font-black uppercase text-slate-200 mr-2 flex items-center gap-1"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600 text-[10px] font-black uppercase text-slate-200 mr-1 flex items-center gap-1"
               >
-                <CheckSquare size={12} /> Select All Cards
+                Select All
               </button>
+
               <span className="text-[10px] uppercase tracking-widest text-slate-500 mr-1">Dock:</span>
               <button
                 type="button"
                 title="Dock to Top Ribbon"
                 onClick={() => setTaskbarDock('top')}
-                className={`p-1.5 rounded-lg ${taskbarDock === 'top' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+                className={`p-2 rounded-lg ${taskbarDock === 'top' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
               >
-                <PanelTop size={13} />
+                <PanelTop size={14} />
               </button>
               <button
                 type="button"
                 title="Dock to Bottom Bar"
                 onClick={() => setTaskbarDock('bottom')}
-                className={`p-1.5 rounded-lg ${taskbarDock === 'bottom' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+                className={`p-2 rounded-lg ${taskbarDock === 'bottom' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
               >
-                <PanelBottom size={13} />
+                <PanelBottom size={14} />
               </button>
               <button
                 type="button"
                 title="Dock to Right Inspector Sidebar"
                 onClick={() => setTaskbarDock('right')}
-                className="p-1.5 rounded-lg hover:bg-slate-800"
+                className="p-2 rounded-lg hover:bg-slate-800"
               >
-                <PanelRight size={13} />
+                <PanelRight size={14} />
               </button>
               <button
                 type="button"
                 title="Float Over Canvas"
                 onClick={() => setTaskbarDock('floating')}
-                className="p-1.5 rounded-lg hover:bg-slate-800"
+                className="p-2 rounded-lg hover:bg-slate-800"
               >
-                <Move size={13} />
+                <Move size={14} />
               </button>
             </div>
           </div>
@@ -2048,10 +2128,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         onClick={(e) => e.stopPropagation()}
         className={`${
           isFloatingInstance
-            ? 'max-w-[95%] w-max rounded-2xl bg-slate-900/95 backdrop-blur-2xl border-2 border-indigo-400/70 shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-2.5 text-white animate-in zoom-in-95 duration-150'
+            ? 'max-w-[96%] w-max rounded-2xl bg-slate-900/95 backdrop-blur-2xl border-2 border-indigo-400/70 shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-3 text-white animate-in zoom-in-95 duration-150'
             : isVertical
             ? 'w-full lg:w-80 shrink-0 rounded-3xl bg-slate-900 text-white border border-slate-800 p-4 space-y-4 self-start shadow-xl'
-            : 'w-full rounded-2xl bg-slate-900 text-white border border-slate-800 px-3.5 py-2.5 shadow-lg'
+            : 'w-full rounded-2xl bg-slate-900 text-white border border-slate-800 px-4 py-3 shadow-lg'
         }`}
       >
         <div
@@ -2059,12 +2139,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             isVertical ? 'flex-col gap-3.5' : 'flex-wrap items-center gap-2.5'
           }`}
         >
-          {/* 1. Drag Grip + Pin Toggle + Multi-Select Count Badge */}
+          {/* 1. Drag Grip + Pin Toggle + Multi-Select Toggle + Count Badge */}
           <div className="flex items-center gap-1.5 pr-2 border-r border-slate-700/80">
             {isFloatingInstance && (
               <button
                 type="button"
-                title="Drag to Reposition Floating Task Bar (Auto-Pins Position)"
+                title="Drag to Reposition Floating Task Bar"
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   setIsTaskbarPinned(true);
@@ -2078,34 +2158,40 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
                   } catch {}
                 }}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white cursor-grab active:cursor-grabbing"
+                className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white cursor-grab active:cursor-grabbing touch-none"
               >
-                <GripVertical size={14} />
+                <GripVertical size={15} />
               </button>
             )}
 
-            <span
-              className={`px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
-                isMultiSelect
-                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/50'
+            <button
+              type="button"
+              onClick={() => setTouchMultiSelectActive((m) => !m)}
+              title="Toggle Touch Multi-Select Mode (Tap multiple items without holding Shift)"
+              className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider flex items-center gap-1 whitespace-nowrap transition-all ${
+                touchMultiSelectActive || isMultiSelect
+                  ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow'
                   : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
               }`}
             >
+              <CheckSquare size={12} />
               {isMultiSelect
                 ? `${selectedItems.length} Selected`
+                : touchMultiSelectActive
+                ? 'Multi-Tap: ON'
                 : isBgShape
                 ? 'Group Shape'
                 : isEntity
                 ? 'Card / Box'
                 : 'Drop Bucket'}
-            </span>
+            </button>
 
             {isFloatingInstance && (
               <button
                 type="button"
                 title={
                   isTaskbarPinned
-                    ? 'Pinned in Place (Click to Follow Selected Object)'
+                    ? 'Pinned in Place (Tap to Follow Selected Object)'
                     : 'Pin Task Bar at Current Position'
                 }
                 onClick={() => {
@@ -2114,13 +2200,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   }
                   setIsTaskbarPinned((p) => !p);
                 }}
-                className={`p-1.5 rounded-lg border transition-colors ${
+                className={`p-2 rounded-lg border transition-colors ${
                   isTaskbarPinned
                     ? 'bg-amber-400 text-slate-950 border-amber-300'
                     : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                 }`}
               >
-                <Pin size={12} />
+                <Pin size={13} />
               </button>
             )}
           </div>
@@ -2133,7 +2219,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 value={activeTarget.label || ''}
                 placeholder="(Empty Box — No Text)"
                 onChange={(e) => updateSelectedFields({ label: e.target.value })}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-400 text-xs font-black text-white outline-none w-40"
+                className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-400 text-xs font-black text-white outline-none w-40"
                 title="Primary Label"
               />
             )}
@@ -2142,8 +2228,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               value={activeTarget.sublabel || ''}
               placeholder={isMultiSelect ? 'Batch subtitle...' : 'Subtitle / hint...'}
               onChange={(e) => updateSelectedFields({ sublabel: e.target.value })}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-400 text-[11px] font-bold text-slate-300 outline-none w-32"
-              title="Subtitle / Hint (Applies to All Selected)"
+              className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-400 text-xs font-bold text-slate-300 outline-none w-32"
+              title="Subtitle / Hint"
             />
             <button
               type="button"
@@ -2157,14 +2243,14 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   resizeMode: 'box'
                 })
               }
-              className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-[9px] font-black uppercase text-slate-300 transition-colors whitespace-nowrap"
+              className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-[10px] font-black uppercase text-slate-300 transition-colors whitespace-nowrap"
             >
               Empty
             </button>
           </div>
 
-          {/* 3. 6-Color Palette Swatches */}
-          <div className="flex items-center gap-1 px-2 border-l border-r border-slate-800">
+          {/* 3. 6-Color Palette Swatches (Larger Touch Targets in Tablet Mode) */}
+          <div className="flex items-center gap-1.5 px-2 border-l border-r border-slate-800">
             {Object.entries(COLOR_STYLES).map(([colorKey, cObj]) => {
               const isPicked = (activeTarget.color || 'indigo') === colorKey;
               return (
@@ -2174,7 +2260,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   title={`Apply ${colorKey} to selected`}
                   onClick={() => updateSelectedFields({ color: colorKey })}
                   style={{ backgroundColor: cObj.hex }}
-                  className={`w-5 h-5 rounded-full border transition-transform ${
+                  className={`${
+                    isTabletMode ? 'w-7 h-7' : 'w-5 h-5'
+                  } rounded-full border transition-transform ${
                     isPicked
                       ? 'border-white scale-125 ring-2 ring-white/60'
                       : 'border-transparent opacity-75 hover:opacity-100'
@@ -2190,7 +2278,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               value={activeTarget.borderStyle || (isEntity ? 'solid' : 'dashed')}
               onChange={(e) => updateSelectedFields({ borderStyle: e.target.value })}
               title="Border Style"
-              className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
+              className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
             >
               <option value="solid">Border: Solid</option>
               <option value="dashed">Border: Dashed</option>
@@ -2205,7 +2293,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 value={activeTarget.shapeVariant || 'banner'}
                 onChange={(e) => updateSelectedFields({ shapeVariant: e.target.value })}
                 title="Corner Geometry"
-                className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
+                className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
               >
                 <option value="banner">Shape: Card</option>
                 <option value="rounded">Shape: Group Box</option>
@@ -2217,7 +2305,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
           {/* 5. Compact W% × H% Dimensions & Opacity */}
           <div className="flex items-center gap-1.5 px-2 border-l border-slate-800">
-            <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-1 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
               <span className="text-[9px] font-black text-slate-400">W%</span>
               <input
                 type="number"
@@ -2232,11 +2320,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     resizeMode: 'box'
                   });
                 }}
-                className="w-10 bg-transparent text-xs font-mono font-black text-emerald-400 outline-none text-center"
+                className="w-11 bg-transparent text-xs font-mono font-black text-emerald-400 outline-none text-center"
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-1 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
               <span className="text-[9px] font-black text-slate-400">H%</span>
               <input
                 type="number"
@@ -2251,13 +2339,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     resizeMode: 'box'
                   });
                 }}
-                className="w-10 bg-transparent text-xs font-mono font-black text-emerald-400 outline-none text-center"
+                className="w-11 bg-transparent text-xs font-mono font-black text-emerald-400 outline-none text-center"
               />
             </div>
 
             {isBgShape && (
               <div
-                className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800"
+                className="flex items-center gap-1 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800"
                 title="Background Fill Opacity %"
               >
                 <span className="text-[9px] font-black text-purple-300">α%</span>
@@ -2272,13 +2360,59 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       opacity: Math.max(5, Math.min(95, Number(e.target.value) || 20))
                     })
                   }
-                  className="w-10 bg-transparent text-xs font-mono font-black text-purple-300 outline-none text-center"
+                  className="w-11 bg-transparent text-xs font-mono font-black text-purple-300 outline-none text-center"
                 />
               </div>
             )}
           </div>
 
-          {/* 6. Category / Sequence / Connector Target Controls */}
+          {/* 🔥 6. ON-SCREEN TOUCH D-PAD NUDGE CLUSTER (4-WAY ARROWS + STEP SELECTOR) */}
+          <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-950 border border-slate-800">
+            <select
+              value={touchNudgeStep}
+              onChange={(e) => setTouchNudgeStep(Number(e.target.value))}
+              title="Touch Nudge Step Size"
+              className="bg-slate-900 text-amber-300 text-[10px] font-mono font-black px-1.5 py-1 rounded-lg border border-slate-700 outline-none"
+            >
+              <option value={0.5}>0.5%</option>
+              <option value={1}>1%</option>
+              <option value={5}>5%</option>
+            </select>
+            <button
+              type="button"
+              title="Nudge Left"
+              onClick={() => nudgeSelectedItems(-touchNudgeStep, 0)}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 active:scale-90 text-white"
+            >
+              <ArrowLeft size={14} />
+            </button>
+            <button
+              type="button"
+              title="Nudge Up"
+              onClick={() => nudgeSelectedItems(0, -touchNudgeStep)}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 active:scale-90 text-white"
+            >
+              <ArrowUp size={14} />
+            </button>
+            <button
+              type="button"
+              title="Nudge Down"
+              onClick={() => nudgeSelectedItems(0, touchNudgeStep)}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 active:scale-90 text-white"
+            >
+              <ArrowDown size={14} />
+            </button>
+            <button
+              type="button"
+              title="Nudge Right"
+              onClick={() => nudgeSelectedItems(touchNudgeStep, 0)}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 active:scale-90 text-white"
+            >
+              <ArrowRight size={14} />
+            </button>
+          </div>
+
+          {/* 7. Category / Sequence / Connector Target Controls */}
           <div className="flex items-center gap-1.5">
             {isEntity && !isBgShape ? (
               <>
@@ -2287,8 +2421,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   placeholder="Category (e.g. ed)"
                   value={activeTarget.category || ''}
                   onChange={(e) => updateSelectedFields({ category: e.target.value })}
-                  title="Category Match Tag (Applies to All Selected)"
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-28"
+                  title="Category Match Tag"
+                  className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-28"
                 />
                 {!isMultiSelect && (
                   <>
@@ -2302,13 +2436,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         })
                       }
                       title="Sequence Order Slot #"
-                      className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-amber-300 outline-none w-16"
+                      className="px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-amber-300 outline-none w-16"
                     />
                     <select
                       value={activeTarget.connectTargetId || ''}
                       onChange={(e) => handleLinkConnectorTarget(activeTarget.id, e.target.value)}
                       title="Link SVG Connector Line Target"
-                      className="px-2 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-[10px] font-bold text-cyan-300 outline-none max-w-[140px]"
+                      className="px-2 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-[10px] font-bold text-cyan-300 outline-none max-w-[140px]"
                     >
                       <option value="">Link Line: None</option>
                       {entities
@@ -2332,9 +2466,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   placeholder="Accepts Cat (e.g. ed)"
                   value={activeTarget.acceptedCategory || ''}
                   onChange={(e) => updateSelectedFields({ acceptedCategory: e.target.value })}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-32"
+                  className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-32"
                 />
-                <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
                   <span className="text-[9px] font-black text-slate-400">Cap</span>
                   <input
                     type="number"
@@ -2353,7 +2487,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             ) : null}
           </div>
 
-          {/* 7. Quick Toggles: Align Selected Row/Col, Background Shape, Anchor, Lock, Z-Order, Duplicate & Delete */}
+          {/* 8. Quick Toggles: Align Row/Col, Background Shape, Anchor, Lock, Z-Order, Duplicate & Delete */}
           <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
             {isMultiSelect && (
               <>
@@ -2361,17 +2495,17 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   type="button"
                   title="Align Selected Items Horizontally in a Row"
                   onClick={handleAutoAlignRow}
-                  className="p-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white"
+                  className="p-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white"
                 >
-                  <AlignHorizontalSpaceAround size={13} />
+                  <AlignHorizontalSpaceAround size={14} />
                 </button>
                 <button
                   type="button"
                   title="Align Selected Items Vertically in a Column"
                   onClick={handleAutoAlignColumn}
-                  className="p-1.5 rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white"
+                  className="p-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white"
                 >
-                  <AlignVerticalSpaceAround size={13} />
+                  <AlignVerticalSpaceAround size={14} />
                 </button>
               </>
             )}
@@ -2396,13 +2530,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       draggable: isBgShape
                     })
                   }
-                  className={`p-1.5 rounded-lg border text-[10px] font-black uppercase flex items-center gap-1 ${
+                  className={`p-2 rounded-lg border text-[10px] font-black uppercase flex items-center gap-1 ${
                     isBgShape
                       ? 'bg-purple-600 text-white border-purple-400'
                       : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                   }`}
                 >
-                  <Square size={12} />
+                  <Square size={13} />
                 </button>
 
                 <button
@@ -2410,7 +2544,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   title={
                     activeTarget.anchored
                       ? 'Anchored on Student Stage (Students Cannot Drag)'
-                      : 'Draggable by Students (Click to Anchor in Place)'
+                      : 'Draggable by Students (Tap to Anchor in Place)'
                   }
                   onClick={() =>
                     updateSelectedFields({
@@ -2418,13 +2552,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       draggable: Boolean(activeTarget.anchored)
                     })
                   }
-                  className={`p-1.5 rounded-lg border ${
+                  className={`p-2 rounded-lg border ${
                     activeTarget.anchored
                       ? 'bg-amber-500 text-slate-950 border-amber-300'
                       : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                   }`}
                 >
-                  <Pin size={12} />
+                  <Pin size={13} />
                 </button>
 
                 {!activeTarget.anchored && (
@@ -2440,13 +2574,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         returnToAnchor: !activeTarget.returnToAnchor
                       })
                     }
-                    className={`p-1.5 rounded-lg border ${
+                    className={`p-2 rounded-lg border ${
                       activeTarget.returnToAnchor
                         ? 'bg-cyan-600 text-white border-cyan-400'
                         : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                     }`}
                   >
-                    <Magnet size={12} />
+                    <Magnet size={13} />
                   </button>
                 )}
               </>
@@ -2460,9 +2594,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   ? adjustBatchZOrder('back')
                   : adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'back')
               }
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
             >
-              <ChevronsDown size={13} />
+              <ChevronsDown size={14} />
             </button>
             <button
               type="button"
@@ -2472,16 +2606,16 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   ? adjustBatchZOrder('front')
                   : adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'front')
               }
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
             >
-              <ChevronsUp size={13} />
+              <ChevronsUp size={14} />
             </button>
 
             <button
               type="button"
               title={
                 activeTarget.lockInBuilder
-                  ? 'Locked in Editor (Click to Unlock)'
+                  ? 'Locked in Editor (Tap to Unlock)'
                   : 'Lock Position in Editor'
               }
               onClick={() =>
@@ -2489,91 +2623,94 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   lockInBuilder: !activeTarget.lockInBuilder
                 })
               }
-              className={`p-1.5 rounded-lg ${
+              className={`p-2 rounded-lg ${
                 activeTarget.lockInBuilder
                   ? 'bg-rose-500 text-white'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              {activeTarget.lockInBuilder ? <Lock size={13} /> : <Unlock size={13} />}
+              {activeTarget.lockInBuilder ? <Lock size={14} /> : <Unlock size={14} />}
             </button>
 
             <button
               type="button"
               title="Duplicate Selected (Ctrl+D)"
               onClick={duplicateSelectedItems}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
             >
-              <Copy size={13} />
+              <Copy size={14} />
             </button>
 
             <button
               type="button"
               title="Delete Selected (Delete / Backspace)"
               onClick={deleteSelectedItems}
-              className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white"
+              className="p-2 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white"
             >
-              <Trash2 size={13} />
+              <Trash2 size={14} />
             </button>
           </div>
 
-          {/* 8. Workspace Dock Mode Switcher */}
+          {/* 9. Workspace Dock Mode Switcher */}
           <div className="flex items-center gap-1 pl-2 border-l border-slate-800 ml-auto">
             <button
               type="button"
-              title="Dock Task Bar to Top Ribbon (Photoshop Style)"
+              title="Dock Task Bar to Top Ribbon"
               onClick={() => setTaskbarDock('top')}
-              className={`p-1.5 rounded-lg ${
+              className={`p-2 rounded-lg ${
                 taskbarDock === 'top'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              <PanelTop size={13} />
+              <PanelTop size={14} />
             </button>
             <button
               type="button"
               title="Dock Task Bar to Bottom Tray"
               onClick={() => setTaskbarDock('bottom')}
-              className={`p-1.5 rounded-lg ${
+              className={`p-2 rounded-lg ${
                 taskbarDock === 'bottom'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              <PanelBottom size={13} />
+              <PanelBottom size={14} />
             </button>
             <button
               type="button"
               title="Dock Task Bar to Right Inspector Sidebar"
               onClick={() => setTaskbarDock('right')}
-              className={`p-1.5 rounded-lg ${
+              className={`p-2 rounded-lg ${
                 taskbarDock === 'right'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              <PanelRight size={13} />
+              <PanelRight size={14} />
             </button>
             <button
               type="button"
               title="Float Task Bar Over Canvas"
               onClick={() => setTaskbarDock('floating')}
-              className={`p-1.5 rounded-lg ${
+              className={`p-2 rounded-lg ${
                 taskbarDock === 'floating'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              <Move size={13} />
+              <Move size={14} />
             </button>
             <button
               type="button"
-              title="Clear Selection (Esc)"
-              onClick={() => setSelectedItems([])}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white ml-0.5"
+              title="Clear Selection"
+              onClick={() => {
+                setSelectedItems([]);
+                setTouchMultiSelectActive(false);
+              }}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white ml-0.5"
             >
-              <X size={13} />
+              <X size={14} />
             </button>
           </div>
         </div>
@@ -2590,9 +2727,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       {/* Top Studio Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-              HD Stage Studio • Shift+Click Multi-Select • Arrows Nudge • Ctrl+D Duplicate ({selectedItems.length} Selected)
+              {isTabletMode
+                ? `Tablet Touch Studio Active • 48px Handles • Touch D-Pad (${selectedItems.length} Selected)`
+                : `HD Stage Studio • Shift+Click Multi-Select • Arrows Nudge • Ctrl+D Duplicate (${selectedItems.length} Selected)`}
             </span>
             {builderToast && (
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase animate-in fade-in">
@@ -2610,6 +2749,36 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* 🔥 TABLET TOUCH MODE AUTO-DETECT + MANUAL OVERRIDE BUTTON */}
+          <button
+            type="button"
+            onClick={() => setTabletModeOverride(isTabletMode ? false : true)}
+            title="Toggle Tablet Touch-Friendly Interface (48px handles, Touch Multi-Select & On-Screen D-Pad)"
+            className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border transition-all ${
+              isTabletMode
+                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/20'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <Tablet size={13} />
+            {isTabletMode ? 'Tablet UI: ON' : 'Tablet UI: Auto'}
+          </button>
+
+          {/* Touch Multi-Select Quick Toggle in Header */}
+          <button
+            type="button"
+            onClick={() => setTouchMultiSelectActive((m) => !m)}
+            title="Tap to select multiple objects with one finger without holding Shift"
+            className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border transition-all ${
+              touchMultiSelectActive
+                ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <CheckSquare size={13} />
+            Multi-Select
+          </button>
+
           <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
             <Monitor size={14} className="text-indigo-500" />
             <select
@@ -2726,7 +2895,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <div className="flex items-center gap-2">
               <Layers size={15} className="text-amber-400" />
               <span className="text-xs font-black uppercase tracking-widest">
-                Layer Stack & Background Group Presets (Shift+Click Rows to Multi-Select)
+                Layer Stack & Background Group Presets
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -2768,7 +2937,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 <div
                   key={`${item.kind}_${item.id}`}
                   onClick={(e) => selectOrToggleItem(item.kind, item.id, e.shiftKey)}
-                  className={`px-3.5 py-2 rounded-2xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
+                  className={`px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
                     isSelected
                       ? 'bg-indigo-600/30 border-amber-400 text-white ring-1 ring-amber-400/50'
                       : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:border-slate-700'
@@ -2794,33 +2963,33 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       type="button"
                       title="Send to Back"
                       onClick={() => adjustLayerZOrder(item.kind, item.id, 'back')}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
                     >
-                      <ChevronsDown size={13} />
+                      <ChevronsDown size={14} />
                     </button>
                     <button
                       type="button"
                       title="Step Backward"
                       onClick={() => adjustLayerZOrder(item.kind, item.id, 'backward')}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
                     >
-                      <ArrowDown size={13} />
+                      <ArrowDown size={14} />
                     </button>
                     <button
                       type="button"
                       title="Step Forward"
                       onClick={() => adjustLayerZOrder(item.kind, item.id, 'forward')}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
                     >
-                      <ArrowUp size={13} />
+                      <ArrowUp size={14} />
                     </button>
                     <button
                       type="button"
                       title="Bring to Front"
                       onClick={() => adjustLayerZOrder(item.kind, item.id, 'front')}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
                     >
-                      <ChevronsUp size={13} />
+                      <ChevronsUp size={14} />
                     </button>
                     <button
                       type="button"
@@ -2830,13 +2999,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                           ? updateEntityField(item.id, { lockInBuilder: !item.locked })
                           : updateZoneField(item.id, { anchored: !item.locked, lockInBuilder: !item.locked })
                       }
-                      className={`p-1.5 rounded-lg ${
+                      className={`p-2 rounded-lg ${
                         item.locked
                           ? 'bg-amber-500 text-slate-950'
                           : 'bg-slate-800 text-slate-400 hover:text-white'
                       }`}
                     >
-                      {item.locked ? <Lock size={13} /> : <Unlock size={13} />}
+                      {item.locked ? <Lock size={14} /> : <Unlock size={14} />}
                     </button>
                   </div>
                 </div>
@@ -2877,7 +3046,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         <div
           ref={outerWrapRef}
           style={{ height: `${Math.round(resolution.height * stageScale)}px` }}
-          className="relative flex-1 w-full overflow-hidden rounded-3xl border-2 border-slate-300 dark:border-slate-700 bg-slate-950 flex justify-center"
+          className="relative flex-1 w-full overflow-hidden rounded-3xl border-2 border-slate-300 dark:border-slate-700 bg-slate-950 flex justify-center touch-none"
         >
           {/* DOCK POSITION 4: FLOATING / PINNABLE OVER-CANVAS TASK BAR */}
           {taskbarDock === 'floating' && renderContextualTaskBar(true)}
@@ -2886,7 +3055,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             ref={stageRef}
             onPointerDown={(e) => {
               builderRootRef.current?.focus();
-              if (!e.shiftKey) {
+              if (!e.shiftKey && !touchMultiSelectActive) {
                 setSelectedItems([]);
               }
             }}
@@ -2901,7 +3070,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               transform: `scale(${stageScale})`,
               transformOrigin: 'top center'
             }}
-            className={`relative shrink-0 select-none overflow-hidden ${activeThemeClass}`}
+            className={`relative shrink-0 select-none overflow-hidden touch-none ${activeThemeClass}`}
           >
             {/* 1. BACKGROUND GROUP SHAPES ON BUILDER STAGE */}
             {entities
@@ -2931,40 +3100,40 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       transform: `translate(-50%, -50%) rotate(${shape.rotation || 0}deg)`,
                       zIndex: shape.zOrder ?? 2
                     }}
-                    className={`group absolute ${radiusClass} ${borderStyleClass} ${palette.border} p-6 flex flex-col items-start justify-start transition-shadow ${
+                    className={`group absolute ${radiusClass} ${borderStyleClass} ${palette.border} p-6 flex flex-col items-start justify-start transition-shadow touch-none ${
                       shape.lockInBuilder ? 'cursor-default' : 'cursor-move'
                     } ${isSelected ? 'ring-4 ring-amber-400' : ''}`}
                   >
                     {!shape.lockInBuilder && (
                       <button
                         type="button"
-                        title="Drag to Move (Shift+Click to Multi-Select)"
+                        title="Drag to Move"
                         onPointerDown={(e) => {
                           builderRootRef.current?.focus();
                           startMoveItem(e, 'entity', shape);
                         }}
-                        className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-purple-600 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-move z-30"
+                        className={`absolute ${handleBtnSize} rounded-full bg-slate-900 hover:bg-purple-600 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-move z-30 touch-none`}
                       >
-                        <Move size={13} />
+                        <Move size={handleIconPx} />
                       </button>
                     )}
 
                     <button
                       type="button"
-                      title="Select (or Shift+Click to Multi-Select)"
+                      title="Select"
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
                         builderRootRef.current?.focus();
                         selectOrToggleItem('entity', shape.id, e.shiftKey);
                       }}
-                      className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
+                      className={`absolute ${menuBtnSize} rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 touch-none ${
                         isSelected
                           ? 'bg-amber-400 text-slate-950 border-white'
                           : 'bg-slate-900 hover:bg-purple-600 text-white border-white'
                       }`}
                     >
-                      <MoreHorizontal size={15} />
+                      <MoreHorizontal size={handleIconPx} />
                     </button>
 
                     {!shape.lockInBuilder && (
@@ -2975,9 +3144,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                           builderRootRef.current?.focus();
                           startResizeItem(e, 'entity', shape);
                         }}
-                        className="absolute -bottom-3.5 -right-3.5 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
+                        className={`absolute ${resizeBtnSize} rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30 touch-none`}
                       >
-                        <MoveDiagonal2 size={13} />
+                        <MoveDiagonal2 size={handleIconPx} />
                       </button>
                     )}
 
@@ -3040,7 +3209,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     transform: 'translate(-50%, -50%)',
                     zIndex: z.zOrder ?? (isSelected ? 25 : 10)
                   }}
-                  className={`group absolute rounded-[2rem] ${zBorderClass} p-5 flex flex-col items-center justify-start cursor-move transition-colors ${
+                  className={`group absolute rounded-[2rem] ${zBorderClass} p-5 flex flex-col items-center justify-start cursor-move transition-colors touch-none ${
                     isSelected
                       ? 'border-amber-400 bg-amber-500/15 ring-4 ring-amber-400/60'
                       : `${zPalette.border} bg-slate-900/35`
@@ -3049,33 +3218,33 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   {!z.lockInBuilder && (
                     <button
                       type="button"
-                      title="Drag to Move Drop Zone (Shift+Click to Multi-Select)"
+                      title="Drag to Move Drop Zone"
                       onPointerDown={(e) => {
                         builderRootRef.current?.focus();
                         startMoveItem(e, 'zone', z);
                       }}
-                      className="absolute -top-3.5 -left-3.5 w-9 h-9 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-slate-600 flex items-center justify-center shadow-lg cursor-move z-30"
+                      className={`absolute ${handleBtnSize} rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-slate-600 flex items-center justify-center shadow-lg cursor-move z-30 touch-none`}
                     >
-                      <Move size={15} />
+                      <Move size={handleIconPx} />
                     </button>
                   )}
 
                   <button
                     type="button"
-                    title="Select Zone (Shift+Click to Multi-Select)"
+                    title="Select Zone"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
                       builderRootRef.current?.focus();
                       selectOrToggleItem('zone', z.id, e.shiftKey);
                     }}
-                    className={`absolute -top-3.5 -right-3.5 w-9 h-9 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
+                    className={`absolute ${menuBtnSize} rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 touch-none ${
                       isSelected
                         ? 'bg-amber-400 text-slate-950 border-white'
                         : 'bg-slate-900 hover:bg-indigo-600 text-white border-slate-600'
                     }`}
                   >
-                    <MoreHorizontal size={16} />
+                    <MoreHorizontal size={handleIconPx} />
                   </button>
 
                   {!z.lockInBuilder && (
@@ -3086,9 +3255,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         builderRootRef.current?.focus();
                         startResizeItem(e, 'zone', z);
                       }}
-                      className="absolute -bottom-3.5 -right-3.5 w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
+                      className={`absolute ${resizeBtnSize} rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30 touch-none`}
                     >
-                      <MoveDiagonal2 size={15} />
+                      <MoveDiagonal2 size={handleIconPx} />
                     </button>
                   )}
 
@@ -3131,7 +3300,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       }deg)`,
                       zIndex: ent.zOrder ?? (isSelected ? 55 : 35)
                     }}
-                    className={`group absolute px-7 py-4 ${radiusClass} ${borderStyleClass} shadow-xl cursor-move flex items-center justify-center ${
+                    className={`group absolute px-7 py-4 ${radiusClass} ${borderStyleClass} shadow-xl cursor-move flex items-center justify-center touch-none ${
                       ent.anchored
                         ? 'bg-slate-900 border-amber-400 text-white'
                         : `${palette.bg} ${palette.border}`
@@ -3146,33 +3315,33 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     {!ent.lockInBuilder && (
                       <button
                         type="button"
-                        title="Drag in 4 Directions to Move (Moves Entire Selected Group)"
+                        title="Drag in 4 Directions to Move"
                         onPointerDown={(e) => {
                           builderRootRef.current?.focus();
                           startMoveItem(e, 'entity', ent);
                         }}
-                        className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-white/80 flex items-center justify-center shadow-lg cursor-move z-30"
+                        className={`absolute ${handleBtnSize} rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-white/80 flex items-center justify-center shadow-lg cursor-move z-30 touch-none`}
                       >
-                        <Move size={13} />
+                        <Move size={handleIconPx} />
                       </button>
                     )}
 
                     <button
                       type="button"
-                      title="Click to Select (or Shift+Click to Multi-Select)"
+                      title="Tap to Select"
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
                         builderRootRef.current?.focus();
                         selectOrToggleItem('entity', ent.id, e.shiftKey);
                       }}
-                      className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
+                      className={`absolute ${menuBtnSize} rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 touch-none ${
                         isSelected
                           ? 'bg-amber-400 text-slate-950 border-white'
                           : 'bg-slate-900 hover:bg-indigo-600 text-white border-white/80'
                       }`}
                     >
-                      <MoreHorizontal size={15} />
+                      <MoreHorizontal size={handleIconPx} />
                     </button>
 
                     {!ent.lockInBuilder && (
@@ -3183,9 +3352,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                           builderRootRef.current?.focus();
                           startResizeItem(e, 'entity', ent);
                         }}
-                        className="absolute -bottom-3.5 -right-3.5 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30"
+                        className={`absolute ${resizeBtnSize} rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30 touch-none`}
                       >
-                        <MoveDiagonal2 size={13} />
+                        <MoveDiagonal2 size={handleIconPx} />
                       </button>
                     )}
 
