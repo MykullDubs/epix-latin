@@ -68,7 +68,7 @@ const DEFAULT_USER_DATA = {
 // --- SEED DATA ---
 const INITIAL_SYSTEM_DECKS: any = {
   salutationes: {
-    title: "👋 Salutationes",
+    title: "Salutationes",
     cards: [
       { id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] },
       { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] },
@@ -76,7 +76,7 @@ const INITIAL_SYSTEM_DECKS: any = {
     ]
   },
   medicina: {
-    title: "⚕️ Medicina",
+    title: "Medicina",
     cards: [
       { id: 'm1', front: "Vulnus", back: "Wound", ipa: "/ˈwul.nus/", type: "noun", mastery: 1, morphology: [{ part: "Vuln-", meaning: "Wound", type: "root" }, { part: "-us", meaning: "Nom.", type: "suffix" }], usage: { sentence: "Vulnus grave est.", translation: "The wound is serious." }, grammar_tags: ["3rd Declension"] }
     ]
@@ -89,6 +89,7 @@ const INITIAL_SYSTEM_LESSONS: any[] = [
     title: "Salutationes",
     subtitle: "Greetings in the Forum",
     description: "Learn how to greet friends and elders.",
+    language: "la",
     xp: 50,
     vocab: ['Salve', 'Vale', 'Quid agis?'],
     blocks: [
@@ -139,7 +140,7 @@ const mergeClassRecords = (existing: any, incoming: any) => {
 };
 
 // ============================================================================
-//  🔥 LIVE WORDFORGE / MARBLE SCRABBLE PROJECTOR HOST WRAPPER
+//  LIVE WORDFORGE / MARBLE SCRABBLE PROJECTOR HOST WRAPPER
 // ============================================================================
 function LiveWordForgeHost({
   classId,
@@ -152,7 +153,6 @@ function LiveWordForgeHost({
 }) {
   const [liveState, setLiveState] = useState<any>({});
 
-  // Extract vocabulary items from targetContent (if a Deck or Lesson was chosen)
   const gameBlock = useMemo(() => {
     const items: any[] = [];
     if (Array.isArray(targetContent?.cards)) {
@@ -641,7 +641,7 @@ const GrammarBlock = ({ block }: any) => (
   </div>
 );
 
-// --- MAIN LESSON VIEW ---
+// --- MAIN LESSON VIEW (WITH WIDE HD STAGE SUPPORT FOR KINETIC CANVAS & WORDFORGE) ---
 function LessonView({ lesson, onFinish }: any) {
   useLearningTimer(auth.currentUser, lesson?.id || 'demo', 'lesson', lesson?.title || 'Lesson');
   const resetScroll = () => {
@@ -891,14 +891,28 @@ function LessonView({ lesson, onFinish }: any) {
           <div className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" style={{ width: `${progress}%` }} />
         </div>
       </div>
-      <div className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full pb-32">
-        {blocks.slice(0, currentBlockIdx + 1).map((block: any, idx: number) => (
-          <div key={idx} className={idx === currentBlockIdx ? "min-h-[50vh] flex flex-col justify-center" : "opacity-40 hover:opacity-100 transition-opacity duration-500 mb-12 border-b border-slate-100 pb-12"}>
-            {renderBlockContent(block)}
-            {idx === currentBlockIdx && <div ref={bottomRef} className="h-1 w-1" />}
-          </div>
-        ))}
+
+      {/* Wide HD container for Kinetic Canvas & WordForge blocks, standard reading width for prose */}
+      <div className="flex-1 px-4 sm:px-8 py-8 max-w-6xl mx-auto w-full pb-32">
+        {blocks.slice(0, currentBlockIdx + 1).map((block: any, idx: number) => {
+          const isWideStageBlock =
+            block?.type === 'kinetic_canvas' || block?.type === 'game' || block?.type === 'arcade_game';
+          return (
+            <div
+              key={idx}
+              className={`${isWideStageBlock ? 'max-w-6xl' : 'max-w-2xl'} mx-auto w-full ${
+                idx === currentBlockIdx
+                  ? 'min-h-[50vh] flex flex-col justify-center'
+                  : 'opacity-40 hover:opacity-100 transition-opacity duration-500 mb-12 border-b border-slate-100 pb-12'
+              }`}
+            >
+              {renderBlockContent(block)}
+              {idx === currentBlockIdx && <div ref={bottomRef} className="h-1 w-1" />}
+            </div>
+          );
+        })}
       </div>
+
       {!isInteractive && (
         <div className="fixed bottom-6 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none">
           <button
@@ -1332,7 +1346,7 @@ function App() {
 
   // --- MEMOS ---
   const allDecks = useMemo(() => {
-    const decks: any = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
+    const decks: any = { ...systemDecks, custom: { title: "Scriptorium", cards: [] } };
     customCards.forEach((card) => {
       const target = card.deckId || 'custom';
       if (!decks[target]) {
@@ -1408,7 +1422,7 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // 🔥 QR CODE DEEP-LINK DETECTOR (/play/:classId or ?classId=...)
+  // QR CODE DEEP-LINK DETECTOR (/play/:classId or ?classId=...)
   useEffect(() => {
     if (!user?.email) return;
     const pathMatch = window.location.pathname.match(/\/play\/([^/?#]+)/i);
@@ -1426,7 +1440,6 @@ function App() {
       return;
     }
 
-    // If student scanned QR code for a class they aren't enrolled in yet, fetch & auto-join
     const joinViaQr = async () => {
       try {
         const classRef = doc(db, 'artifacts', appId, 'classes', targetJoinClassId);
@@ -1956,7 +1969,7 @@ function App() {
     );
   }
 
-  // 🔥 1. INTERCEPT LIVE HOST/PROJECTOR VIEWS (PRESENTATION & MARBLE SCRABBLE / WORDFORGE)
+  // 1. INTERCEPT LIVE HOST/PROJECTOR VIEWS (PRESENTATION & MARBLE SCRABBLE / WORDFORGE)
   if (liveHostConfig) {
     const targetContent =
       allDecks[liveHostConfig.contentId] ||
@@ -2085,6 +2098,10 @@ function App() {
     onSaveCurriculum: handleCreateCurriculum,
     onAssign: handleAssign,
     onRevoke: handleRevoke,
+    onStartMarbleScrabble: (arg1: string, arg2?: string) => {
+      const { contentId, classId } = resolveHostLaunchIds(arg1, arg2);
+      setLiveHostConfig({ mode: 'marble_scrabble', contentId, classId });
+    },
     onSelectLesson: handleContentSelection,
     onLaunchLesson: handleContentSelection,
     onPreviewLesson: handleContentSelection,
@@ -2105,7 +2122,7 @@ function App() {
     onClickLesson: handleContentSelection
   };
 
-  // 🔥 ROUTE 1: ADMIN COMMAND CENTER
+  // ROUTE 1: ADMIN COMMAND CENTER
   if (activeViewMode === 'admin') {
     const adminUserPayload = {
       ...userData,
@@ -2125,7 +2142,7 @@ function App() {
     );
   }
 
-  // 🔥 ROUTE 2: INSTRUCTOR STUDIO DASHBOARD
+  // ROUTE 2: INSTRUCTOR STUDIO DASHBOARD
   if (activeViewMode === 'instructor') {
     return (
       <div className="relative h-screen w-full overflow-hidden">
@@ -2177,7 +2194,7 @@ function App() {
     );
   }
 
-  // 🔥 ROUTE 3: STUDENT VIEW
+  // ROUTE 3: STUDENT VIEW
   const renderStudentView = () => {
     let content;
     let viewKey;
@@ -2245,7 +2262,16 @@ function App() {
           break;
         }
         case 'create':
-          content = <BuilderHub allDecks={allDecks} lessons={lessons} curriculums={curriculums} instructorClasses={enrolledClasses} {...commonHandlers} />;
+          content = (
+            <BuilderHub
+              userData={userData}
+              allDecks={allDecks}
+              lessons={lessons}
+              curriculums={curriculums}
+              instructorClasses={enrolledClasses}
+              {...commonHandlers}
+            />
+          );
           break;
         case 'profile':
           content = <ProfileView user={user} userData={userData} />;
