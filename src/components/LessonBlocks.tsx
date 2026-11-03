@@ -716,9 +716,9 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                   } ${ringStyle}`}
                 >
                   <div className="flex items-center gap-2.5">
-                    {isAnchored && (
-                      <Pin size={14} className="text-amber-400 shrink-0 rotate-45" title="Anchored to Stage" />
-                    )}
+                  {isAnchored && (
+  <Pin size={14} className="text-amber-400 shrink-0 rotate-45" />
+)}
                     <div>
                       <div className="text-lg font-black leading-tight whitespace-nowrap">
                         {ent.label}
