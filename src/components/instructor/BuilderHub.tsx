@@ -1,7 +1,7 @@
 // src/components/instructor/BuilderHub.tsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Layers, BookOpen, FileText, Gamepad2, X, Eye, Map,
+  Layers, BookOpen, FileText, Gamepad2, X, Eye, Map as MapIcon,
   Wrench, Search, Loader2, Volume2, AlertCircle, ArrowLeft, PenTool,
   Sparkles, Plus, Trash2, BookText, Link as LinkIcon, School,
   Rocket, Globe
@@ -35,7 +35,7 @@ const KINETIC_PRESETS: Record<string, any> = {
   },
   sorting: {
     title: 'Category Sorting & Chronological Sequencing',
-    subtitle: '1. Sort the vocabulary cards into buckets ➔ 2. Order steps into sequence slots.',
+    subtitle: '1. Sort vocabulary into buckets 2. Order steps into sequence slots.',
     backgroundTheme: 'light_grid',
     backgroundUrl: '',
     successAnimation: 'bounce_glow',
@@ -255,7 +255,7 @@ const ReadingStudioPanel = ({ lessons = [], instructorClasses = [], onSaveLesson
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [language, setLanguage] = useState('la');
-  const [readingMode, setReadingMode] = useState<string>('hybrid');
+  const [readingMode, setReadingMode] = useState('hybrid');
   const [externalUrl, setExternalUrl] = useState('');
   const [sourceCitation, setSourceCitation] = useState('');
   const [xp, setXp] = useState<number>(60);
@@ -786,7 +786,6 @@ export default function BuilderHub({
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [triggerAiModal, setTriggerAiModal] = useState(false);
 
-  // Live WordForge Host State
   const [wfLaunchClassId, setWfLaunchClassId] = useState<string>(instructorClasses?.[0]?.id || '');
   const [wfSelectedDeckKey, setWfSelectedDeckKey] = useState<string>('salutationes');
   const [activeWordForgeHost, setActiveWordForgeHost] = useState<any>(null);
@@ -803,8 +802,7 @@ export default function BuilderHub({
     const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', activeWordForgeHost.classId);
     const unsub = onSnapshot(sessionRef, (snap) => {
       if (snap.exists()) {
-        const snapData: any = snap.data();
-        setWfLiveState(snapData || {});
+        setWfLiveState(snap.data() || {});
       }
     });
     return () => unsub();
@@ -872,7 +870,7 @@ export default function BuilderHub({
     { id: 'reading', label: 'Readings & Links', icon: <BookText size={16} /> },
     { id: 'exam', label: 'Assessment', icon: <FileText size={16} /> },
     { id: 'arcade', label: 'Arcade & WordForge', icon: <Gamepad2 size={16} /> },
-    { id: 'curriculum', label: 'Pathway Map', icon:  }
+    { id: 'curriculum', label: 'Pathway Map', icon: <MapIcon size={16} /> }
   ];
 
   const handleAddKineticBlock = (presetKey = 'blank') => {
