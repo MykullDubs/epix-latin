@@ -8,7 +8,7 @@ import {
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround,
   Square, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown,
   Layers, GripVertical, PanelTop, PanelBottom, PanelRight,
-  Sliders, Sparkles
+  Sliders, CheckSquare, Columns
 } from 'lucide-react';
 
 // ============================================================================
@@ -947,11 +947,9 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 // ============================================================================
 //  2. INSTRUCTOR VISUAL STUDIO: KINETIC CANVAS BUILDER
 //  Features:
-//   - Photoshop / Figma Contextual Task Bar (Floating, Pinned, Top Ribbon, Bottom Dock, Right Inspector)
-//   - True 2D Box Resizing (Width % × Height %) for Empty Blocks, Shapes & Cards
-//   - Background Group Shape Generator (+ Group Shape)
-//   - Interactive Layer & Z-Order Toolbar Drawer
-//   - 1-Click Auto-Align Row & Auto-Align Column Buttons
+//   - Shift+Click Multi-Selection & Synchronized Group Dragging
+//   - Batch Contextual Task Bar Editing (Color, Border, Shape, Dimensions, Category, Align, Delete)
+//   - 4 Dock Modes (Top Ribbon, Bottom Bar, Right Inspector, Pinned/Floating)
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const outerWrapRef = useRef<HTMLDivElement>(null);
@@ -962,20 +960,44 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
   const [stageScale, setStageScale] = useState(0.5);
   const [gridSnap, setGridSnap] = useState<number>(1);
-  const [selectedItem, setSelectedItem] = useState<{ kind: 'entity' | 'zone'; id: string } | null>(
-    null
-  );
+
+  // 🔥 MULTI-SELECTION STATE (Supports 1 or many selected items via Shift+Click)
+  const [selectedItems, setSelectedItems] = useState<
+    Array<{ kind: 'entity' | 'zone'; id: string }>
+  >([]);
+
+  const primarySelected = selectedItems[0] || null;
+  const isItemSelected = (kind: 'entity' | 'zone', id: string) =>
+    selectedItems.some((s) => s.kind === kind && s.id === id);
+
+  const selectOrToggleItem = (
+    kind: 'entity' | 'zone',
+    id: string,
+    isShiftHeld: boolean
+  ) => {
+    if (isShiftHeld) {
+      setSelectedItems((prev) => {
+        const exists = prev.some((s) => s.kind === kind && s.id === id);
+        if (exists) {
+          return prev.filter((s) => !(s.kind === kind && s.id === id));
+        }
+        return [...prev, { kind, id }];
+      });
+    } else {
+      setSelectedItems([{ kind, id }]);
+    }
+  };
+
   const [showLayerToolbar, setShowLayerToolbar] = useState(false);
   const [builderToast, setBuilderToast] = useState<string | null>(null);
 
-  // 🔥 PHOTOSHOP CONTEXTUAL TASK BAR STATE
-  // dockMode: 'floating' | 'top' | 'bottom' | 'right'
+  // PHOTOSHOP CONTEXTUAL TASK BAR DOCK & PIN STATE
   const [taskbarDock, setTaskbarDock] = useState<'floating' | 'top' | 'bottom' | 'right'>('top');
   const [isTaskbarPinned, setIsTaskbarPinned] = useState<boolean>(false);
   const [pinnedPos, setPinnedPos] = useState<{ x: number; y: number }>({ x: 50, y: 12 });
   const [isDraggingTaskbar, setIsDraggingTaskbar] = useState<boolean>(false);
-  const [showAdvancedPopover, setShowAdvancedPopover] = useState<boolean>(false);
 
+  // Supports both single-item and multi-item group dragging
   const [interaction, setInteraction] = useState<{
     mode: 'move' | 'resize';
     kind: 'entity' | 'zone';
@@ -987,6 +1009,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     initScale: number;
     initWidth: number;
     initHeight: number;
+    groupInitialCoords: Array<{
+      kind: 'entity' | 'zone';
+      id: string;
+      initX: number;
+      initY: number;
+    }>;
   } | null>(null);
 
   const [showRawJson, setShowRawJson] = useState(false);
@@ -1025,11 +1053,57 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   };
 
   // ============================================================================
-  //  1-CLICK AUTO-ALIGN ROW & AUTO-ALIGN COLUMN ENGINES
+  //  1-CLICK AUTO-ALIGN ROW & COLUMN (MULTI-SELECT AWARE)
   // ============================================================================
   const handleAutoAlignRow = () => {
-    if (selectedItem?.kind === 'zone') {
-      const targetZone = zones.find((z: any) => z.id === selectedItem.id);
+    // 1. If 2+ items are multi-selected via Shift+Click, align & space ONLY the selected items!
+    if (selectedItems.length >= 2) {
+      const resolved = selectedItems
+        .map((s) => {
+          const obj =
+            s.kind === 'entity'
+              ? entities.find((e: any) => e.id === s.id)
+              : zones.find((z: any) => z.id === s.id);
+          return obj ? { ...s, x: Number(obj.x ?? 50), y: Number(obj.y ?? 50) } : null;
+        })
+        .filter(Boolean) as Array<{ kind: 'entity' | 'zone'; id: string; x: number; y: number }>;
+
+      if (resolved.length >= 2) {
+        const sorted = [...resolved].sort((a, b) => a.x - b.x);
+        const avgY = Number(
+          (sorted.reduce((sum, item) => sum + item.y, 0) / sorted.length).toFixed(1)
+        );
+        const minX = Math.max(10, Math.min(...sorted.map((i) => i.x)));
+        const maxX = Math.min(90, Math.max(...sorted.map((i) => i.x)));
+        const span = maxX - minX >= 16 ? maxX - minX : 72;
+        const startX = maxX - minX >= 16 ? minX : 14;
+
+        const newPosMap = new Map<string, { x: number; y: number }>();
+        sorted.forEach((item, idx) => {
+          const evenX = Number(
+            (startX + (idx * span) / Math.max(1, sorted.length - 1)).toFixed(1)
+          );
+          newPosMap.set(`${item.kind}_${item.id}`, { x: evenX, y: avgY });
+        });
+
+        const nextEntities = entities.map((e: any) => {
+          const hit = newPosMap.get(`entity_${e.id}`);
+          return hit ? { ...e, x: hit.x, y: hit.y, anchorX: hit.x, anchorY: hit.y } : e;
+        });
+        const nextZones = zones.map((z: any) => {
+          const hit = newPosMap.get(`zone_${z.id}`);
+          return hit ? { ...z, x: hit.x, y: hit.y } : z;
+        });
+
+        onChange({ ...block, entities: nextEntities, zones: nextZones });
+        notifyBuilder(`Aligned & distributed ${sorted.length} selected items along Y=${avgY}%!`);
+        return;
+      }
+    }
+
+    // 2. Single item selected -> Align its horizontal row band
+    if (primarySelected?.kind === 'zone') {
+      const targetZone = zones.find((z: any) => z.id === primarySelected.id);
       if (targetZone) {
         const bandY = Number(targetZone.y ?? 30);
         const rowZones = zones
@@ -1056,8 +1130,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       }
     }
 
-    if (selectedItem?.kind === 'entity') {
-      const targetEnt = entities.find((e: any) => e.id === selectedItem.id);
+    if (primarySelected?.kind === 'entity') {
+      const targetEnt = entities.find((e: any) => e.id === primarySelected.id);
       if (targetEnt && targetEnt.entityType !== 'bg_shape') {
         const bandY = Number(targetEnt.y ?? 82);
         const rowEnts = entities
@@ -1093,6 +1167,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       }
     }
 
+    // 3. Fallback: Tidy all unanchored draggable cards into 1–2 bottom word-bank rows
     const draggables = entities.filter(
       (e: any) => !e.anchored && e.draggable !== false && e.entityType !== 'bg_shape'
     );
@@ -1129,8 +1204,54 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   };
 
   const handleAutoAlignColumn = () => {
-    if (selectedItem?.kind === 'entity') {
-      const targetEnt = entities.find((e: any) => e.id === selectedItem.id);
+    // 1. If 2+ items are multi-selected via Shift+Click, align & space ONLY the selected items vertically!
+    if (selectedItems.length >= 2) {
+      const resolved = selectedItems
+        .map((s) => {
+          const obj =
+            s.kind === 'entity'
+              ? entities.find((e: any) => e.id === s.id)
+              : zones.find((z: any) => z.id === s.id);
+          return obj ? { ...s, x: Number(obj.x ?? 50), y: Number(obj.y ?? 50) } : null;
+        })
+        .filter(Boolean) as Array<{ kind: 'entity' | 'zone'; id: string; x: number; y: number }>;
+
+      if (resolved.length >= 2) {
+        const sorted = [...resolved].sort((a, b) => a.y - b.y);
+        const avgX = Number(
+          (sorted.reduce((sum, item) => sum + item.x, 0) / sorted.length).toFixed(1)
+        );
+        const minY = Math.max(14, Math.min(...sorted.map((i) => i.y)));
+        const maxY = Math.min(88, Math.max(...sorted.map((i) => i.y)));
+        const span = maxY - minY >= 16 ? maxY - minY : 56;
+        const startY = maxY - minY >= 16 ? minY : 22;
+
+        const newPosMap = new Map<string, { x: number; y: number }>();
+        sorted.forEach((item, idx) => {
+          const evenY = Number(
+            (startY + (idx * span) / Math.max(1, sorted.length - 1)).toFixed(1)
+          );
+          newPosMap.set(`${item.kind}_${item.id}`, { x: avgX, y: evenY });
+        });
+
+        const nextEntities = entities.map((e: any) => {
+          const hit = newPosMap.get(`entity_${e.id}`);
+          return hit ? { ...e, x: hit.x, y: hit.y, anchorX: hit.x, anchorY: hit.y } : e;
+        });
+        const nextZones = zones.map((z: any) => {
+          const hit = newPosMap.get(`zone_${z.id}`);
+          return hit ? { ...z, x: hit.x, y: hit.y } : z;
+        });
+
+        onChange({ ...block, entities: nextEntities, zones: nextZones });
+        notifyBuilder(`Aligned & stacked ${sorted.length} selected items vertically along X=${avgX}%!`);
+        return;
+      }
+    }
+
+    // 2. Single item selected -> Align its vertical column band
+    if (primarySelected?.kind === 'entity') {
+      const targetEnt = entities.find((e: any) => e.id === primarySelected.id);
       if (targetEnt && targetEnt.entityType !== 'bg_shape') {
         const bandX = Number(targetEnt.x ?? 25);
         const colEnts = entities
@@ -1165,18 +1286,56 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         }
       }
     }
-    notifyBuilder('Select a box in a vertical column first, then click Align Col.');
+    notifyBuilder('Shift+Click 2+ items (or select a box in a vertical column) to align vertically.');
   };
 
-  // Start Four-Directions Move
+  // Start Four-Directions Move (Supports Shift+Click Multi-Selection & Synchronized Group Dragging)
   const startMoveItem = (
     e: React.PointerEvent,
     kind: 'entity' | 'zone',
     item: any
   ) => {
     e.stopPropagation();
-    setSelectedItem({ kind, id: item.id });
+
+    const alreadySelected = isItemSelected(kind, item.id);
+    let nextSelection = selectedItems;
+
+    if (e.shiftKey) {
+      if (alreadySelected) {
+        nextSelection = selectedItems.filter((s) => !(s.kind === kind && s.id === item.id));
+        setSelectedItems(nextSelection);
+        return;
+      } else {
+        nextSelection = [...selectedItems, { kind, id: item.id }];
+        setSelectedItems(nextSelection);
+      }
+    } else if (!alreadySelected) {
+      nextSelection = [{ kind, id: item.id }];
+      setSelectedItems(nextSelection);
+    }
+
     if (item.lockInBuilder) return;
+
+    const groupInitialCoords = nextSelection
+      .map((s) => {
+        const obj =
+          s.kind === 'entity'
+            ? entities.find((ent: any) => ent.id === s.id)
+            : zones.find((z: any) => z.id === s.id);
+        if (!obj || obj.lockInBuilder) return null;
+        return {
+          kind: s.kind,
+          id: s.id,
+          initX: Number(obj.x ?? 50),
+          initY: Number(obj.y ?? 50)
+        };
+      })
+      .filter(Boolean) as Array<{
+      kind: 'entity' | 'zone';
+      id: string;
+      initX: number;
+      initY: number;
+    }>;
 
     setInteraction({
       mode: 'move',
@@ -1184,11 +1343,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       id: item.id,
       startClientX: e.clientX,
       startClientY: e.clientY,
-      initX: item.x ?? 50,
-      initY: item.y ?? 50,
+      initX: Number(item.x ?? 50),
+      initY: Number(item.y ?? 50),
       initScale: item.scale ?? 1,
       initWidth: item.width ?? 24,
-      initHeight: item.height ?? 20
+      initHeight: item.height ?? 20,
+      groupInitialCoords
     });
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -1200,7 +1360,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     item: any
   ) => {
     e.stopPropagation();
-    setSelectedItem({ kind, id: item.id });
+    if (!isItemSelected(kind, item.id)) {
+      setSelectedItems([{ kind, id: item.id }]);
+    }
     if (item.lockInBuilder) return;
 
     setInteraction({
@@ -1209,20 +1371,21 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       id: item.id,
       startClientX: e.clientX,
       startClientY: e.clientY,
-      initX: item.x ?? 50,
-      initY: item.y ?? 50,
+      initX: Number(item.x ?? 50),
+      initY: Number(item.y ?? 50),
       initScale: item.scale ?? 1,
       initWidth:
         item.width ??
         (kind === 'zone' ? 28 : item.entityType === 'bg_shape' ? 44 : 18),
       initHeight:
         item.height ??
-        (kind === 'zone' ? 26 : item.entityType === 'bg_shape' ? 36 : 10)
+        (kind === 'zone' ? 26 : item.entityType === 'bg_shape' ? 36 : 10),
+      groupInitialCoords: []
     });
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  // Unified Stage Pointer Move (Handles Object Move, Object Resize, and Floating Taskbar Drag)
+  // Unified Stage Pointer Move (Handles Single/Group Move, Resize, and Floating Taskbar Drag)
   const handleStagePointerMove = (e: React.PointerEvent) => {
     if (!stageRef.current) return;
     const rect = stageRef.current.getBoundingClientRect();
@@ -1237,8 +1400,39 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     if (!interaction) return;
 
     if (interaction.mode === 'move') {
-      const nextX = snapCoord(((e.clientX - rect.left) / rect.width) * 100);
-      const nextY = snapCoord(((e.clientY - rect.top) / rect.height) * 100);
+      const deltaPctX = ((e.clientX - interaction.startClientX) / rect.width) * 100;
+      const deltaPctY = ((e.clientY - interaction.startClientY) / rect.height) * 100;
+
+      // Group Move when 2+ items are selected
+      if (interaction.groupInitialCoords.length > 1) {
+        const entityMoveMap = new Map<string, { x: number; y: number }>();
+        const zoneMoveMap = new Map<string, { x: number; y: number }>();
+
+        interaction.groupInitialCoords.forEach((g) => {
+          const nx = snapCoord(g.initX + deltaPctX);
+          const ny = snapCoord(g.initY + deltaPctY);
+          if (g.kind === 'entity') entityMoveMap.set(g.id, { x: nx, y: ny });
+          else zoneMoveMap.set(g.id, { x: nx, y: ny });
+        });
+
+        const nextEntities = entities.map((ent: any) => {
+          const moved = entityMoveMap.get(ent.id);
+          return moved
+            ? { ...ent, x: moved.x, y: moved.y, anchorX: moved.x, anchorY: moved.y }
+            : ent;
+        });
+        const nextZones = zones.map((z: any) => {
+          const moved = zoneMoveMap.get(z.id);
+          return moved ? { ...z, x: moved.x, y: moved.y } : z;
+        });
+
+        onChange({ ...block, entities: nextEntities, zones: nextZones });
+        return;
+      }
+
+      // Single Item Move
+      const nextX = snapCoord(interaction.initX + deltaPctX);
+      const nextY = snapCoord(interaction.initY + deltaPctY);
 
       if (interaction.kind === 'entity') {
         const nextEntities = entities.map((ent: any) =>
@@ -1295,6 +1489,45 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     }
   };
 
+  // Batch-Aware Field Updater (Applies to ALL currently selected items!)
+  const updateSelectedFields = (patch: Record<string, any>) => {
+    const selEntIds = new Set(
+      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
+    );
+    const selZoneIds = new Set(
+      selectedItems.filter((s) => s.kind === 'zone').map((s) => s.id)
+    );
+
+    const nextEntities = entities.map((e: any) =>
+      selEntIds.has(e.id) ? { ...e, ...patch } : e
+    );
+    const nextZones = zones.map((z: any) =>
+      selZoneIds.has(z.id)
+        ? {
+            ...z,
+            ...patch,
+            ...(patch.category !== undefined ? { acceptedCategory: patch.category } : {})
+          }
+        : z
+    );
+
+    onChange({ ...block, entities: nextEntities, zones: nextZones });
+  };
+
+  const updateEntityField = (id: string, patch: Record<string, any>) => {
+    onChange({
+      ...block,
+      entities: entities.map((e: any) => (e.id === id ? { ...e, ...patch } : e))
+    });
+  };
+
+  const updateZoneField = (id: string, patch: Record<string, any>) => {
+    onChange({
+      ...block,
+      zones: zones.map((z: any) => (z.id === id ? { ...z, ...patch } : z))
+    });
+  };
+
   const addEntity = (isAnchoredProp: boolean) => {
     const newId = `ent_${Date.now()}`;
     const newEnt = {
@@ -1321,7 +1554,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       category: ''
     };
     onChange({ ...block, entities: [...entities, newEnt] });
-    setSelectedItem({ kind: 'entity', id: newId });
+    setSelectedItems([{ kind: 'entity', id: newId }]);
   };
 
   const addBackgroundShape = () => {
@@ -1347,7 +1580,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       lockInBuilder: false
     };
     onChange({ ...block, entities: [newShape, ...entities] });
-    setSelectedItem({ kind: 'entity', id: newId });
+    setSelectedItems([{ kind: 'entity', id: newId }]);
     notifyBuilder('Added Background Group Shape! Use the Contextual Taskbar to style or lock it.');
   };
 
@@ -1379,8 +1612,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       };
     });
     onChange({ ...block, entities: [...newShapes, ...entities] });
-    setSelectedItem({ kind: 'entity', id: newShapes[0].id });
-    notifyBuilder(`Added ${cols}-Column Background Group Layout!`);
+    setSelectedItems(newShapes.map((s) => ({ kind: 'entity' as const, id: s.id })));
+    notifyBuilder(`Added ${cols}-Column Background Group Layout (All ${cols} Selected)!`);
   };
 
   const addZone = () => {
@@ -1401,21 +1634,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       anchored: false
     };
     onChange({ ...block, zones: [...zones, newZone] });
-    setSelectedItem({ kind: 'zone', id: newId });
-  };
-
-  const updateEntityField = (id: string, patch: Record<string, any>) => {
-    onChange({
-      ...block,
-      entities: entities.map((e: any) => (e.id === id ? { ...e, ...patch } : e))
-    });
-  };
-
-  const updateZoneField = (id: string, patch: Record<string, any>) => {
-    onChange({
-      ...block,
-      zones: zones.map((z: any) => (z.id === id ? { ...z, ...patch } : z))
-    });
+    setSelectedItems([{ kind: 'zone', id: newId }]);
   };
 
   const adjustLayerZOrder = (
@@ -1439,6 +1658,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       const currZ = target?.zOrder ?? 10;
       updateZoneField(id, { zOrder: getNextZ(currZ) });
     }
+  };
+
+  const adjustBatchZOrder = (op: 'back' | 'front') => {
+    const targetZ = op === 'back' ? 1 : 60;
+    updateSelectedFields({ zOrder: targetZ });
   };
 
   const handleLinkConnectorTarget = (sourceId: string, targetId: string) => {
@@ -1469,18 +1693,59 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     }
   };
 
-  const duplicateEntity = (ent: any) => {
-    const copyId = `ent_${Date.now()}`;
-    const copy = {
-      ...ent,
-      id: copyId,
-      x: Math.min(92, (ent.x || 50) + 5),
-      y: Math.min(92, (ent.y || 50) + 4),
-      anchorX: Math.min(92, (ent.x || 50) + 5),
-      anchorY: Math.min(92, (ent.y || 50) + 4)
-    };
-    onChange({ ...block, entities: [...entities, copy] });
-    setSelectedItem({ kind: 'entity', id: copyId });
+  const duplicateSelectedItems = () => {
+    const now = Date.now();
+    const selEntIds = new Set(
+      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
+    );
+    const copies: any[] = [];
+    const newSelection: Array<{ kind: 'entity' | 'zone'; id: string }> = [];
+
+    entities.forEach((ent: any, idx: number) => {
+      if (selEntIds.has(ent.id)) {
+        const copyId = `ent_${now}_${idx}`;
+        const nx = Math.min(92, Number((ent.x || 50) + 4));
+        const ny = Math.min(92, Number((ent.y || 50) + 4));
+        copies.push({
+          ...ent,
+          id: copyId,
+          x: nx,
+          y: ny,
+          anchorX: nx,
+          anchorY: ny
+        });
+        newSelection.push({ kind: 'entity', id: copyId });
+      }
+    });
+
+    if (copies.length > 0) {
+      onChange({ ...block, entities: [...entities, ...copies] });
+      setSelectedItems(newSelection);
+      notifyBuilder(`Duplicated ${copies.length} item(s)!`);
+    }
+  };
+
+  const deleteSelectedItems = () => {
+    const selEntIds = new Set(
+      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
+    );
+    const selZoneIds = new Set(
+      selectedItems.filter((s) => s.kind === 'zone').map((s) => s.id)
+    );
+    onChange({
+      ...block,
+      entities: entities.filter((e: any) => !selEntIds.has(e.id)),
+      zones: zones.filter((z: any) => !selZoneIds.has(z.id))
+    });
+    setSelectedItems([]);
+  };
+
+  const handleSelectAllCards = () => {
+    const allCardSelections = entities
+      .filter((e: any) => e.entityType !== 'bg_shape')
+      .map((e: any) => ({ kind: 'entity' as const, id: e.id }));
+    setSelectedItems(allCardSelections);
+    notifyBuilder(`Selected all ${allCardSelections.length} cards on stage!`);
   };
 
   const unifiedLayerStack = useMemo(() => {
@@ -1528,28 +1793,39 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   }, [entities, zones]);
 
   const activeSelectedEntity =
-    selectedItem?.kind === 'entity' ? entities.find((e: any) => e.id === selectedItem.id) : null;
+    primarySelected?.kind === 'entity'
+      ? entities.find((e: any) => e.id === primarySelected.id)
+      : null;
   const activeSelectedZone =
-    selectedItem?.kind === 'zone' ? zones.find((z: any) => z.id === selectedItem.id) : null;
+    primarySelected?.kind === 'zone'
+      ? zones.find((z: any) => z.id === primarySelected.id)
+      : null;
   const activeTarget = activeSelectedEntity || activeSelectedZone;
+  const isMultiSelect = selectedItems.length > 1;
 
   const activeThemeClass =
     THEME_BACKGROUNDS[block?.backgroundTheme || 'physics_lab'] || THEME_BACKGROUNDS.physics_lab;
 
   // ============================================================================
-  //  🔥 PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER
-  //  Adapts layout for Top Ribbon, Bottom Dock, Right Inspector, or Pinned/Floating
+  //  🔥 PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER (SINGLE + BATCH MULTI-EDIT)
   // ============================================================================
   const renderContextualTaskBar = (isFloatingInstance = false) => {
     if (!activeTarget) {
       if (taskbarDock === 'top' || taskbarDock === 'bottom') {
         return (
-          <div className="px-4 py-2.5 rounded-2xl bg-slate-900/95 text-slate-400 border border-slate-800 flex items-center justify-between text-xs font-bold">
+          <div className="px-4 py-2.5 rounded-2xl bg-slate-900/95 text-slate-400 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
             <span className="flex items-center gap-2">
               <Sliders size={14} className="text-indigo-400" />
-              Click any Card, Group Shape, or Drop Bucket on the canvas to inspect and style it in this Contextual Task Bar.
+              Click any box to inspect — or <strong className="text-cyan-300">Shift + Click</strong> multiple boxes to batch-style, align, or move them together!
             </span>
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleSelectAllCards}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-[10px] font-black uppercase text-slate-200 mr-2 flex items-center gap-1"
+              >
+                <CheckSquare size={12} /> Select All Cards
+              </button>
               <span className="text-[10px] uppercase tracking-widest text-slate-500 mr-1">Dock:</span>
               <button
                 type="button"
@@ -1594,7 +1870,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     const isEntity = Boolean(activeSelectedEntity);
     const isBgShape = activeSelectedEntity?.entityType === 'bg_shape';
 
-    // Compute floating coordinates if in floating mode
     const floatX = isTaskbarPinned
       ? pinnedPos.x
       : Math.min(76, Math.max(24, Number(activeTarget.x ?? 50)));
@@ -1622,7 +1897,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         onClick={(e) => e.stopPropagation()}
         className={`${
           isFloatingInstance
-            ? 'max-w-[94%] w-max rounded-2xl bg-slate-900/95 backdrop-blur-2xl border-2 border-indigo-400/70 shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-2.5 text-white animate-in zoom-in-95 duration-150'
+            ? 'max-w-[95%] w-max rounded-2xl bg-slate-900/95 backdrop-blur-2xl border-2 border-indigo-400/70 shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-2.5 text-white animate-in zoom-in-95 duration-150'
             : isVertical
             ? 'w-full lg:w-80 shrink-0 rounded-3xl bg-slate-900 text-white border border-slate-800 p-4 space-y-4 self-start shadow-xl'
             : 'w-full rounded-2xl bg-slate-900 text-white border border-slate-800 px-3.5 py-2.5 shadow-lg'
@@ -1633,7 +1908,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             isVertical ? 'flex-col gap-3.5' : 'flex-wrap items-center gap-2.5'
           }`}
         >
-          {/* 1. Drag Grip + Pin Toggle + Type Badge */}
+          {/* 1. Drag Grip + Pin Toggle + Multi-Select Count Badge */}
           <div className="flex items-center gap-1.5 pr-2 border-r border-slate-700/80">
             {isFloatingInstance && (
               <button
@@ -1658,8 +1933,20 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               </button>
             )}
 
-            <span className="px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
-              {isBgShape ? 'Group Shape' : isEntity ? 'Card / Box' : 'Drop Bucket'}
+            <span
+              className={`px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
+                isMultiSelect
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/50'
+                  : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+              }`}
+            >
+              {isMultiSelect
+                ? `${selectedItems.length} Selected`
+                : isBgShape
+                ? 'Group Shape'
+                : isEntity
+                ? 'Card / Box'
+                : 'Drop Bucket'}
             </span>
 
             {isFloatingInstance && (
@@ -1687,45 +1974,37 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             )}
           </div>
 
-          {/* 2. Primary Text & Sublabel Inline Inputs */}
+          {/* 2. Primary Text & Sublabel Inline Inputs (Shown for Single Item or Batch Sublabel) */}
           <div className={`flex ${isVertical ? 'flex-col' : 'items-center'} gap-1.5`}>
-            <input
-              type="text"
-              value={activeTarget.label || ''}
-              placeholder="(Empty Box — No Text)"
-              onChange={(e) =>
-                isEntity
-                  ? updateEntityField(activeTarget.id, { label: e.target.value })
-                  : updateZoneField(activeTarget.id, { label: e.target.value })
-              }
-              className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-400 text-xs font-black text-white outline-none w-40"
-              title="Primary Label (Clear text to make an Empty Frame)"
-            />
+            {!isMultiSelect && (
+              <input
+                type="text"
+                value={activeTarget.label || ''}
+                placeholder="(Empty Box — No Text)"
+                onChange={(e) => updateSelectedFields({ label: e.target.value })}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-400 text-xs font-black text-white outline-none w-40"
+                title="Primary Label"
+              />
+            )}
             <input
               type="text"
               value={activeTarget.sublabel || ''}
-              placeholder="Subtitle / hint..."
-              onChange={(e) =>
-                isEntity
-                  ? updateEntityField(activeTarget.id, { sublabel: e.target.value })
-                  : updateZoneField(activeTarget.id, { sublabel: e.target.value })
-              }
+              placeholder={isMultiSelect ? 'Batch subtitle...' : 'Subtitle / hint...'}
+              onChange={(e) => updateSelectedFields({ sublabel: e.target.value })}
               className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-400 text-[11px] font-bold text-slate-300 outline-none w-32"
-              title="Subtitle / Hint"
+              title="Subtitle / Hint (Applies to All Selected)"
             />
             <button
               type="button"
-              title="Clear Text (Convert to Empty Resizable Box)"
+              title="Clear Text on Selected (Convert to Empty Resizable Box)"
               onClick={() =>
-                isEntity
-                  ? updateEntityField(activeTarget.id, {
-                      label: '',
-                      sublabel: '',
-                      width: activeTarget.width ?? 24,
-                      height: activeTarget.height ?? 16,
-                      resizeMode: 'box'
-                    })
-                  : updateZoneField(activeTarget.id, { label: '', sublabel: '' })
+                updateSelectedFields({
+                  label: '',
+                  sublabel: '',
+                  width: activeTarget.width ?? 24,
+                  height: activeTarget.height ?? 16,
+                  resizeMode: 'box'
+                })
               }
               className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-[9px] font-black uppercase text-slate-300 transition-colors whitespace-nowrap"
             >
@@ -1733,7 +2012,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </button>
           </div>
 
-          {/* 3. 6-Color Palette Swatches */}
+          {/* 3. 6-Color Palette Swatches (Batch Applies to All Selected!) */}
           <div className="flex items-center gap-1 px-2 border-l border-r border-slate-800">
             {Object.entries(COLOR_STYLES).map(([colorKey, cObj]) => {
               const isPicked = (activeTarget.color || 'indigo') === colorKey;
@@ -1741,12 +2020,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 <button
                   key={colorKey}
                   type="button"
-                  title={`Color: ${colorKey}`}
-                  onClick={() =>
-                    isEntity
-                      ? updateEntityField(activeTarget.id, { color: colorKey })
-                      : updateZoneField(activeTarget.id, { color: colorKey })
-                  }
+                  title={`Apply ${colorKey} to selected`}
+                  onClick={() => updateSelectedFields({ color: colorKey })}
                   style={{ backgroundColor: cObj.hex }}
                   className={`w-5 h-5 rounded-full border transition-transform ${
                     isPicked
@@ -1758,15 +2033,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             })}
           </div>
 
-          {/* 4. Border Style & Shape Corner Pickers */}
+          {/* 4. Border Style & Shape Corner Pickers (Batch Applies to All Selected!) */}
           <div className="flex items-center gap-1.5">
             <select
               value={activeTarget.borderStyle || (isEntity ? 'solid' : 'dashed')}
-              onChange={(e) =>
-                isEntity
-                  ? updateEntityField(activeTarget.id, { borderStyle: e.target.value })
-                  : updateZoneField(activeTarget.id, { borderStyle: e.target.value })
-              }
+              onChange={(e) => updateSelectedFields({ borderStyle: e.target.value })}
               title="Border Style"
               className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
             >
@@ -1781,9 +2052,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             {isEntity && (
               <select
                 value={activeTarget.shapeVariant || 'banner'}
-                onChange={(e) =>
-                  updateEntityField(activeTarget.id, { shapeVariant: e.target.value })
-                }
+                onChange={(e) => updateSelectedFields({ shapeVariant: e.target.value })}
                 title="Corner Geometry"
                 className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
               >
@@ -1795,7 +2064,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             )}
           </div>
 
-          {/* 5. Compact W% × H% Dimensions & Opacity / Scale */}
+          {/* 5. Compact W% × H% Dimensions & Opacity */}
           <div className="flex items-center gap-1.5 px-2 border-l border-slate-800">
             <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
               <span className="text-[9px] font-black text-slate-400">W%</span>
@@ -1806,13 +2075,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 value={activeTarget.width ?? (isEntity ? 20 : 28)}
                 onChange={(e) => {
                   const w = Math.max(5, Math.min(96, Number(e.target.value) || 15));
-                  isEntity
-                    ? updateEntityField(activeTarget.id, {
-                        width: w,
-                        height: activeTarget.height ?? 14,
-                        resizeMode: 'box'
-                      })
-                    : updateZoneField(activeTarget.id, { width: w });
+                  updateSelectedFields({
+                    width: w,
+                    height: activeTarget.height ?? 14,
+                    resizeMode: 'box'
+                  });
                 }}
                 className="w-10 bg-transparent text-xs font-mono font-black text-emerald-400 outline-none text-center"
               />
@@ -1827,20 +2094,21 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 value={activeTarget.height ?? (isEntity ? 12 : 24)}
                 onChange={(e) => {
                   const h = Math.max(5, Math.min(96, Number(e.target.value) || 12));
-                  isEntity
-                    ? updateEntityField(activeTarget.id, {
-                        height: h,
-                        width: activeTarget.width ?? 20,
-                        resizeMode: 'box'
-                      })
-                    : updateZoneField(activeTarget.id, { height: h });
+                  updateSelectedFields({
+                    height: h,
+                    width: activeTarget.width ?? 20,
+                    resizeMode: 'box'
+                  });
                 }}
                 className="w-10 bg-transparent text-xs font-mono font-black text-emerald-400 outline-none text-center"
               />
             </div>
 
             {isBgShape && (
-              <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800" title="Background Fill Opacity %">
+              <div
+                className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800"
+                title="Background Fill Opacity %"
+              >
                 <span className="text-[9px] font-black text-purple-300">α%</span>
                 <input
                   type="number"
@@ -1849,7 +2117,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   step={5}
                   value={activeTarget.opacity ?? 22}
                   onChange={(e) =>
-                    updateEntityField(activeTarget.id, {
+                    updateSelectedFields({
                       opacity: Math.max(5, Math.min(95, Number(e.target.value) || 20))
                     })
                   }
@@ -1867,42 +2135,44 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   type="text"
                   placeholder="Category (e.g. ed)"
                   value={activeTarget.category || ''}
-                  onChange={(e) =>
-                    updateEntityField(activeTarget.id, { category: e.target.value })
-                  }
-                  title="Category Match Tag"
+                  onChange={(e) => updateSelectedFields({ category: e.target.value })}
+                  title="Category Match Tag (Applies to All Selected)"
                   className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-28"
                 />
-                <input
-                  type="number"
-                  placeholder="Seq #"
-                  value={activeTarget.sequenceIndex ?? ''}
-                  onChange={(e) =>
-                    updateEntityField(activeTarget.id, {
-                      sequenceIndex: e.target.value ? Number(e.target.value) : undefined
-                    })
-                  }
-                  title="Sequence Order Slot #"
-                  className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-amber-300 outline-none w-16"
-                />
-                <select
-                  value={activeTarget.connectTargetId || ''}
-                  onChange={(e) => handleLinkConnectorTarget(activeTarget.id, e.target.value)}
-                  title="Link SVG Connector Line Target"
-                  className="px-2 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-[10px] font-bold text-cyan-300 outline-none max-w-[140px]"
-                >
-                  <option value="">Link Line: None</option>
-                  {entities
-                    .filter(
-                      (other: any) =>
-                        other.id !== activeTarget.id && other.entityType !== 'bg_shape'
-                    )
-                    .map((other: any) => (
-                      <option key={other.id} value={other.id}>
-                        ➔ {other.label || other.id}
-                      </option>
-                    ))}
-                </select>
+                {!isMultiSelect && (
+                  <>
+                    <input
+                      type="number"
+                      placeholder="Seq #"
+                      value={activeTarget.sequenceIndex ?? ''}
+                      onChange={(e) =>
+                        updateEntityField(activeTarget.id, {
+                          sequenceIndex: e.target.value ? Number(e.target.value) : undefined
+                        })
+                      }
+                      title="Sequence Order Slot #"
+                      className="px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-amber-300 outline-none w-16"
+                    />
+                    <select
+                      value={activeTarget.connectTargetId || ''}
+                      onChange={(e) => handleLinkConnectorTarget(activeTarget.id, e.target.value)}
+                      title="Link SVG Connector Line Target"
+                      className="px-2 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-[10px] font-bold text-cyan-300 outline-none max-w-[140px]"
+                    >
+                      <option value="">Link Line: None</option>
+                      {entities
+                        .filter(
+                          (other: any) =>
+                            other.id !== activeTarget.id && other.entityType !== 'bg_shape'
+                        )
+                        .map((other: any) => (
+                          <option key={other.id} value={other.id}>
+                            ➔ {other.label || other.id}
+                          </option>
+                        ))}
+                    </select>
+                  </>
+                )}
               </>
             ) : !isEntity ? (
               <>
@@ -1910,9 +2180,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   type="text"
                   placeholder="Accepts Cat (e.g. ed)"
                   value={activeTarget.acceptedCategory || ''}
-                  onChange={(e) =>
-                    updateZoneField(activeTarget.id, { acceptedCategory: e.target.value })
-                  }
+                  onChange={(e) => updateSelectedFields({ acceptedCategory: e.target.value })}
                   className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-32"
                 />
                 <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
@@ -1923,7 +2191,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     max={12}
                     value={activeTarget.capacity ?? 2}
                     onChange={(e) =>
-                      updateZoneField(activeTarget.id, {
+                      updateSelectedFields({
                         capacity: Math.max(1, Number(e.target.value) || 1)
                       })
                     }
@@ -1934,19 +2202,40 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             ) : null}
           </div>
 
-          {/* 7. Quick Toggles: Background Shape Toggle, Student Anchor, Editor Lock, Z-Order, Duplicate & Delete */}
+          {/* 7. Quick Toggles: Align Selected Row/Col, Background Shape, Anchor, Lock, Z-Order, Duplicate & Delete */}
           <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
+            {isMultiSelect && (
+              <>
+                <button
+                  type="button"
+                  title="Align Selected Items Horizontally in a Row"
+                  onClick={handleAutoAlignRow}
+                  className="p-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white"
+                >
+                  <AlignHorizontalSpaceAround size={13} />
+                </button>
+                <button
+                  type="button"
+                  title="Align Selected Items Vertically in a Column"
+                  onClick={handleAutoAlignColumn}
+                  className="p-1.5 rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white"
+                >
+                  <AlignVerticalSpaceAround size={13} />
+                </button>
+              </>
+            )}
+
             {isEntity && (
               <>
                 <button
                   type="button"
                   title={
                     isBgShape
-                      ? 'Currently a Background Group Shape (Click to Make Draggable Card)'
+                      ? 'Convert to Draggable Card'
                       : 'Convert to Background Group Shape (Sends Behind Cards)'
                   }
                   onClick={() =>
-                    updateEntityField(activeTarget.id, {
+                    updateSelectedFields({
                       entityType: isBgShape ? 'draggable' : 'bg_shape',
                       zOrder: isBgShape ? 30 : 2,
                       width: activeTarget.width ?? 42,
@@ -1973,7 +2262,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       : 'Draggable by Students (Click to Anchor in Place)'
                   }
                   onClick={() =>
-                    updateEntityField(activeTarget.id, {
+                    updateSelectedFields({
                       anchored: !activeTarget.anchored,
                       draggable: Boolean(activeTarget.anchored)
                     })
@@ -1996,10 +2285,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         : 'Magnetic Home Return: OFF'
                     }
                     onClick={() =>
-                      updateEntityField(activeTarget.id, {
-                        returnToAnchor: !activeTarget.returnToAnchor,
-                        anchorX: activeTarget.x,
-                        anchorY: activeTarget.y
+                      updateSelectedFields({
+                        returnToAnchor: !activeTarget.returnToAnchor
                       })
                     }
                     className={`p-1.5 rounded-lg border ${
@@ -2016,9 +2303,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
             <button
               type="button"
-              title="Send to Back (Behind All Cards)"
+              title="Send Selected to Back"
               onClick={() =>
-                adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'back')
+                isMultiSelect
+                  ? adjustBatchZOrder('back')
+                  : adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'back')
               }
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
             >
@@ -2026,9 +2315,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </button>
             <button
               type="button"
-              title="Bring to Front"
+              title="Bring Selected to Front"
               onClick={() =>
-                adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'front')
+                isMultiSelect
+                  ? adjustBatchZOrder('front')
+                  : adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'front')
               }
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
             >
@@ -2043,13 +2334,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   : 'Lock Position in Editor'
               }
               onClick={() =>
-                isEntity
-                  ? updateEntityField(activeTarget.id, {
-                      lockInBuilder: !activeTarget.lockInBuilder
-                    })
-                  : updateZoneField(activeTarget.id, {
-                      lockInBuilder: !activeTarget.lockInBuilder
-                    })
+                updateSelectedFields({
+                  lockInBuilder: !activeTarget.lockInBuilder
+                })
               }
               className={`p-1.5 rounded-lg ${
                 activeTarget.lockInBuilder
@@ -2063,8 +2350,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             {isEntity && (
               <button
                 type="button"
-                title="Duplicate Box"
-                onClick={() => duplicateEntity(activeTarget)}
+                title="Duplicate Selected"
+                onClick={duplicateSelectedItems}
                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
               >
                 <Copy size={13} />
@@ -2073,28 +2360,15 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
             <button
               type="button"
-              title="Delete Selected Item"
-              onClick={() => {
-                if (isEntity) {
-                  onChange({
-                    ...block,
-                    entities: entities.filter((e: any) => e.id !== activeTarget.id)
-                  });
-                } else {
-                  onChange({
-                    ...block,
-                    zones: zones.filter((z: any) => z.id !== activeTarget.id)
-                  });
-                }
-                setSelectedItem(null);
-              }}
+              title="Delete Selected"
+              onClick={deleteSelectedItems}
               className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white"
             >
               <Trash2 size={13} />
             </button>
           </div>
 
-          {/* 8. Workspace Dock Mode Switcher (Top Ribbon | Bottom Bar | Right Inspector | Floating) */}
+          {/* 8. Workspace Dock Mode Switcher */}
           <div className="flex items-center gap-1 pl-2 border-l border-slate-800 ml-auto">
             <button
               type="button"
@@ -2146,8 +2420,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </button>
             <button
               type="button"
-              title="Deselect"
-              onClick={() => setSelectedItem(null)}
+              title="Clear Selection"
+              onClick={() => setSelectedItems([])}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white ml-0.5"
             >
               <X size={13} />
@@ -2160,12 +2434,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-indigo-500/30 shadow-xl overflow-hidden space-y-4 p-6">
-      {/* Top Studio Controls: Resolution Picker, Grid Snap, Layer Toolbar & Add Buttons */}
+      {/* Top Studio Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-              HD Stage Studio • Contextual Task Bar ({taskbarDock.toUpperCase()})
+              HD Stage Studio • Shift+Click to Multi-Select ({selectedItems.length} Selected)
             </span>
             {builderToast && (
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase animate-in fade-in">
@@ -2183,7 +2457,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Resolution Selector */}
           <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
             <Monitor size={14} className="text-indigo-500" />
             <select
@@ -2199,7 +2472,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </select>
           </div>
 
-          {/* Grid Snap Precision Selector */}
           <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
             <Grid size={14} className="text-emerald-500" />
             <select
@@ -2214,11 +2486,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </select>
           </div>
 
-          {/* 1-CLICK AUTO-ALIGN ROW & COLUMN BUTTONS */}
           <button
             type="button"
             onClick={handleAutoAlignRow}
-            title="Auto-align and evenly space selected row of cards/zones (or tidy entire word bank)"
+            title="Auto-align and evenly space selected items (or horizontal row)"
             className="px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
           >
             <AlignHorizontalSpaceAround size={13} /> Align Row
@@ -2227,13 +2498,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
           <button
             type="button"
             onClick={handleAutoAlignColumn}
-            title="Auto-align selected vertical column of boxes"
+            title="Auto-align selected items vertically in a column"
             className="px-3 py-2 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
           >
             <AlignVerticalSpaceAround size={13} /> Align Col
           </button>
 
-          {/* ADD BACKGROUND GROUP SHAPE BUTTON */}
           <button
             type="button"
             onClick={addBackgroundShape}
@@ -2268,7 +2538,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <Plus size={12} /> Drop Bucket
           </button>
 
-          {/* TOGGLE LAYER & Z-ORDER MANAGER TOOLBAR */}
           <button
             type="button"
             onClick={() => setShowLayerToolbar((l) => !l)}
@@ -2294,7 +2563,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         </div>
       </div>
 
-      {/* 🔥 DOCK POSITION 1: TOP PHOTOSHOP OPTIONS RIBBON */}
+      {/* DOCK POSITION 1: TOP PHOTOSHOP OPTIONS RIBBON */}
       {taskbarDock === 'top' && renderContextualTaskBar(false)}
 
       {/* VISUAL LAYER & Z-ORDER TOOLBAR PANEL */}
@@ -2304,23 +2573,30 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <div className="flex items-center gap-2">
               <Layers size={15} className="text-amber-400" />
               <span className="text-xs font-black uppercase tracking-widest">
-                Layer Stack & Background Group Presets
+                Layer Stack & Background Group Presets (Shift+Click Rows to Multi-Select)
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
+                onClick={handleSelectAllCards}
+                className="px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
+              >
+                <CheckSquare size={11} /> Select All Cards
+              </button>
+              <button
+                type="button"
                 onClick={() => addMultiColumnGroupPreset(2)}
                 className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
               >
-                <Columns size={11} /> + 2-Column Group Layout
+                <Columns size={11} /> + 2-Column Group
               </button>
               <button
                 type="button"
                 onClick={() => addMultiColumnGroupPreset(3)}
                 className="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
               >
-                <Columns size={11} /> + 3-Column Group Layout
+                <Columns size={11} /> + 3-Column Group
               </button>
               <button
                 type="button"
@@ -2334,15 +2610,14 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-52 overflow-y-auto custom-scrollbar pr-1">
             {unifiedLayerStack.map((item) => {
-              const isSelected =
-                selectedItem?.kind === item.kind && selectedItem.id === item.id;
+              const isSelected = isItemSelected(item.kind, item.id);
               return (
                 <div
                   key={`${item.kind}_${item.id}`}
-                  onClick={() => setSelectedItem({ kind: item.kind, id: item.id })}
+                  onClick={(e) => selectOrToggleItem(item.kind, item.id, e.shiftKey)}
                   className={`px-3.5 py-2 rounded-2xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
                     isSelected
-                      ? 'bg-indigo-600/30 border-indigo-400 text-white'
+                      ? 'bg-indigo-600/30 border-amber-400 text-white ring-1 ring-amber-400/50'
                       : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:border-slate-700'
                   }`}
                 >
@@ -2364,7 +2639,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   >
                     <button
                       type="button"
-                      title="Send to Back (Behind All Cards)"
+                      title="Send to Back"
                       onClick={() => adjustLayerZOrder(item.kind, item.id, 'back')}
                       className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
                     >
@@ -2444,21 +2719,21 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         </div>
       )}
 
-      {/* Main Workspace Container (Supports Right-Hand Docked Inspector or Full-Width Stage) */}
+      {/* Main Workspace Container */}
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div
           ref={outerWrapRef}
           style={{ height: `${Math.round(resolution.height * stageScale)}px` }}
           className="relative flex-1 w-full overflow-hidden rounded-3xl border-2 border-slate-300 dark:border-slate-700 bg-slate-950 flex justify-center"
         >
-          {/* 🔥 DOCK POSITION 4: FLOATING / PINNABLE OVER-CANVAS TASK BAR */}
+          {/* DOCK POSITION 4: FLOATING / PINNABLE OVER-CANVAS TASK BAR */}
           {taskbarDock === 'floating' && renderContextualTaskBar(true)}
 
           <div
             ref={stageRef}
-            onPointerDown={() => {
-              if (!isTaskbarPinned && taskbarDock === 'floating') {
-                setSelectedItem(null);
+            onPointerDown={(e) => {
+              if (!e.shiftKey) {
+                setSelectedItems([]);
               }
             }}
             onPointerMove={handleStagePointerMove}
@@ -2478,7 +2753,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             {entities
               .filter((e: any) => e.entityType === 'bg_shape')
               .map((shape: any) => {
-                const isSelected = selectedItem?.kind === 'entity' && selectedItem.id === shape.id;
+                const isSelected = isItemSelected('entity', shape.id);
                 const palette = COLOR_STYLES[shape.color || 'indigo'] || COLOR_STYLES.indigo;
                 const borderStyleClass =
                   BORDER_STYLE_CLASSES[shape.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
@@ -2506,7 +2781,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     {!shape.lockInBuilder && (
                       <button
                         type="button"
-                        title="Drag in 4 Directions to Move Group Shape"
+                        title="Drag to Move (Shift+Click to Multi-Select)"
                         onPointerDown={(e) => startMoveItem(e, 'entity', shape)}
                         className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-purple-600 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-move z-30"
                       >
@@ -2516,11 +2791,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
                     <button
                       type="button"
-                      title="Select & Focus in Contextual Task Bar"
+                      title="Select (or Shift+Click to Multi-Select)"
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedItem({ kind: 'entity', id: shape.id });
+                        selectOrToggleItem('entity', shape.id, e.shiftKey);
                       }}
                       className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
                         isSelected
@@ -2582,7 +2857,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
             {/* 3. DROP ZONES / BUCKETS ON BUILDER STAGE */}
             {zones.map((z: any) => {
-              const isSelected = selectedItem?.kind === 'zone' && selectedItem.id === z.id;
+              const isSelected = isItemSelected('zone', z.id);
               const zBorderClass = BORDER_STYLE_CLASSES[z.borderStyle || 'dashed'] || 'border-4 border-dashed';
               const zPalette = COLOR_STYLES[z.color || 'indigo'] || COLOR_STYLES.indigo;
 
@@ -2600,14 +2875,14 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   }}
                   className={`group absolute rounded-[2rem] ${zBorderClass} p-5 flex flex-col items-center justify-start cursor-move transition-colors ${
                     isSelected
-                      ? 'border-amber-400 bg-amber-500/15 ring-2 ring-amber-400/50'
+                      ? 'border-amber-400 bg-amber-500/15 ring-4 ring-amber-400/60'
                       : `${zPalette.border} bg-slate-900/35`
                   }`}
                 >
                   {!z.lockInBuilder && (
                     <button
                       type="button"
-                      title="Drag to Move Drop Zone"
+                      title="Drag to Move Drop Zone (Shift+Click to Multi-Select)"
                       onPointerDown={(e) => startMoveItem(e, 'zone', z)}
                       className="absolute -top-3.5 -left-3.5 w-9 h-9 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-slate-600 flex items-center justify-center shadow-lg cursor-move z-30"
                     >
@@ -2617,11 +2892,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
                   <button
                     type="button"
-                    title="Select Zone in Contextual Task Bar"
+                    title="Select Zone (Shift+Click to Multi-Select)"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedItem({ kind: 'zone', id: z.id });
+                      selectOrToggleItem('zone', z.id, e.shiftKey);
                     }}
                     className={`absolute -top-3.5 -right-3.5 w-9 h-9 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
                       isSelected
@@ -2658,7 +2933,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             {entities
               .filter((e: any) => e.entityType !== 'bg_shape')
               .map((ent: any) => {
-                const isSelected = selectedItem?.kind === 'entity' && selectedItem.id === ent.id;
+                const isSelected = isItemSelected('entity', ent.id);
                 const palette = COLOR_STYLES[ent.color || 'indigo'] || COLOR_STYLES.indigo;
                 const borderStyleClass =
                   BORDER_STYLE_CLASSES[ent.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
@@ -2683,12 +2958,18 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       ent.anchored
                         ? 'bg-slate-900 border-amber-400 text-white'
                         : `${palette.bg} ${palette.border}`
-                    } ${isSelected ? 'ring-4 ring-amber-400' : ''}`}
+                    } ${
+                      isSelected
+                        ? isMultiSelect
+                          ? 'ring-4 ring-cyan-300 shadow-[0_0_25px_rgba(34,211,238,0.6)]'
+                          : 'ring-4 ring-amber-400'
+                        : ''
+                    }`}
                   >
                     {!ent.lockInBuilder && (
                       <button
                         type="button"
-                        title="Drag in 4 Directions to Move"
+                        title="Drag in 4 Directions to Move (Moves Entire Selected Group)"
                         onPointerDown={(e) => startMoveItem(e, 'entity', ent)}
                         className="absolute -top-3.5 -left-3.5 w-8 h-8 rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-white/80 flex items-center justify-center shadow-lg cursor-move z-30"
                       >
@@ -2698,11 +2979,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
                     <button
                       type="button"
-                      title="Select & Edit in Contextual Task Bar"
+                      title="Click to Select (or Shift+Click to Multi-Select)"
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedItem({ kind: 'entity', id: ent.id });
+                        selectOrToggleItem('entity', ent.id, e.shiftKey);
                       }}
                       className={`absolute -top-3.5 -right-3.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 ${
                         isSelected
@@ -2756,11 +3037,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
           </div>
         </div>
 
-        {/* 🔥 DOCK POSITION 3: RIGHT-HAND INSPECTOR SIDEBAR */}
+        {/* DOCK POSITION 3: RIGHT-HAND INSPECTOR SIDEBAR */}
         {taskbarDock === 'right' && renderContextualTaskBar(false)}
       </div>
 
-      {/* 🔥 DOCK POSITION 2: BOTTOM DOCKED CONTEXTUAL BAR */}
+      {/* DOCK POSITION 2: BOTTOM DOCKED CONTEXTUAL BAR */}
       {taskbarDock === 'bottom' && renderContextualTaskBar(false)}
     </div>
   );
