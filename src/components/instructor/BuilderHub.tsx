@@ -1,10 +1,13 @@
 // src/components/instructor/BuilderHub.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Layers, BookOpen, FileText, Gamepad2, X, Edit3, Eye, Zap, Map, 
   Wrench, Search, Loader2, Volume2, AlertCircle, ArrowLeft, PenTool,
-  Sparkles, Plus, Trash2
+  Sparkles, Plus, Trash2, BookText, Link as LinkIcon, School, HelpCircle,
+  Rocket, Globe, Check
 } from 'lucide-react';
+import { doc, setDoc, onSnapshot, deleteDoc, arrayUnion } from 'firebase/firestore';
+import { db, appId, auth } from '../../config/firebase';
 import { JuicyToast } from '../Toast';
 import CardBuilderView from './CardBuilderView';
 import LessonBuilderView from './LessonBuilderView';
@@ -13,6 +16,7 @@ import ArcadeBuilderView from './ArcadeBuilderView';
 import CurriculumBuilderView from './CurriculumBuilderView';
 import LivePreview from '../LivePreview';
 import { KineticCanvasBuilder } from '../LessonBlocks';
+import MarbleScrabble from '../MarbleScrabble';
 
 // ============================================================================
 //  KINETIC CANVAS PRESET TEMPLATES (CLASSIC + 7-MODE STORYLINE 360 PRESETS)
@@ -344,6 +348,535 @@ const PhoneticEngine = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => v
 };
 
 // ============================================================================
+//  🔥 BUILT-IN READING & SOURCE LINK STUDIO (CREATE, LINK & ASSIGN TO COHORTS)
+// ============================================================================
+const ReadingStudioPanel = ({
+    lessons = [],
+    instructorClasses = [],
+    onSaveLesson,
+    onAssign,
+    onToast
+}: any) => {
+    const existingReadings = useMemo(
+        () => (lessons || []).filter((l: any) => l?.type === 'reading' || l?.contentType === 'reading'),
+        [lessons]
+    );
+
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [title, setTitle] = useState('');
+    const [subtitle, setSubtitle] = useState('');
+    const [language, setLanguage] = useState('la');
+    const [readingMode, setReadingMode] = useState<'passage' | 'external_link' | 'hybrid'>('hybrid');
+    const [externalUrl, setExternalUrl] = useState('');
+    const [sourceCitation, setSourceCitation] = useState('');
+    const [xp, setXp] = useState<number>(60);
+    const [content, setContent] = useState('');
+    const [glossary, setGlossary] = useState<any[]>([]);
+    const [checkpoints, setCheckpoints] = useState<any[]>([]);
+
+    const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+    const [newTerm, setNewTerm] = useState('');
+    const [newPos, setNewPos] = useState('noun');
+    const [newDef, setNewDef] = useState('');
+
+    const resetReadingForm = () => {
+        setEditingId(null);
+        setTitle('');
+        setSubtitle('');
+        setLanguage('la');
+        setReadingMode('hybrid');
+        setExternalUrl('');
+        setSourceCitation('');
+        setXp(60);
+        setContent('');
+        setGlossary([]);
+        setCheckpoints([]);
+        setSelectedClassIds([]);
+    };
+
+    const loadReadingForEdit = (r: any) => {
+        setEditingId(r.id);
+        setTitle(r.title || '');
+        setSubtitle(r.subtitle || r.description || '');
+        setLanguage(r.language || 'la');
+        setReadingMode(r.readingMode || (r.externalUrl && !r.content ? 'external_link' : 'hybrid'));
+        setExternalUrl(r.externalUrl || '');
+        setSourceCitation(r.sourceCitation || '');
+        setXp(r.xp || 60);
+        setContent(r.content || '');
+        setGlossary(Array.isArray(r.glossary) ? r.glossary : []);
+        setCheckpoints(Array.isArray(r.checkpoints) ? r.checkpoints : []);
+    };
+
+    const addGlossTerm = () => {
+        if (!newTerm.trim() || !newDef.trim()) return;
+        setGlossary(prev => [
+            ...prev,
+            { id: `gl_${Date.now()}`, term: newTerm.trim(), partOfSpeech: newPos, definition: newDef.trim() }
+        ]);
+        setNewTerm('');
+        setNewDef('');
+    };
+
+    const addCheckpointQuestion = () => {
+        setCheckpoints(prev => [
+            ...prev,
+            {
+                id: `cp_${Date.now()}`,
+                question: 'Comprehension question...',
+                options: [
+                    { id: 'a', text: 'Option A' },
+                    { id: 'b', text: 'Option B' },
+                    { id: 'c', text: 'Option C' }
+                ],
+                correctId: 'a'
+            }
+        ]);
+    };
+
+    const assignReadingToClassEverywhere = async (classId: string, readingPayload: any) => {
+        const assignmentEntry = {
+            id: readingPayload.id,
+            lessonId: readingPayload.id,
+            title: readingPayload.title,
+            description: readingPayload.subtitle || readingPayload.description || 'Assigned Reading',
+            type: 'reading',
+            contentType: 'reading',
+            cohortId: null,
+            assignedAt: Date.now()
+        };
+
+        if (onAssign) {
+            await onAssign(classId, assignmentEntry);
+        }
+
+        // Also write directly to Firestore classes/{classId} so it works even if onAssign wasn't passed down
+        await setDoc(
+            doc(db, 'artifacts', appId, 'classes', classId),
+            { assignments: arrayUnion(assignmentEntry) },
+            { merge: true }
+        ).catch(() => {});
+
+        const uid = auth?.currentUser?.uid;
+        if (uid) {
+            await setDoc(
+                doc(db, 'artifacts', appId, 'users', uid, 'classes', classId),
+                { assignments: arrayUnion(assignmentEntry) },
+                { merge: true }
+            ).catch(() => {});
+        }
+    };
+
+    const handleSaveAndPublishReading = async () => {
+        if (!title.trim()) {
+            if (onToast) onToast('Please enter a title for the reading passage.');
+            return;
+        }
+        const readingId = editingId || `reading_${Date.now()}`;
+        const payload = {
+            id: readingId,
+            title: title.trim(),
+            subtitle: subtitle.trim(),
+            description: subtitle.trim() || 'Assigned reading & annotation passage.',
+            language,
+            type: 'reading',
+            contentType: 'reading',
+            readingMode,
+            externalUrl: externalUrl.trim(),
+            sourceCitation: sourceCitation.trim(),
+            xp: Number(xp) || 60,
+            content,
+            glossary,
+            checkpoints,
+            blocks: [
+                {
+                    type: 'text',
+                    title: title.trim(),
+                    content: content || `External Resource: ${externalUrl}`
+                }
+            ],
+            updatedAt: Date.now()
+        };
+
+        // Save directly to custom_lessons so it is immediately available in the global library
+        await setDoc(doc(db, 'artifacts', appId, 'custom_lessons', readingId), payload, { merge: true }).catch(() => {});
+        if (onSaveLesson) {
+            await onSaveLesson(payload, readingId);
+        }
+
+        for (const cId of selectedClassIds) {
+            await assignReadingToClassEverywhere(cId, payload);
+        }
+
+        if (onToast) {
+            onToast(
+                selectedClassIds.length > 0
+                    ? `Reading saved & assigned to ${selectedClassIds.length} class(es)! 📖`
+                    : 'Reading saved to Library! 📖'
+            );
+        }
+        resetReadingForm();
+    };
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left 8 Cols: Reading & Link Authoring */}
+            <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xl space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <div>
+                        <span className="px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest">
+                            Reading & Source Link Studio
+                        </span>
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white mt-1">
+                            {editingId ? `Editing: ${title}` : 'Create or Link an Assigned Reading'}
+                        </h3>
+                    </div>
+                    {editingId && (
+                        <button
+                            type="button"
+                            onClick={resetReadingForm}
+                            className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black uppercase"
+                        >
+                            + New Blank
+                        </button>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                    {[
+                        { id: 'passage', label: '📖 Passage Only' },
+                        { id: 'external_link', label: '🔗 External URL / PDF' },
+                        { id: 'hybrid', label: '⚡ Passage + Link' }
+                    ].map((m) => (
+                        <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setReadingMode(m.id as any)}
+                            className={`py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                                readingMode === m.id
+                                    ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm'
+                                    : 'text-slate-500'
+                            }`}
+                        >
+                            {m.label}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+                    <div className="sm:col-span-6">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Reading Title</label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="e.g., Caesar's De Bello Gallico (I.1)"
+                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-black outline-none"
+                        />
+                    </div>
+                    <div className="sm:col-span-3">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Language Lock</label>
+                        <select
+                            value={language}
+                            onChange={(e) => setLanguage(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-black outline-none"
+                        >
+                            <option value="la">Latin (la)</option>
+                            <option value="es">Spanish (es)</option>
+                            <option value="en">English (en)</option>
+                            <option value="fr">French (fr)</option>
+                            <option value="de">German (de)</option>
+                        </select>
+                    </div>
+                    <div className="sm:col-span-3">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Reward XP</label>
+                        <input
+                            type="number"
+                            value={xp}
+                            onChange={(e) => setXp(parseInt(e.target.value) || 60)}
+                            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-black outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                        Student Instructions / Context Subtitle
+                    </label>
+                    <input
+                        type="text"
+                        value={subtitle}
+                        onChange={(e) => setSubtitle(e.target.value)}
+                        placeholder="Read the passage, click underlined words for glossary notes, and annotate key clauses..."
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-bold outline-none"
+                    />
+                </div>
+
+                {(readingMode === 'external_link' || readingMode === 'hybrid') && (
+                    <div className="p-4 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200/70 dark:border-indigo-500/30 space-y-2.5">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                            <LinkIcon size={13} /> External Resource URL (PDF, Perseus Digital Library, Google Doc, or Article)
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                            <input
+                                type="url"
+                                value={externalUrl}
+                                onChange={(e) => setExternalUrl(e.target.value)}
+                                placeholder="https://..."
+                                className="sm:col-span-8 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold outline-none"
+                            />
+                            <input
+                                type="text"
+                                value={sourceCitation}
+                                onChange={(e) => setSourceCitation(e.target.value)}
+                                placeholder="Source Citation (optional)"
+                                className="sm:col-span-4 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold outline-none"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {(readingMode === 'passage' || readingMode === 'hybrid') && (
+                    <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                            Passage Content (Separate paragraphs with a new line so students can annotate each section)
+                        </label>
+                        <textarea
+                            rows={8}
+                            lang={language}
+                            translate="no"
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            placeholder="Gallia est omnis divisa in partes tres..."
+                            className="notranslate w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-serif leading-relaxed outline-none custom-scrollbar"
+                        />
+                    </div>
+                )}
+
+                {/* Interactive Glossary Builder */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">
+                        Tap-to-Define Glossary ({glossary.length} terms)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                        <input
+                            type="text"
+                            translate="no"
+                            value={newTerm}
+                            onChange={(e) => setNewTerm(e.target.value)}
+                            placeholder="Word in text (e.g. divisa)"
+                            className="notranslate sm:col-span-4 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-black"
+                        />
+                        <select
+                            value={newPos}
+                            onChange={(e) => setNewPos(e.target.value)}
+                            className="sm:col-span-2 px-2 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                        >
+                            <option value="noun">Noun</option>
+                            <option value="verb">Verb</option>
+                            <option value="adj">Adj</option>
+                            <option value="prep">Prep</option>
+                        </select>
+                        <input
+                            type="text"
+                            value={newDef}
+                            onChange={(e) => setNewDef(e.target.value)}
+                            placeholder="Definition / morphology note..."
+                            className="sm:col-span-4 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-bold"
+                        />
+                        <button
+                            type="button"
+                            onClick={addGlossTerm}
+                            className="sm:col-span-2 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase"
+                        >
+                            + Add
+                        </button>
+                    </div>
+                    {glossary.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                            {glossary.map((g) => (
+                                <span
+                                    key={g.id}
+                                    className="px-3 py-1 rounded-xl bg-white dark:bg-slate-900 border text-xs flex items-center gap-1.5"
+                                >
+                                    <strong translate="no" className="notranslate text-indigo-600">{g.term}</strong>: {g.definition}
+                                    <button
+                                        type="button"
+                                        onClick={() => setGlossary(glossary.filter(i => i.id !== g.id))}
+                                        className="text-slate-400 hover:text-rose-500"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Checkpoints */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                            Comprehension Checkpoints ({checkpoints.length})
+                        </span>
+                        <button
+                            type="button"
+                            onClick={addCheckpointQuestion}
+                            className="px-3 py-1 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase"
+                        >
+                            + Add Question
+                        </button>
+                    </div>
+                    {checkpoints.map((cp, idx) => (
+                        <div key={cp.id} className="p-3 rounded-xl bg-white dark:bg-slate-900 border space-y-2">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={cp.question}
+                                    onChange={(e) => {
+                                        const next = [...checkpoints];
+                                        next[idx] = { ...cp, question: e.target.value };
+                                        setCheckpoints(next);
+                                    }}
+                                    className="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border text-xs font-black"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setCheckpoints(checkpoints.filter(i => i.id !== cp.id))}
+                                    className="text-rose-500"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {cp.options.map((opt: any, oIdx: number) => (
+                                    <div key={opt.id} className="flex items-center gap-1">
+                                        <input
+                                            type="radio"
+                                            checked={cp.correctId === opt.id}
+                                            onChange={() => {
+                                                const next = [...checkpoints];
+                                                next[idx] = { ...cp, correctId: opt.id };
+                                                setCheckpoints(next);
+                                            }}
+                                        />
+                                        <input
+                                            type="text"
+                                            value={opt.text}
+                                            onChange={(e) => {
+                                                const next = [...checkpoints];
+                                                const opts = [...cp.options];
+                                                opts[oIdx] = { ...opt, text: e.target.value };
+                                                next[idx] = { ...cp, options: opts };
+                                                setCheckpoints(next);
+                                            }}
+                                            className="w-full px-2 py-1 rounded bg-slate-50 dark:bg-slate-950 border text-[11px] font-bold"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Right 4 Cols: Assign to Cohorts & Saved Readings Library */}
+            <div className="lg:col-span-4 space-y-6">
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-6 shadow-xl space-y-4">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                        Assign to Classes / Cohorts
+                    </span>
+                    <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar">
+                        {(instructorClasses || []).map((cls: any) => {
+                            const isChecked = selectedClassIds.includes(cls.id);
+                            return (
+                                <label
+                                    key={cls.id}
+                                    className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer ${
+                                        isChecked
+                                            ? 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-500'
+                                            : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+                                    }`}
+                                >
+                                    <div>
+                                        <div className="text-xs font-black text-slate-800 dark:text-white">{cls.name}</div>
+                                        <div className="text-[10px] font-bold text-slate-400">Code: {cls.code}</div>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() =>
+                                            setSelectedClassIds(prev =>
+                                                isChecked ? prev.filter(id => id !== cls.id) : [...prev, cls.id]
+                                            )
+                                        }
+                                    />
+                                </label>
+                            );
+                        })}
+                        {(!instructorClasses || instructorClasses.length === 0) && (
+                            <p className="text-xs text-slate-400 font-bold">No classes created yet—reading will save to your Vault.</p>
+                        )}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={handleSaveAndPublishReading}
+                        className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+                    >
+                        <School size={15} />
+                        {selectedClassIds.length > 0
+                            ? `Save & Assign to ${selectedClassIds.length} Class(es)`
+                            : 'Save Reading to Library'}
+                    </button>
+                </div>
+
+                {/* Existing Readings Quick-Assign */}
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-6 shadow-xl space-y-3">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">
+                        Saved Readings ({existingReadings.length})
+                    </h4>
+                    <div className="space-y-2.5 max-h-80 overflow-y-auto custom-scrollbar">
+                        {existingReadings.map((r: any) => (
+                            <div key={r.id} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-black text-slate-800 dark:text-white truncate">{r.title}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => loadReadingForEdit(r)}
+                                        className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase shrink-0"
+                                    >
+                                        Edit
+                                    </button>
+                                </div>
+                                {instructorClasses?.length > 0 && (
+                                    <select
+                                        defaultValue=""
+                                        onChange={async (e) => {
+                                            if (e.target.value) {
+                                                await assignReadingToClassEverywhere(e.target.value, r);
+                                                if (onToast) onToast(`Assigned "${r.title}" to class! 📖`);
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                        className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border text-[10px] font-black"
+                                    >
+                                        <option value="">+ Quick-Assign to Class...</option>
+                                        {instructorClasses.map((c: any) => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================================
 //  MAIN BUILDER HUB
 // ============================================================================
 export default function BuilderHub({ 
@@ -353,18 +886,20 @@ export default function BuilderHub({
   onDeleteCard, 
   onSaveLesson,
   onSaveCurriculum, 
+  onAssign,
+  onStartMarbleScrabble,
   allDecks, 
   onPublishDeck,       
-  instructorClasses,   
-  lessons, 
-  curriculums, 
+  instructorClasses = [],   
+  lessons = [], 
+  curriculums = [], 
   initialMode, 
   onClearMode,
-  targetLessonId,     
-  clearTargetLesson   
+  targetLessonId,      
+  clearTargetLesson    
 }: any) {
-  const [lessonData, setLessonData] = useState<any>({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
-  const [mode, setMode] = useState<'card' | 'lesson' | 'exam' | 'arcade' | 'curriculum'>(initialMode || 'card'); 
+  const [lessonData, setLessonData] = useState<any>({ title: '', subtitle: '', language: 'la', blocks: [], theme: 'indigo' });
+  const [mode, setMode] = useState<'card' | 'lesson' | 'reading' | 'exam' | 'arcade' | 'curriculum'>(initialMode || 'card'); 
   
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [isPreviewActive, setIsPreviewActive] = useState(false);
@@ -373,23 +908,73 @@ export default function BuilderHub({
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [triggerAiModal, setTriggerAiModal] = useState(false);
 
+  // 🔥 Live WordForge Host Modal State (Allows launching WordForge directly from BuilderHub!)
+  const [wfLaunchClassId, setWfLaunchClassId] = useState<string>(instructorClasses?.[0]?.id || '');
+  const [wfSelectedDeckKey, setWfSelectedDeckKey] = useState<string>('salutationes');
+  const [activeWordForgeHost, setActiveWordForgeHost] = useState<{ classId: string; block: any } | null>(null);
+  const [wfLiveState, setWfLiveState] = useState<any>({});
+
+  useEffect(() => {
+    if (!wfLaunchClassId && instructorClasses?.length > 0) {
+      setWfLaunchClassId(instructorClasses[0].id);
+    }
+  }, [instructorClasses, wfLaunchClassId]);
+
+  // Sync live_sessions/{classId} when hosting WordForge directly from BuilderHub
+  useEffect(() => {
+    if (!activeWordForgeHost?.classId) return;
+    const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', activeWordForgeHost.classId);
+    const unsub = onSnapshot(sessionRef, (snap) => {
+      if (snap.exists()) {
+        setWfLiveState(snap.data() as Record<string, any>);
+      }
+    });
+    return () => unsub();
+  }, [activeWordForgeHost?.classId]);
+
+  const handleUpdateWordForgeSession = useCallback(
+    async (updates: any) => {
+      if (!activeWordForgeHost?.classId) return;
+      const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', activeWordForgeHost.classId);
+      await setDoc(
+        sessionRef,
+        {
+          ...updates,
+          classId: activeWordForgeHost.classId,
+          type: 'marble-scrabble',
+          currentQuestion: {
+            ...activeWordForgeHost.block,
+            gameType: 'marble-scrabble'
+          },
+          updatedAt: Date.now()
+        },
+        { merge: true }
+      ).catch(() => {});
+    },
+    [activeWordForgeHost]
+  );
+
   // Catch intent from Dashboard
   useEffect(() => {
     if (targetLessonId) {
         if (targetLessonId === 'new') {
             setMode('lesson');
-            setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
+            setLessonData({ title: '', subtitle: '', language: 'la', blocks: [], theme: 'indigo' });
         } 
         else if (targetLessonId === 'generate') {
             setMode('lesson');
-            setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
+            setLessonData({ title: '', subtitle: '', language: 'la', blocks: [], theme: 'indigo' });
             setTriggerAiModal(true);
         } 
         else {
             const lessonToEdit = lessons.find((l: any) => l.id === targetLessonId);
             if (lessonToEdit) {
-                setMode('lesson');
-                setLessonData(lessonToEdit);
+                if (lessonToEdit.type === 'reading' || lessonToEdit.contentType === 'reading') {
+                    setMode('reading');
+                } else {
+                    setMode('lesson');
+                    setLessonData(lessonToEdit);
+                }
             }
         }
         if (clearTargetLesson) clearTargetLesson();
@@ -407,9 +992,10 @@ export default function BuilderHub({
   const modes = [
     { id: 'card', label: 'Flashcards', icon: <Layers size={16}/> },
     { id: 'lesson', label: 'Interactive Lesson', icon: <BookOpen size={16}/> },
+    { id: 'reading', label: 'Readings & Links', icon: <BookText size={16}/> },
     { id: 'exam', label: 'Assessment', icon: <FileText size={16}/> },
-    { id: 'arcade', label: 'Arcade Game', icon: <Gamepad2 size={16}/> },
-    { id: 'curriculum', label: 'Pathway Map', icon: <Map size={16}/> } 
+    { id: 'arcade', label: 'Arcade & WordForge', icon: <Gamepad2 size={16}/> },
+    { id: 'curriculum', label: 'Pathway Map', icon:  } 
   ];
 
   // --- INJECT A KINETIC CANVAS LAB BLOCK INTO LESSON DATA ---
@@ -428,6 +1014,55 @@ export default function BuilderHub({
         blocks: [...(prev.blocks || []), newBlock]
     }));
     setToastMsg(`Added "${clonedPreset.title}" to Lesson! ✨`);
+  };
+
+  // --- INJECT A WORDFORGE (MARBLE-SCRABBLE) GAME BLOCK INTO LESSON DATA ---
+  const handleAddWordForgeBlockToLesson = () => {
+    const chosenDeck = allDecks?.[wfSelectedDeckKey] || Object.values(allDecks || {})[0];
+    const deckItems = Array.isArray(chosenDeck?.cards)
+      ? chosenDeck.cards.map((c: any) => ({ term: c.front || c.term, definition: c.back || c.definition }))
+      : [];
+
+    const wfBlock = {
+      id: `wordforge_${Date.now()}`,
+      type: 'game',
+      gameType: 'marble-scrabble',
+      title: `WordForge Arena: ${chosenDeck?.title || 'Vocabulary Discovery'}`,
+      timePerTurnSeconds: 90,
+      items: deckItems
+    };
+
+    setLessonData((prev: any) => ({
+      ...prev,
+      blocks: [...(prev.blocks || []), wfBlock]
+    }));
+    setToastMsg('Added 3D WordForge Arena Slide to Lesson! 🎲');
+  };
+
+  // --- LAUNCH WORDFORGE LIVE ON SMARTBOARD FOR SELECTED CLASS ---
+  const handleLaunchLiveWordForge = () => {
+    const targetClsId = wfLaunchClassId || instructorClasses?.[0]?.id || 'LIVE_ARENA';
+    const chosenDeck = allDecks?.[wfSelectedDeckKey] || Object.values(allDecks || {})[0];
+    const deckItems = Array.isArray(chosenDeck?.cards)
+      ? chosenDeck.cards.map((c: any) => ({ term: c.front || c.term, definition: c.back || c.definition }))
+      : [];
+
+    if (onStartMarbleScrabble && wfSelectedDeckKey && targetClsId) {
+      onStartMarbleScrabble(wfSelectedDeckKey, targetClsId);
+      return;
+    }
+
+    setActiveWordForgeHost({
+      classId: targetClsId,
+      block: {
+        id: `wf_live_${Date.now()}`,
+        type: 'game',
+        gameType: 'marble-scrabble',
+        title: `WordForge: ${chosenDeck?.title || 'Live Vocabulary Arena'}`,
+        timePerTurnSeconds: 90,
+        items: deckItems
+      }
+    });
   };
 
   const handleUpdateKineticBlock = (blockId: string, updatedBlock: any) => {
@@ -449,7 +1084,7 @@ export default function BuilderHub({
     onSaveLesson(payload, lessonData.id || null);
     setToastMsg(mode === 'arcade' ? "Arcade Game Committed! 🎮" : "Unit Committed! 📚");
     if (mode === 'lesson') {
-        setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
+        setLessonData({ title: '', subtitle: '', language: 'la', blocks: [], theme: 'indigo' });
     } else if (mode === 'arcade') {
         setLessonData({ title: '', description: '', gameTemplate: 'connect-three', targetScore: 3, mode: 'pvp', deckIds: [] });
     }
@@ -457,24 +1092,68 @@ export default function BuilderHub({
 
   const kineticBlocks = (lessonData?.blocks || []).filter((b: any) => b?.type === 'kinetic_canvas');
 
+  // If hosting WordForge live directly from BuilderHub, render the full-screen Projector Arena
+  if (activeWordForgeHost) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col">
+        <button
+          type="button"
+          onClick={async () => {
+            await deleteDoc(doc(db, 'artifacts', appId, 'live_sessions', activeWordForgeHost.classId)).catch(() => {});
+            setActiveWordForgeHost(null);
+            setWfLiveState({});
+          }}
+          className="absolute top-4 left-4 z-[9999] bg-slate-900/90 hover:bg-rose-600 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-700 flex items-center gap-1.5 shadow-xl"
+        >
+          <ArrowLeft size={14} /> End WordForge Broadcast
+        </button>
+        <MarbleScrabble
+          block={activeWordForgeHost.block}
+          classId={activeWordForgeHost.classId}
+          isProjector={true}
+          liveState={wfLiveState}
+          studentId="projector"
+          onUpdateLiveState={handleUpdateWordForgeSession}
+        />
+      </div>
+    );
+  }
+
   return ( 
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 relative transition-colors">
       {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
       {/* TOP HEADER */}
       <header className="h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 flex justify-between items-center shrink-0 z-40 select-none">
-        
         <div className="flex items-center gap-4 flex-1">
             <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hidden sm:flex">
                 <PenTool size={20} />
             </div>
             <div>
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">Studio</h2>
-                <p className="text-xs font-medium text-slate-500 mt-0.5">Build and edit curriculum</p>
+                <p className="text-xs font-medium text-slate-500 mt-0.5">Build, link, and launch curriculum</p>
             </div>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
+          {mode === 'lesson' && (
+            <div className="hidden md:flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+              <Globe size={14} className="text-indigo-500" />
+              <select
+                value={lessonData.language || 'la'}
+                onChange={(e) => setLessonData((prev: any) => ({ ...prev, language: e.target.value }))}
+                className="bg-transparent text-xs font-black text-slate-700 dark:text-slate-200 outline-none"
+                title="Target Language Lock (Prevents Browser Auto-Translate)"
+              >
+                <option value="la">Lang: Latin (la)</option>
+                <option value="es">Lang: Spanish (es)</option>
+                <option value="en">Lang: English (en)</option>
+                <option value="fr">Lang: French (fr)</option>
+                <option value="de">Lang: German (de)</option>
+              </select>
+            </div>
+          )}
+
           <button 
               onClick={() => setIsToolsOpen(!isToolsOpen)} 
               className={`p-2.5 rounded-xl transition-all border ${isToolsOpen ? 'bg-indigo-600 border-indigo-500 text-white shadow-md' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300'}`} 
@@ -492,7 +1171,7 @@ export default function BuilderHub({
             </button>
           )}
 
-          {mode !== 'exam' && mode !== 'card' && mode !== 'curriculum' && (
+          {mode !== 'exam' && mode !== 'card' && mode !== 'curriculum' && mode !== 'reading' && (
             <button onClick={handleCommit} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white shadow-md transition-all active:scale-95 ${mode === 'arcade' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/20'}`}>
                 Save
             </button>
@@ -514,7 +1193,7 @@ export default function BuilderHub({
         <div className="h-full flex flex-col w-full overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out">
           
           {/* TAB SELECTOR */}
-          <div className="w-full px-6 pt-6 pb-2 shrink-0 max-w-5xl mx-auto select-none">
+          <div className="w-full px-6 pt-6 pb-2 shrink-0 max-w-6xl mx-auto select-none">
               <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-2xl w-full sm:w-fit overflow-x-auto shadow-inner border border-slate-200/50 dark:border-slate-800 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   {modes.map((m) => {
                       const isActive = mode === m.id;
@@ -524,7 +1203,7 @@ export default function BuilderHub({
                               onClick={() => {
                                   setMode(m.id as any);
                                   if (m.id === 'arcade') setLessonData({ title: '', description: '', gameTemplate: 'connect-three', targetScore: 3, mode: 'pvp', deckIds: [] });
-                                  if (m.id === 'lesson') setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
+                                  if (m.id === 'lesson') setLessonData({ title: '', subtitle: '', language: 'la', blocks: [], theme: 'indigo' });
                               }} 
                               className={`flex-1 sm:flex-none min-w-fit px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                                   isActive 
@@ -541,7 +1220,7 @@ export default function BuilderHub({
           </div>
 
           {/* BUILDER CONTENT */}
-          <div className="flex-1 p-6 md:p-8 pt-4 mx-auto w-full max-w-5xl animate-in fade-in duration-500 space-y-8">
+          <div className="flex-1 p-6 md:p-8 pt-4 mx-auto w-full max-w-6xl animate-in fade-in duration-500 space-y-8">
             {mode === 'card' && (
                 <CardBuilderView 
                     onSaveCard={onSaveCard} 
@@ -555,7 +1234,7 @@ export default function BuilderHub({
 
             {mode === 'lesson' && (
                 <>
-                    {/* 🔥 KINETIC CANVAS 2.0: 1-CLICK MULTI-MODAL PRESET DOCK */}
+                    {/* 🔥 KINETIC CANVAS 2.0 + WORDFORGE 1-CLICK MULTI-MODAL PRESET DOCK */}
                     <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-950 text-white p-5 sm:p-6 rounded-[2.2rem] border border-indigo-500/30 shadow-xl space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3.5">
@@ -565,7 +1244,7 @@ export default function BuilderHub({
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
-                                            Storyline 360 Engine • 1-Click Templates
+                                            Storyline 360 & WordForge Engine • 1-Click Templates
                                         </span>
                                         {kineticBlocks.length > 0 && (
                                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase">
@@ -574,21 +1253,30 @@ export default function BuilderHub({
                                         )}
                                     </div>
                                     <h3 className="text-base sm:text-lg font-black tracking-tight">
-                                        Insert a Multi-Modal Kinetic Canvas Slide
+                                        Insert an Interactive Kinetic Canvas or WordForge Arena Slide
                                     </h3>
                                 </div>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => handleAddKineticBlock('blank')}
-                                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 border border-white/15"
-                            >
-                                <Plus size={12} /> 📄 Blank Slide
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleAddWordForgeBlockToLesson}
+                                    className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+                                >
+                                    <Plus size={12} /> 🎲 WordForge Arena Slide
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleAddKineticBlock('blank')}
+                                    className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 border border-white/15"
+                                >
+                                    <Plus size={12} /> 📄 Blank Canvas
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Row 1: The 4 New Multi-Modal Storyline 360 Templates */}
+                        {/* Row 1: The 4 Multi-Modal Storyline 360 Templates */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-white/10">
                             <button
                                 type="button"
@@ -672,6 +1360,27 @@ export default function BuilderHub({
                         </div>
                     </div>
 
+                    {/* 🔥 RENDER VISUAL EDITORS FOR ANY KINETIC CANVAS BLOCKS IN THIS LESSON */}
+                    {kineticBlocks.length > 0 && (
+                        <div className="space-y-6">
+                            {kineticBlocks.map((kb: any) => (
+                                <div key={kb.id} className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveKineticBlock(kb.id)}
+                                        className="absolute top-6 right-6 z-20 px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 hover:bg-rose-100"
+                                    >
+                                        <Trash2 size={12} /> Remove Canvas Slide
+                                    </button>
+                                    <KineticCanvasBuilder
+                                        block={kb}
+                                        onChange={(updated: any) => handleUpdateKineticBlock(kb.id, updated)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {/* EXISTING LESSON BUILDER VIEW */}
                     <LessonBuilderView 
                         data={lessonData} 
@@ -685,6 +1394,17 @@ export default function BuilderHub({
                 </>
             )}
 
+            {/* 🔥 NEW MODE: READINGS & EXTERNAL SOURCE LINKS */}
+            {mode === 'reading' && (
+                <ReadingStudioPanel
+                    lessons={lessons}
+                    instructorClasses={instructorClasses}
+                    onSaveLesson={onSaveLesson}
+                    onAssign={onAssign}
+                    onToast={(msg: string) => setToastMsg(msg)}
+                />
+            )}
+
             {mode === 'exam' && (
                 <ExamBuilderView 
                     onSave={(examObj: any) => { 
@@ -695,11 +1415,79 @@ export default function BuilderHub({
             )}
 
             {mode === 'arcade' && (
-                <ArcadeBuilderView 
-                    data={lessonData} 
-                    setData={setLessonData} 
-                    availableDecks={allDecks} 
-                />
+                <div className="space-y-8">
+                    {/* 🔥 WORDFORGE (MARBLE-SCRABBLE) LIVE SMARTBOARD LAUNCHER & DECK LINKER */}
+                    <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white p-6 sm:p-8 rounded-[2.5rem] border border-indigo-500/40 shadow-2xl space-y-6">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <span className="px-3 py-1 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30 text-[10px] font-black uppercase tracking-widest">
+                                    3D Multiplayer Vocabulary Arena
+                                </span>
+                                <h3 className="text-2xl font-black tracking-tight mt-2">
+                                    WordForge Live Smartboard Launcher
+                                </h3>
+                                <p className="text-xs font-medium text-indigo-200 mt-1">
+                                    Select a Class Cohort and a Vocabulary Deck below to launch a live 3D WordForge session on your Smartboard—students join automatically from their class screen or QR code!
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                            <div className="md:col-span-4">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-300 block mb-1.5">
+                                    Target Class / Cohort
+                                </label>
+                                <select
+                                    value={wfLaunchClassId}
+                                    onChange={(e) => setWfLaunchClassId(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-xs font-black text-white outline-none"
+                                >
+                                    {instructorClasses.map((cls: any) => (
+                                        <option key={cls.id} value={cls.id}>
+                                            {cls.name} (Code: {cls.code})
+                                        </option>
+                                    ))}
+                                    {instructorClasses.length === 0 && (
+                                        <option value="LIVE_ARENA">Open Sandbox Room (Code: LIVE_A)</option>
+                                    )}
+                                </select>
+                            </div>
+
+                            <div className="md:col-span-4">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-300 block mb-1.5">
+                                    Bonus Curriculum Deck (+15 XP per Word)
+                                </label>
+                                <select
+                                    value={wfSelectedDeckKey}
+                                    onChange={(e) => setWfSelectedDeckKey(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-xs font-black text-white outline-none"
+                                >
+                                    {Object.entries(allDecks || {}).map(([key, d]: any) => (
+                                        <option key={key} value={key}>
+                                            {d.title || key} ({(d.cards || []).length} words)
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="md:col-span-4">
+                                <button
+                                    type="button"
+                                    onClick={handleLaunchLiveWordForge}
+                                    className="w-full py-3.5 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/40 flex items-center justify-center gap-2 transition-all active:scale-95 border border-indigo-400/40"
+                                >
+                                    <Rocket size={16} /> Launch Live WordForge Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ArcadeBuilderView 
+                        data={lessonData} 
+                        setData={setLessonData} 
+                        availableDecks={allDecks} 
+                    />
+                </div>
             )}
 
             {mode === 'curriculum' && (
