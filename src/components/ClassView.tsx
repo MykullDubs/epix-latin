@@ -5,12 +5,12 @@ import {
     MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, 
     ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, 
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
-    Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation,
+    PenTool, Crosshair, Eraser, Wrench, Highlighter, Presentation,
     ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen, Volume2,
     AlertCircle, Download, LayoutGrid, Check, Maximize, Keyboard, Monitor,
-    GitBranch, Tag, Sparkles, BookmarkPlus
+    GitBranch, Tag, Sparkles, BookmarkPlus, Radio, Trash2
 } from 'lucide-react';
-import { collection, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
@@ -38,7 +38,6 @@ export interface LexiconEntry {
 
 const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
-// Built-in seed entries for instant offline/classical demonstration
 const BUILTIN_LEXICON: Record<string, LexiconEntry> = {
     salve: {
         term: 'Salvē',
@@ -106,7 +105,7 @@ const BUILTIN_LEXICON: Record<string, LexiconEntry> = {
 };
 
 // ============================================================================
-//  MEMOIZED PERFORMANCE COMPONENTS (Clock, Footer, Timer)
+//  MEMOIZED PERFORMANCE COMPONENTS (Clock)
 // ============================================================================
 const LiveClock = memo(() => {
     const [elapsed, setElapsed] = useState(0);
@@ -140,7 +139,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     const [wbPage, setWbPage] = useState(0);
     const [isIdle, setIsIdle] = useState(false);
 
-    // 🔥 DICTIONARY & TRANSLATION SLIDE-DOWN STATE
+    // DICTIONARY & TRANSLATION SLIDE-DOWN STATE
     const [showLexicon, setShowLexicon] = useState(false);
     const [lexiconQuery, setLexiconQuery] = useState('');
     const [targetLang, setTargetLang] = useState<string>(lesson?.language || 'en');
@@ -187,7 +186,17 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
     const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz, updateLiveState } = useLiveClass(classId, true);
 
-    // Normalize blocks so even raw flashcard decks or readings project cleanly
+    // Unified Student Counter across `students`, `joined`, and `players` maps
+    const connectedStudentCount = useMemo(() => {
+        const ids = new Set<string>([
+            ...Object.keys(liveState?.students || {}),
+            ...Object.keys(liveState?.joined || {}),
+            ...Object.keys(liveState?.players || {})
+        ]);
+        return ids.size;
+    }, [liveState?.students, liveState?.joined, liveState?.players]);
+
+    // Normalize blocks so raw flashcard decks, `'deck'` blocks, or readings project cleanly
     const normalizedBlocks = useMemo(() => {
         if (Array.isArray(lesson?.blocks) && lesson.blocks.length > 0) return lesson.blocks;
         if (Array.isArray(lesson?.cards) && lesson.cards.length > 0) {
@@ -205,9 +214,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         return imgBlock ? (imgBlock.url || imgBlock.imageUrl) : null;
     }, [normalizedBlocks]);
 
+    // Extract vocabulary from BOTH `'vocab-list'` and `'deck'` blocks
     const lessonVocab = useMemo(() => {
         if (!normalizedBlocks.length) return [];
-        return normalizedBlocks.filter((b: any) => String(b.type) === 'vocab-list').flatMap((b: any) => b.items || []);
+        return normalizedBlocks
+            .filter((b: any) => ['vocab-list', 'deck'].includes(String(b.type)))
+            .flatMap((b: any) => b.items || b.cards || []);
     }, [normalizedBlocks]);
 
     // Build a fast local dictionary map from the lesson's own vocab cards, glossary, and built-in seed terms
@@ -260,7 +272,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         const grouped: any[] = [];
         let buffer: any[] = [];
         const interactables = [
-            'quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game',
+            'quiz', 'flashcard', 'deck', 'vocab-list', 'scenario', 'fill-blank', 'discussion', 'game',
             'drag-drop', 'pronunciation', 'roleplay', 'audio-story', 'image-hotspot',
             'drawing', 'code', 'timeline', 'grammar', 'kinetic_canvas'
         ];
@@ -276,8 +288,16 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         return grouped;
     }, [normalizedBlocks]);
 
+    // Helper to leave Lobby and sync `started: true` to connected student devices
+    const startBroadcastFromLobby = useCallback(() => {
+        setIsLobby(false);
+        setActivePageIdx(0);
+        updateLiveState({ started: true, currentBlockIndex: 0 });
+        changeSlide(0);
+    }, [updateLiveState, changeSlide]);
+
     // ============================================================================
-    //  🔥 LEXICON LOOKUP & TRANSLATION ENGINE + SAVE TO CLASS DECK
+    //  LEXICON LOOKUP & TRANSLATION ENGINE + SAVE TO CLASS DECK
     // ============================================================================
     const lookupWordInLexicon = useCallback(async (rawInput: string) => {
         const cleaned = (rawInput || '').replace(/[.,;!?:"'()[\]]/g, '').trim();
@@ -373,7 +393,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 return;
             }
 
-            // Fallback morphological & translation breakdown for inflected Latin / target-language words
             let inferredPos = 'Noun / Inflected Form';
             if (lower.endsWith('re') || lower.endsWith('t') || lower.endsWith('nt')) inferredPos = 'Verb (Inflected / Infinitive)';
             else if (lower.endsWith('us') || lower.endsWith('a') || lower.endsWith('um') || lower.endsWith('is')) inferredPos = 'Noun / Adjective (Declined)';
@@ -410,7 +429,18 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         }
     }, [localLexiconMap, targetLang, lesson?.title]);
 
-    // 🔥 1-CLICK SAVE TO CLASS FLASHCARD DECK
+    const handleBroadcastLexiconEntry = () => {
+        if (!activeLexiconEntry) return;
+        updateLiveState({
+            broadcastedLexicon: {
+                ...activeLexiconEntry,
+                timestamp: Date.now()
+            }
+        });
+        setLexiconToast(`Broadcasted "${activeLexiconEntry.term}" to connected student devices!`);
+        setTimeout(() => setLexiconToast(null), 3000);
+    };
+
     const handleSaveEntryToClassDeck = async () => {
         if (!activeLexiconEntry || isSavingToDeck) return;
         setIsSavingToDeck(true);
@@ -445,10 +475,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 createdAt: Date.now()
             };
 
-            // 1. Write card to Firestore custom_cards collection
             await setDoc(doc(db, 'artifacts', appId, 'custom_cards', cardId), newCardPayload);
 
-            // 2. If a classId is active, ensure this class deck is assigned to the class so students see it immediately
             if (classId) {
                 const deckAssignment = {
                     id: deckId,
@@ -466,7 +494,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 ).catch(() => {});
             }
 
-            // 3. Also invoke parent callback if provided
             if (onSaveCard) {
                 onSaveCard(newCardPayload);
             }
@@ -491,7 +518,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         window.speechSynthesis.speak(u);
     };
 
-    // Double-click any word on the Smartboard stage to inspect it in the slide-down
     const handleStageDoubleClick = () => {
         if (isAnnotating || showWhiteboard) return;
         const selected = window.getSelection()?.toString().trim();
@@ -537,12 +563,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         } else if (isLobby && liveState?.started) {
             setIsLobby(false);
         }
-    }, [liveState?.currentBlockIndex, liveState?.started]);
+    }, [liveState?.currentBlockIndex, liveState?.started, activePageIdx, isLobby]);
 
     // Initialize Class
     useEffect(() => {
-        if (!lesson?.id) return;
-        startLiveClass(lesson.id);
+        const lessonIdentifier = lesson?.id || lesson?.title || 'smartboard_session';
+        startLiveClass(lessonIdentifier);
         updateLiveState({ started: false }); 
 
         if (timerRef.current) timerRef.current.style.transform = localStorage.getItem('timerPos') || `translate(${window.innerWidth - 350}px, 50px)`;
@@ -550,7 +576,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         if (mainToolsRef.current) mainToolsRef.current.style.transform = localStorage.getItem('toolsPos') || `translate(${window.innerWidth - 320}px, ${window.innerHeight - 500}px)`;
 
         return () => { endLiveClass(); };
-    }, [lesson?.id]);
+    }, [lesson?.id, lesson?.title]);
 
     // Timer Logic
     useEffect(() => {
@@ -567,7 +593,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         return () => clearInterval(interval);
     }, [timerRunning, timeLeft]);
 
-    // Canvas Resizing & Redrawing
+    // High-DPI-Safe Canvas Resizing & Redrawing
     const redrawCanvas = useCallback(() => {
         const dpr = window.devicePixelRatio || 1;
         const targetCanvas = showWhiteboard ? boardCanvasRef.current : slideCanvasRef.current;
@@ -579,7 +605,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         
         const ctx = targetCanvas.getContext('2d');
         if (!ctx) return;
-        ctx.scale(dpr, dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
@@ -634,7 +660,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         window.addEventListener('pointerup', onUp);
     };
 
-    // Drawing Handlers
+    // High-DPI-Safe Drawing Handlers
     const startAnnotation = (e: React.PointerEvent) => {
         if (!isAnnotating) return;
         const rect = classViewRef.current?.getBoundingClientRect();
@@ -643,11 +669,18 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         isDrawing.current = true;
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
+        const dpr = window.devicePixelRatio || 1;
+
+        // If whiteboard background is light and marker is white, use dark slate ink so it's visible
+        const effectiveColor =
+            showWhiteboard && wbBg === 'light' && markerColor.toLowerCase() === '#ffffff'
+                ? '#0f172a'
+                : markerColor;
 
         currentStroke.current = {
             id: Date.now().toString(),
             points: [{ x, y }],
-            color: markerStyle === 'eraser' ? '#000' : markerColor,
+            color: markerStyle === 'eraser' ? '#000' : effectiveColor,
             size: markerStyle === 'highlighter' ? markerSize * 4 : markerStyle === 'eraser' ? 40 : markerSize,
             isEraser: markerStyle === 'eraser',
             style: markerStyle
@@ -656,6 +689,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         const targetCanvas = showWhiteboard ? boardCanvasRef.current : slideCanvasRef.current;
         const ctx = targetCanvas?.getContext('2d');
         if (ctx) {
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.beginPath();
             ctx.strokeStyle = currentStroke.current.color;
             ctx.lineWidth = currentStroke.current.size;
@@ -690,13 +726,16 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     const stopAnnotation = (e: React.PointerEvent) => {
         if (!isDrawing.current) return;
         isDrawing.current = false;
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        try {
+            (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        } catch {}
 
         if (currentStroke.current) {
+            const finishedStroke = currentStroke.current;
             if (showWhiteboard) {
-                setWbStrokesByPage(prev => ({ ...prev, [wbPage]: [...(prev[wbPage] || []), currentStroke.current!] }));
+                setWbStrokesByPage(prev => ({ ...prev, [wbPage]: [...(prev[wbPage] || []), finishedStroke] }));
             } else {
-                setStrokesByPage(prev => ({ ...prev, [activePageIdx]: [...(prev[activePageIdx] || []), currentStroke.current!] }));
+                setStrokesByPage(prev => ({ ...prev, [activePageIdx]: [...(prev[activePageIdx] || []), finishedStroke] }));
             }
         }
         currentStroke.current = null;
@@ -713,6 +752,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 const arr = prev[activePageIdx] || [];
                 return { ...prev, [activePageIdx]: arr.slice(0, -1) };
             });
+        }
+        setTimeout(redrawCanvas, 10);
+    }, [showWhiteboard, wbPage, activePageIdx, redrawCanvas]);
+
+    const handleClearAnnotations = useCallback(() => {
+        if (showWhiteboard) {
+            setWbStrokesByPage(prev => ({ ...prev, [wbPage]: [] }));
+        } else {
+            setStrokesByPage(prev => ({ ...prev, [activePageIdx]: [] }));
         }
         setTimeout(redrawCanvas, 10);
     }, [showWhiteboard, wbPage, activePageIdx, redrawCanvas]);
@@ -737,9 +785,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         if (index >= 0 && index < pages.length) {
             setSlideDirection(index > activePageIdx ? 'right' : 'left');
             setActivePageIdx(index);
+            setIsLobby(false);
+            updateLiveState({ started: true, currentBlockIndex: index });
             changeSlide(index);
         }
-    }, [activePageIdx, pages.length, changeSlide]);
+    }, [activePageIdx, pages.length, changeSlide, updateLiveState]);
 
     const toggleLexiconDrawer = useCallback(() => {
         setShowLexicon(prev => {
@@ -776,7 +826,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 case 'arrowright':
                 case ' ':
                     e.preventDefault(); 
-                    if (isLobby) setIsLobby(false); else jumpToSlide(activePageIdx + 1);
+                    if (isLobby) startBroadcastFromLobby(); else jumpToSlide(activePageIdx + 1);
                     break;
                 case 'arrowleft':
                     e.preventDefault(); 
@@ -829,10 +879,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activePageIdx, isLobby, jumpToSlide, handleUndo, activeRoleplayBlock, showExitConfirm, showLexicon, showShortcuts, showGrid, showQR, showForum, showTimer, showTools, isAnnotating, isSpotlight, showWhiteboard, toggleLexiconDrawer]);
+    }, [activePageIdx, isLobby, startBroadcastFromLobby, jumpToSlide, handleUndo, activeRoleplayBlock, showExitConfirm, showLexicon, showShortcuts, showGrid, showQR, showForum, showTimer, showTools, isAnnotating, isSpotlight, showWhiteboard, toggleLexiconDrawer]);
 
     const activePage = pages[activePageIdx];
     if (!lesson || !pages.length) return <div className="h-screen bg-slate-950 flex items-center justify-center text-white text-2xl font-bold">No lesson content found.</div>;
+
+    const hasWideStageBlock = activePage?.blocks?.some((b: any) =>
+        ['kinetic_canvas', 'game', 'arcade_game'].includes(String(b?.type || ''))
+    );
 
     const joinUrl = `${window.location.origin}/play/${classId}`;
     const formatTime = (seconds: number) => {
@@ -850,7 +904,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             className={`fixed inset-0 z-[9999] flex flex-col bg-slate-950 text-white overflow-hidden font-sans selection:bg-indigo-500/30 ${isIdle && !isLobby && !isAnnotating && !showWhiteboard && !showLexicon ? 'cursor-none' : ''}`}
             onContextMenu={(e) => { if (isAnnotating || isSpotlight) e.preventDefault(); }} 
         >
-            {/* Toast Banner for Saved Class Deck Words */}
+            {/* Toast Banner for Saved / Broadcasted Class Deck Words */}
             {lexiconToast && (
                 <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full bg-emerald-600 text-white font-black text-xs uppercase tracking-widest shadow-2xl border border-white/20 flex items-center gap-2 animate-in slide-in-from-top-4">
                     <Sparkles size={16} />
@@ -859,7 +913,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             )}
 
             {/* ============================================================================ */}
-            {/* 🔥 DICTIONARY & TRANSLATION SLIDE-DOWN DRAWER (WITH + SAVE TO CLASS DECK)    */}
+            {/* DICTIONARY & TRANSLATION SLIDE-DOWN DRAWER (WITH + SAVE & BROADCAST)         */}
             {/* ============================================================================ */}
             <div
                 className={`absolute top-0 left-0 right-0 z-[9400] bg-slate-900/95 backdrop-blur-3xl border-b-2 border-indigo-500/50 shadow-[0_30px_90px_rgba(0,0,0,0.85)] transition-transform duration-500 ease-out pointer-events-auto max-h-[80vh] overflow-y-auto custom-scrollbar ${
@@ -924,26 +978,35 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
                         <div className="flex items-center gap-2.5">
                             {activeLexiconEntry && (
-                                <button
-                                    type="button"
-                                    disabled={isSavingToDeck || isCurrentTermSaved}
-                                    onClick={handleSaveEntryToClassDeck}
-                                    className={`px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all active:scale-95 border ${
-                                        isCurrentTermSaved
-                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                            : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/40 shadow-emerald-600/30'
-                                    }`}
-                                >
-                                    {isCurrentTermSaved ? (
-                                        <>
-                                            <Check size={16} strokeWidth={3} /> Saved to Class Deck
-                                        </>
-                                    ) : (
-                                        <>
-                                            <BookmarkPlus size={16} /> + Save to Class Deck
-                                        </>
-                                    )}
-                                </button>
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={handleBroadcastLexiconEntry}
+                                        className="px-4 py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg border border-cyan-400/40 transition-all active:scale-95"
+                                    >
+                                        <Radio size={15} /> Broadcast to Class
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isSavingToDeck || isCurrentTermSaved}
+                                        onClick={handleSaveEntryToClassDeck}
+                                        className={`px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all active:scale-95 border ${
+                                            isCurrentTermSaved
+                                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                                : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/40 shadow-emerald-600/30'
+                                        }`}
+                                    >
+                                        {isCurrentTermSaved ? (
+                                            <>
+                                                <Check size={16} strokeWidth={3} /> Saved to Class Deck
+                                            </>
+                                        ) : (
+                                            <>
+                                                <BookmarkPlus size={16} /> + Save to Class Deck
+                                            </>
+                                        )}
+                                    </button>
+                                </>
                             )}
 
                             <button
@@ -1133,7 +1196,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                                             <p className="text-sm font-medium text-indigo-200">{ex.translation}</p>
                                             {ex.note && (
                                                 <span className="inline-block text-[10px] font-black uppercase tracking-wider text-amber-400/80 pt-1">
-                                                    💡 {ex.note}
+                                                    Note: {ex.note}
                                                 </span>
                                             )}
                                         </div>
@@ -1172,14 +1235,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             >
                 <canvas ref={boardCanvasRef} className="absolute inset-0 w-full h-full" />
                 {showWhiteboard && (
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-slate-800/90 p-2 rounded-full pointer-events-auto border border-slate-700">
+                    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-slate-800/90 p-2 px-4 rounded-full pointer-events-auto border border-slate-700 shadow-2xl">
                         <button onClick={() => setWbPage(p => Math.max(0, p - 1))} className="p-2 hover:bg-slate-700 rounded-full"><ChevronLeft size={20}/></button>
                         <span className="font-bold text-sm tracking-widest uppercase px-2">Page {wbPage + 1}</span>
                         <button onClick={() => setWbPage(p => p + 1)} className="p-2 hover:bg-slate-700 rounded-full"><ChevronRight size={20}/></button>
                         <div className="w-px h-6 bg-slate-600 mx-1"/>
-                        <button onClick={() => setWbBg('dark')} className="w-6 h-6 rounded bg-slate-900 border border-slate-600"/>
-                        <button onClick={() => setWbBg('light')} className="w-6 h-6 rounded bg-white border border-slate-400"/>
-                        <button onClick={() => setWbBg('grid')} className="w-6 h-6 rounded bg-slate-900 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:4px_4px] border border-slate-600"/>
+                        <button onClick={() => setWbBg('dark')} title="Dark Board" className={`w-6 h-6 rounded bg-slate-900 border ${wbBg === 'dark' ? 'border-indigo-400 ring-2 ring-indigo-400/50' : 'border-slate-600'}`}/>
+                        <button onClick={() => setWbBg('light')} title="Light Board" className={`w-6 h-6 rounded bg-white border ${wbBg === 'light' ? 'border-indigo-500 ring-2 ring-indigo-500/50' : 'border-slate-400'}`}/>
+                        <button onClick={() => setWbBg('grid')} title="Dot Grid" className={`w-6 h-6 rounded bg-slate-900 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:4px_4px] border ${wbBg === 'grid' ? 'border-indigo-400 ring-2 ring-indigo-400/50' : 'border-slate-600'}`}/>
+                        <button onClick={() => setWbBg('lined')} title="Lined Paper" className={`w-6 h-6 rounded bg-slate-900 bg-[linear-gradient(transparent_4px,#94a3b8_5px)] [background-size:100%_6px] border ${wbBg === 'lined' ? 'border-indigo-400 ring-2 ring-indigo-400/50' : 'border-slate-600'}`}/>
                         <div className="w-px h-6 bg-slate-600 mx-1"/>
                         <button onClick={downloadWhiteboard} title="Export as PNG" className="p-2 hover:bg-indigo-600 rounded-full text-indigo-300 hover:text-white"><Download size={20}/></button>
                     </div>
@@ -1200,13 +1264,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 className={`absolute inset-0 z-[8600] touch-none ${isAnnotating ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
             />
 
-            {/* 🎨 FLOATING PALETTE */}
+            {/* FLOATING ANNOTATION PALETTE */}
             {isAnnotating && (
                 <div 
                     ref={toolbarRef}
                     className="absolute z-[8700] flex flex-col items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
                 >
-                    <div className="bg-slate-900/90 backdrop-blur-2xl p-3 pl-1 pr-4 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-slate-700/50 flex flex-row gap-4 items-center">
+                    <div className="bg-slate-900/90 backdrop-blur-2xl p-3 pl-1 pr-4 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-slate-700/50 flex flex-row gap-3 items-center">
                         <div className="h-16 w-8 cursor-grab active:cursor-grabbing flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity bg-slate-800/50 rounded-l-full -ml-1 mr-1" onPointerDown={makeDraggable(toolbarRef, 'toolbarPos')} aria-label="Drag Palette">
                             <div className="w-1.5 h-8 bg-slate-400 rounded-full" />
                         </div>
@@ -1230,8 +1294,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                             ))}
                         </div>
                         <div className="w-px h-10 bg-slate-700" />
-                        <button onClick={handleUndo} title="Undo (Ctrl+Z)" className="bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white p-4 rounded-full transition-all flex items-center justify-center border border-slate-700/50"><RotateCcw size={20} strokeWidth={2.5}/></button>
-                        <button onClick={() => { setIsAnnotating(false); setShowWhiteboard(false); }} className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-full font-bold uppercase tracking-wider ml-2 shadow-lg">Done</button>
+                        <button onClick={handleUndo} title="Undo Last Stroke (Ctrl+Z)" className="bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white p-4 rounded-full transition-all flex items-center justify-center border border-slate-700/50"><RotateCcw size={20} strokeWidth={2.5}/></button>
+                        <button onClick={handleClearAnnotations} title="Clear Page Ink" className="bg-slate-800/50 hover:bg-rose-600 text-slate-400 hover:text-white p-4 rounded-full transition-all flex items-center justify-center border border-slate-700/50"><Trash2 size={20} strokeWidth={2.5}/></button>
+                        <button onClick={() => { setIsAnnotating(false); setShowWhiteboard(false); }} className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-full font-bold uppercase tracking-wider ml-1 shadow-lg">Done</button>
                     </div>
                 </div>
             )}
@@ -1361,16 +1426,20 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                         <button onClick={() => setShowGrid(false)} className="p-4 bg-slate-800 hover:bg-rose-500 rounded-full text-white transition-colors"><X size={28}/></button>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 max-w-7xl mx-auto">
-                        {pages.map((p, idx) => (
-                            <button 
-                                key={idx} 
-                                onClick={() => { jumpToSlide(idx); setShowGrid(false); }}
-                                className={`aspect-video rounded-2xl border-4 flex flex-col items-center justify-center p-4 transition-all hover:scale-105 ${activePageIdx === idx ? 'border-indigo-500 bg-indigo-500/20' : 'border-slate-800 bg-slate-900 hover:border-slate-600'}`}
-                            >
-                                <span className="text-4xl font-black text-slate-600 mb-2">{idx + 1}</span>
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{p.type}</span>
-                            </button>
-                        ))}
+                        {pages.map((p, idx) => {
+                            const primaryBlock = p.blocks?.[0];
+                            const slideTitle = primaryBlock?.title || primaryBlock?.question || p.type;
+                            return (
+                                <button 
+                                    key={idx} 
+                                    onClick={() => { jumpToSlide(idx); setShowGrid(false); }}
+                                    className={`aspect-video rounded-2xl border-4 flex flex-col items-center justify-center p-4 transition-all hover:scale-105 ${activePageIdx === idx ? 'border-indigo-500 bg-indigo-500/20' : 'border-slate-800 bg-slate-900 hover:border-slate-600'}`}
+                                >
+                                    <span className="text-4xl font-black text-slate-600 mb-2">{idx + 1}</span>
+                                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider line-clamp-1 px-2">{slideTitle}</span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -1381,7 +1450,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                     <button aria-label="Previous Slide" onClick={() => jumpToSlide(activePageIdx - 1)} className="absolute left-6 top-1/2 -translate-y-1/2 z-50 p-4 bg-slate-800/50 hover:bg-slate-700 border border-slate-600 text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-xl min-w-[48px] min-h-[48px] flex items-center justify-center"><ChevronLeft size={32}/></button>
                 )}
                 {(isLobby || activePageIdx < pages.length - 1) && (
-                    <button aria-label="Next Slide" onClick={() => { if (isLobby) setIsLobby(false); else jumpToSlide(activePageIdx + 1); }} className="absolute right-6 top-1/2 -translate-y-1/2 z-50 p-4 bg-slate-800/50 hover:bg-slate-700 border border-slate-600 text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-xl min-w-[48px] min-h-[48px] flex items-center justify-center"><ChevronRight size={32}/></button>
+                    <button aria-label="Next Slide" onClick={() => { if (isLobby) startBroadcastFromLobby(); else jumpToSlide(activePageIdx + 1); }} className="absolute right-6 top-1/2 -translate-y-1/2 z-50 p-4 bg-slate-800/50 hover:bg-slate-700 border border-slate-600 text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-xl min-w-[48px] min-h-[48px] flex items-center justify-center"><ChevronRight size={32}/></button>
                 )}
 
                 {/* LOBBY SCREEN */}
@@ -1400,27 +1469,30 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                         <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight mb-6 relative z-20 drop-shadow-lg">{lesson.title || 'Untitled Lesson'}</h1>
                         
                         <div className="flex gap-8 items-center bg-slate-900/80 p-6 rounded-[2.5rem] border border-slate-800 backdrop-blur-md mb-12 relative z-20">
-                            <div className="text-left px-4 border-r border-slate-700">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Room Code</p>
-                                <div className="text-4xl font-black text-indigo-400 tracking-[0.2em] leading-none">{String(classId || '').substring(0,6).toUpperCase()}</div>
+                            <div className="text-left px-4 border-r border-slate-700 cursor-pointer" onClick={() => setShowQR(true)}>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Room Code (Click for QR)</p>
+                                <div className="text-4xl font-black text-indigo-400 tracking-[0.2em] leading-none">{String(classId || 'LIVE').substring(0,6).toUpperCase()}</div>
                             </div>
                             <div className="flex items-center gap-4 px-4 text-emerald-400">
                                 <Users size={32} className="motion-safe:animate-pulse" />
                                 <div className="text-left">
                                     <p className="text-xs font-bold text-emerald-500/70 uppercase tracking-widest mb-1">Status</p>
-                                    <div className="text-2xl font-bold leading-none">{Object.keys(liveState?.students || {}).length} Joined</div>
+                                    <div className="text-2xl font-bold leading-none">{connectedStudentCount} Joined</div>
                                 </div>
                             </div>
                         </div>
 
-                        <button onClick={() => setIsLobby(false)} className="px-10 py-4 bg-white/10 hover:bg-white text-white hover:text-slate-900 border border-white/20 hover:scale-105 active:scale-95 rounded-full font-bold text-sm uppercase tracking-widest transition-all shadow-lg flex items-center gap-3 relative z-20 min-h-[48px]">
+                        <button onClick={startBroadcastFromLobby} className="px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/40 hover:scale-105 active:scale-95 rounded-full font-bold text-sm uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/30 flex items-center gap-3 relative z-20 min-h-[48px]">
                             Start Broadcast <Zap size={18} fill="currentColor" />
                         </button>
                     </div>
                 ) : (
                     <div className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
-                        <div className="flex flex-col min-h-full w-full items-center px-12 py-12 lg:px-24 pb-32">
-                            <div key={`${activePageIdx}`} className={`w-full max-w-7xl my-auto flex flex-col gap-12 animate-in fade-in duration-500 ${slideDirection === 'right' ? 'slide-in-from-right-16' : 'slide-in-from-left-16'}`}>
+                        <div className={`flex flex-col min-h-full w-full items-center ${hasWideStageBlock ? 'px-4 py-6 lg:px-10' : 'px-12 py-12 lg:px-24'} pb-32`}>
+                            <div
+                                key={`${activePageIdx}`}
+                                className={`w-full ${hasWideStageBlock ? 'max-w-[94vw]' : 'max-w-7xl'} my-auto flex flex-col gap-12 animate-in fade-in duration-500 ${slideDirection === 'right' ? 'slide-in-from-right-16' : 'slide-in-from-left-16'}`}
+                            >
                                 {activePage.blocks.map((block: any, i: number) => {
                                     if (!block) return null;
                                     const blockType = String(block.type || '');
@@ -1428,36 +1500,46 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
                                     return (
                                         <div key={`${activePageIdx}-${i}`} className="w-full">
-                                            {isQuiz ? <QuizBlock block={block} liveState={liveState} triggerQuiz={triggerQuiz} /> : (
+                                            {isQuiz ? (
+                                                <QuizBlock
+                                                    block={block}
+                                                    liveState={liveState}
+                                                    triggerQuiz={triggerQuiz}
+                                                    connectedStudentCount={connectedStudentCount}
+                                                />
+                                            ) : (
                                                 <>
-                                                    {blockType === 'text' && <TextBlock block={block} />}
+                                                    {(blockType === 'text' || blockType === 'text_block') && <TextBlock block={block} />}
                                                     {blockType === 'essay' && <EssayBlock block={block} />}
                                                     {blockType === 'image' && <ImageBlock block={block} />}
-                                                    {blockType === 'dialogue' && <DialogueBlock block={block} />}
-                                                    {blockType === 'vocab-list' && <VocabListBlock block={block} onInspectWord={lookupWordInLexicon} />}
+                                                    {(blockType === 'dialogue' || blockType === 'dialogue_block') && <DialogueBlock block={block} />}
+                                                    {(blockType === 'vocab-list' || blockType === 'deck') && (
+                                                        <VocabListBlock block={block} onInspectWord={lookupWordInLexicon} />
+                                                    )}
                                                     {blockType === 'flashcard' && <FlashcardSlideBlock block={block} onInspectWord={lookupWordInLexicon} />}
                                                     {blockType === 'kinetic_canvas' && (
                                                         <div className="w-full pointer-events-auto">
                                                             <KineticCanvasBlock block={block} onComplete={() => jumpToSlide(activePageIdx + 1)} />
                                                         </div>
                                                     )}
-                                                    {blockType === 'discussion' && <DiscussionBlock block={block} />}
+                                                    {(blockType === 'discussion' || blockType === 'discussion_block') && <DiscussionBlock block={block} />}
                                                     {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
-                                                   {blockType === 'game' && block.gameType === 'marble-scrabble' && (
-    <div className="w-full h-[80vh] pointer-events-auto rounded-[3rem] overflow-hidden shadow-2xl border border-slate-800">
-        <MarbleScrabble
-            block={block}
-            classId={classId}
-            isProjector={true}
-            liveState={liveState}
-            onUpdateLiveState={updateLiveState}
-            studentId="projector"
-        />
-    </div>
-)}
+                                                    {(blockType === 'game' || blockType === 'arcade_game') &&
+                                                        (block.gameType === 'marble-scrabble' || block.gameType === 'marble_scrabble') && (
+                                                        <div className="w-full h-[82vh] pointer-events-auto rounded-[3rem] overflow-hidden shadow-2xl border border-slate-800">
+                                                            <MarbleScrabble
+                                                                block={block}
+                                                                classId={classId}
+                                                                isProjector={true}
+                                                                liveState={liveState}
+                                                                onUpdateLiveState={updateLiveState}
+                                                                studentId="projector"
+                                                            />
+                                                        </div>
+                                                    )}
                                                     {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
-                                                    {blockType === 'callout' && <CalloutBlock block={block} />}
-                                                    {blockType === 'drawing' && <DrawingBlock block={block} liveState={liveState} />}
+                                                    {(blockType === 'callout' || blockType === 'note') && <CalloutBlock block={block} />}
+                                                    {blockType === 'drawing' && <DrawingBlock block={block} liveState={liveState} connectedStudentCount={connectedStudentCount} />}
                                                     {blockType === 'image-hotspot' && <ImageHotspotBlock block={block} />}
                                                     {blockType === 'audio-story' && <AudioStoryBlock block={block} />}
                                                     {blockType === 'code' && <CodeBlock block={block} />}
@@ -1492,9 +1574,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             {/* FOOTER */}
             <footer className={`absolute bottom-0 left-0 right-0 h-[72px] bg-slate-900/90 backdrop-blur-xl border-t border-slate-800/60 flex items-center justify-between px-6 shrink-0 z-[8800] transition-transform duration-500 ${isIdle && !isLobby && !isAnnotating && !showWhiteboard && !showLexicon ? 'translate-y-full' : 'translate-y-0'}`}>
                 <div className="flex items-center gap-6">
-                    <h2 className="text-[clamp(12px,1.8vh,16px)] font-bold text-slate-300 uppercase tracking-wider hidden sm:block">{String(lesson?.title || '')}</h2>
+                    <h2 className="text-[clamp(12px,1.8vh,16px)] font-bold text-slate-300 uppercase tracking-wider hidden sm:block truncate max-w-[260px]">{String(lesson?.title || '')}</h2>
                     <div className="h-5 w-px bg-slate-700 hidden sm:block" />
                     <LiveClock />
+                    <div className="hidden md:flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-wider bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+                        <Users size={14} /> {connectedStudentCount} Online
+                    </div>
                     
                     {timerRunning && !showTimer && (
                         <div className="flex items-center gap-2 bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg border border-rose-500/30 text-sm font-bold ml-2 cursor-pointer hover:bg-rose-500/30 transition-colors pointer-events-auto" onClick={() => setShowTimer(true)}>
@@ -1504,7 +1589,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 </div>
                 
                 <div className="flex items-center gap-3 sm:gap-4 pointer-events-auto">
-                    {/* 🔥 1-CLICK LEXICON & TRANSLATION SLIDE-DOWN BUTTON IN FOOTER */}
+                    <button
+                        aria-label="Toggle Slide Grid"
+                        onClick={() => setShowGrid(p => !p)}
+                        title="Slide Grid Overview (G)"
+                        className={`p-3 rounded-xl transition-all shadow-sm border min-w-[48px] min-h-[48px] flex items-center justify-center ${showGrid ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'}`}
+                    >
+                        <LayoutGrid size={20} strokeWidth={2.5} />
+                    </button>
+
                     <button
                         aria-label="Toggle Lexicon Drawer"
                         onClick={toggleLexiconDrawer}
@@ -1519,9 +1612,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                         {showLexicon ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </button>
 
-                    <button aria-label="Toggle Forum" onClick={() => setShowForum(p => !p)} className={`p-3 rounded-xl transition-all shadow-sm border min-w-[48px] min-h-[48px] flex items-center justify-center ${showForum ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'}`}>
-                        <MessageSquare size={20} strokeWidth={2.5}/>
-                    </button>
                     <button aria-label="Toggle Tools" onClick={() => setShowTools(p => !p)} className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all text-[clamp(12px,1.5vh,14px)] font-bold uppercase tracking-wider shadow-sm border min-h-[48px] ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-500/20' : 'bg-slate-800 hover:bg-indigo-600/80 text-slate-300 hover:text-white border-slate-700'}`}>
                         <Wrench size={16} strokeWidth={2.5}/> <span className="hidden sm:inline">Tools</span>
                     </button>
@@ -1556,7 +1646,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 const TextBlock = memo(({ block }: { block: any }) => (
     <div className="text-center py-12 max-w-6xl mx-auto">
         {block.title && <h3 className="text-[3vh] font-bold text-indigo-500 uppercase tracking-wider mb-6">{String(block.title)}</h3>}
-        <p className="text-[6vh] font-bold text-slate-100 leading-[1.2] tracking-tight">{String(block.content || '')}</p>
+        <p className="text-[5.5vh] font-bold text-slate-100 leading-[1.3] tracking-tight whitespace-pre-wrap">{String(block.content || '')}</p>
     </div>
 ));
 
@@ -1694,9 +1784,9 @@ const ImageHotspotBlock = memo(({ block }: { block: any }) => {
     );
 });
 
-const DrawingBlock = memo(({ block, liveState }: { block: any, liveState: any }) => {
+const DrawingBlock = memo(({ block, liveState, connectedStudentCount }: { block: any, liveState: any, connectedStudentCount: number }) => {
     const finishedCount = Object.keys(liveState?.drawings || {}).length;
-    const totalCount = Object.keys(liveState?.students || {}).length || 1;
+    const totalCount = Math.max(1, connectedStudentCount);
     return (
         <div className="bg-slate-900 p-16 rounded-[4rem] border border-slate-800 shadow-2xl my-12 w-full max-w-6xl mx-auto text-center flex flex-col items-center transition-colors">
             <div className="inline-flex items-center justify-center p-8 bg-fuchsia-500/10 text-fuchsia-500 border border-fuchsia-500/20 rounded-[3rem] mb-10 shadow-sm"><Palette size={64} strokeWidth={2}/></div>
@@ -1711,7 +1801,7 @@ const DrawingBlock = memo(({ block, liveState }: { block: any, liveState: any })
 });
 
 const DialogueBlock = memo(({ block }: { block: any }) => {
-    const lines = Array.isArray(block.lines) ? block.lines : [];
+    const lines = Array.isArray(block.lines) ? block.lines : (Array.isArray(block.turns) ? block.turns : []);
     const [revealedIdx, setRevealedIdx] = useState(-1);
     
     return (
@@ -1721,7 +1811,7 @@ const DialogueBlock = memo(({ block }: { block: any }) => {
             </div>
             <div className="space-y-12">
                 {lines.map((line: any, j: number) => {
-                    const sideRight = String(line.side) === 'right';
+                    const sideRight = String(line.side) === 'right' || (line.side === undefined && j % 2 === 1);
                     const speakerInitial = typeof line.speaker === 'string' && line.speaker.trim().length > 0 ? line.speaker.trim()[0].toUpperCase() : '?';
                     const isRevealed = revealedIdx >= j;
 
@@ -1741,7 +1831,7 @@ const DialogueBlock = memo(({ block }: { block: any }) => {
 });
 
 const VocabListBlock = memo(({ block, onInspectWord }: { block: any; onInspectWord?: (word: string) => void }) => {
-    const items = Array.isArray(block.items) ? block.items : [];
+    const items = Array.isArray(block.items) ? block.items : (Array.isArray(block.cards) ? block.cards : []);
     const [revealed, setRevealed] = useState<Record<number, boolean>>({});
     const [page, setPage] = useState(0);
     const perPage = 6;
@@ -1754,19 +1844,39 @@ const VocabListBlock = memo(({ block, onInspectWord }: { block: any; onInspectWo
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
     };
 
+    const revealAllOnPage = () => {
+        const next: Record<number, boolean> = { ...revealed };
+        currentItems.forEach((_: any, idx: number) => {
+            next[page * perPage + idx] = true;
+        });
+        setRevealed(next);
+    };
+
     return (
         <div className="py-12 w-full max-w-7xl mx-auto pointer-events-auto">
-            <div className="grid grid-cols-2 gap-10">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-10">
+                <h3 className="text-[4.5vh] font-bold text-white tracking-tight">
+                    {String(block.title || 'Key Vocabulary')}
+                </h3>
+                <button
+                    type="button"
+                    onClick={revealAllOnPage}
+                    className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm uppercase tracking-wider shadow-lg transition-colors"
+                >
+                    Reveal All on Page
+                </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 {currentItems.map((item: any, j: number) => {
                     const absIdx = page * perPage + j;
                     const isRev = revealed[absIdx];
                     const termStr = String(item.term || item.front || '');
                     const defStr = String(item.definition || item.back || '');
                     return (
-                        <div key={absIdx} onClick={() => setRevealed(p => ({...p, [absIdx]: true}))} className={`p-10 rounded-[3rem] border shadow-xl text-left relative overflow-hidden transition-all duration-300 cursor-pointer min-h-[200px] flex flex-col justify-center ${isRev ? 'bg-slate-900 border-slate-800 hover:-translate-y-1' : 'bg-slate-900/50 border-slate-800/50 hover:bg-slate-800 border-dashed'}`}>
+                        <div key={absIdx} onClick={() => setRevealed(p => ({...p, [absIdx]: !p[absIdx]}))} className={`p-10 rounded-[3rem] border shadow-xl text-left relative overflow-hidden transition-all duration-300 cursor-pointer min-h-[200px] flex flex-col justify-center ${isRev ? 'bg-slate-900 border-slate-800 hover:-translate-y-1' : 'bg-slate-900/50 border-slate-800/50 hover:bg-slate-800 border-dashed'}`}>
                             {isRev && <div className="absolute -right-8 -top-8 opacity-5 text-indigo-400 rotate-12"><Layers size={200} /></div>}
                             <div className="flex justify-between items-start relative z-10 mb-4 gap-3">
-                                <p className={`text-[5vh] font-bold tracking-tight ${isRev ? 'text-indigo-400' : 'text-slate-500'}`}>{termStr}</p>
+                                <p className={`text-[4.5vh] font-bold tracking-tight ${isRev ? 'text-indigo-400' : 'text-slate-300'}`}>{termStr}</p>
                                 {isRev && (
                                     <div className="flex items-center gap-2 shrink-0">
                                         {onInspectWord && (
@@ -1775,7 +1885,7 @@ const VocabListBlock = memo(({ block, onInspectWord }: { block: any; onInspectWo
                                                 title="Open in Lexicon Slide-Down"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    onInspectWord(termStr);
+                                                    onInspectWord(termStr.split(' vs. ')[0]);
                                                 }}
                                                 className="p-4 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 rounded-2xl transition-colors"
                                             >
@@ -1786,7 +1896,7 @@ const VocabListBlock = memo(({ block, onInspectWord }: { block: any; onInspectWo
                                     </div>
                                 )}
                             </div>
-                            <p className="text-[3vh] text-slate-300 font-medium leading-relaxed relative z-10">{isRev ? defStr : 'Click to reveal definition'}</p>
+                            <p className="text-[2.8vh] text-slate-300 font-medium leading-relaxed relative z-10 whitespace-pre-wrap">{isRev ? defStr : 'Click to reveal definition'}</p>
                         </div>
                     );
                 })}
@@ -1880,13 +1990,18 @@ const TimelineBlock = memo(({ block }: { block: any }) => (
     </div>
 ));
 
-const QuizBlock = memo(({ block, liveState, triggerQuiz }: { block: any, liveState: any, triggerQuiz: any }) => {
+const QuizBlock = memo(({ block, liveState, triggerQuiz, connectedStudentCount }: { block: any, liveState: any, triggerQuiz: any, connectedStudentCount: number }) => {
     const answerCount = Object.keys(liveState?.answers || {}).length;
-    const totalCount = Object.keys(liveState?.students || {}).length || 1;
+    const totalCount = Math.max(1, connectedStudentCount);
     const options = Array.isArray(block.content?.options) ? block.content.options : (Array.isArray(block.options) ? block.options : []);
+    const quizState = liveState?.quizState || 'waiting';
     
+    // Handles both string optionId (`answers[email] = 'a'`) and object (`answers[email] = { answerId: 'a' }`)
     const answerCounts: Record<string, number> = {};
-    Object.values(liveState?.answers || {}).forEach((ans: any) => { answerCounts[ans.answerId] = (answerCounts[ans.answerId] || 0) + 1; });
+    Object.values(liveState?.answers || {}).forEach((ans: any) => {
+        const id = typeof ans === 'string' ? ans : ans?.answerId;
+        if (id) answerCounts[id] = (answerCounts[id] || 0) + 1;
+    });
 
     return (
         <div className="bg-slate-900 text-white border border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-6xl my-12 relative overflow-hidden">
@@ -1895,11 +2010,11 @@ const QuizBlock = memo(({ block, liveState, triggerQuiz }: { block: any, liveSta
                 <span className="text-[2.5vh] font-bold text-indigo-400 uppercase tracking-widest block mb-8">Class Question</span>
                 <h2 className="text-[5.5vh] md:text-[6.5vh] font-bold mb-12 leading-tight tracking-tight">{String(block.content?.question || block.question || '')}</h2>
                 
-                {liveState?.quizState === 'waiting' && (
+                {quizState === 'waiting' && (
                     <button onClick={() => triggerQuiz('active')} className="bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 text-white px-12 py-6 rounded-full font-bold text-[3vh] uppercase tracking-wider shadow-[0_0_40px_rgba(244,63,94,0.4)] transition-transform hover:-translate-y-1 active:scale-95 flex items-center gap-4 mx-auto pointer-events-auto"><Zap size={36} fill="currentColor" /> Start Question</button>
                 )}
 
-                {liveState?.quizState === 'active' && (
+                {quizState === 'active' && (
                     <div className="space-y-12 animate-in fade-in duration-500">
                         <div className="grid grid-cols-2 gap-6 text-left">
                             {options.map((opt:any, i:number) => (
@@ -1918,7 +2033,7 @@ const QuizBlock = memo(({ block, liveState, triggerQuiz }: { block: any, liveSta
                     </div>
                 )}
 
-                {liveState?.quizState === 'revealed' && (
+                {quizState === 'revealed' && (
                     <div className="animate-in zoom-in duration-500 flex flex-col items-center">
                         <div className="inline-flex items-center gap-4 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-10 py-5 rounded-[2.5rem] text-[4vh] font-bold mb-12 shadow-[0_0_30px_rgba(16,185,129,0.1)]"><CheckCircle2 size={48} strokeWidth={2.5}/> Correct Answer</div>
                         
@@ -1939,6 +2054,12 @@ const QuizBlock = memo(({ block, liveState, triggerQuiz }: { block: any, liveSta
                                 );
                             })}
                         </div>
+                        <button
+                            onClick={() => triggerQuiz('waiting')}
+                            className="px-8 py-4 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm uppercase tracking-widest border border-slate-700 pointer-events-auto"
+                        >
+                            Reset Question
+                        </button>
                     </div>
                 )}
             </div>
