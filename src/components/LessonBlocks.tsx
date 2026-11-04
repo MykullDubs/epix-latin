@@ -9,7 +9,8 @@ import {
   Square, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   ChevronsUp, ChevronsDown, Layers, GripVertical,
   PanelTop, PanelBottom, PanelRight,
-  CheckSquare, Columns, Keyboard, Tablet
+  CheckSquare, Columns, Keyboard, Tablet,
+  Sparkles, Radio, Eye
 } from 'lucide-react';
 
 // ============================================================================
@@ -48,6 +49,14 @@ export const CANVAS_RESOLUTIONS: Record<
     desc: 'Panoramic horizontal stage for 6–8 sequential timeline or syntax slots'
   }
 };
+
+const BUILTIN_STATE_KEYS = [
+  { id: 'normal', label: 'Normal (Base)', desc: 'Default appearance on slide load' },
+  { id: 'hover', label: 'Hover', desc: 'Shown when pointer hovers over box' },
+  { id: 'selected', label: 'Selected', desc: 'Toggled on click or Button Set choice' },
+  { id: 'visited', label: 'Visited', desc: 'Remembers object was clicked at least once' },
+  { id: 'disabled', label: 'Disabled', desc: 'Locked & non-interactive until enabled' }
+];
 
 const COLOR_STYLES: Record<
   string,
@@ -172,8 +181,26 @@ function useTabletTouchDetector() {
   return isAutoTouchTablet;
 }
 
+// Helper: Resolve an entity's effective visual properties for a given active state
+function resolveEntityVisualState(ent: any, stateName: string) {
+  if (!stateName || stateName === 'normal' || !ent?.states?.[stateName]) {
+    return ent;
+  }
+  const st = ent.states[stateName] || {};
+  return {
+    ...ent,
+    label: st.label !== undefined && st.label !== '' ? st.label : ent.label,
+    sublabel: st.sublabel !== undefined && st.sublabel !== '' ? st.sublabel : ent.sublabel,
+    color: st.color || ent.color,
+    borderStyle: st.borderStyle || ent.borderStyle,
+    scale: st.scale !== undefined ? st.scale : ent.scale
+  };
+}
+
 // ============================================================================
-//  1. STUDENT & SMARTBOARD PLAYER: KINETIC CANVAS BLOCK (HD + ANCHORED + SHAPES)
+//  1. STUDENT & SMARTBOARD PLAYER: KINETIC CANVAS BLOCK
+//  Now with Full Storyline Object States Engine (Normal, Hover, Selected, Visited, Disabled)
+//  and Button Sets (Radio-Group Mutual Exclusivity)
 // ============================================================================
 export const KineticCanvasBlock = ({ block, onComplete }: any) => {
   const outerWrapRef = useRef<HTMLDivElement>(null);
@@ -191,11 +218,12 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       anchorX: e.anchorX ?? e.x ?? 50,
       anchorY: e.anchorY ?? e.y ?? 50,
       currentState: e.initialState || 'normal',
+      isVisited: e.initialState === 'visited',
+      isSelected: e.initialState === 'selected',
       placedZoneId: null,
       validationStatus: 'neutral' as 'neutral' | 'correct' | 'incorrect',
       sliderValue: e.sliderMin ?? 0,
-      textValue: '',
-      isSelected: false
+      textValue: ''
     }));
   }, [block?.entities]);
 
@@ -208,6 +236,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
   );
 
   const [entities, setEntities] = useState<any[]>(initialEntities);
+  const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [activeConnectorSourceId, setActiveConnectorSourceId] = useState<string | null>(null);
   const [connections, setConnections] = useState<
@@ -276,12 +305,84 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     setConnections([]);
     setTimelineProgress(0);
     setActiveLayer(null);
-    setStatusBanner('Canvas reset to anchored starting positions.');
+    setStatusBanner('Canvas reset to initial states and anchored positions.');
     setTimeout(() => setStatusBanner(null), 2500);
   };
 
+  // ============================================================================
+  //  STORYLINE OBJECT STATE & BUTTON SET TRANSITION ENGINE
+  // ============================================================================
+  const applyEntityClickStateTransition = (clickedEnt: any) => {
+    const hasStates =
+      clickedEnt.states && Object.keys(clickedEnt.states).length > 0;
+    const buttonSetName = (clickedEnt.buttonSet || '').trim();
+    const isMultiSelectType = clickedEnt.entityType === 'multi_select';
+
+    if (!hasStates && !buttonSetName && !isMultiSelectType && !clickedEnt.requireVisited) {
+      return;
+    }
+
+    setEntities((prev) =>
+      prev.map((item) => {
+        // 1. If clickedEnt belongs to a Button Set, deselect all other members in that same Button Set
+        if (
+          buttonSetName &&
+          item.id !== clickedEnt.id &&
+          (item.buttonSet || '').trim() === buttonSetName
+        ) {
+          const fallbackState =
+            item.isVisited && item.states?.visited ? 'visited' : 'normal';
+          return {
+            ...item,
+            isSelected: false,
+            currentState: fallbackState
+          };
+        }
+
+        if (item.id !== clickedEnt.id) return item;
+
+        // 2. Transition the clicked entity itself
+        const nextVisited = true;
+        let nextSelected = item.isSelected;
+        let nextState = item.currentState || 'normal';
+
+        if (buttonSetName) {
+          // In a radio Button Set, clicking selects this item
+          nextSelected = true;
+          nextState = item.states?.selected
+            ? 'selected'
+            : item.states?.visited
+            ? 'visited'
+            : 'selected';
+        } else if (isMultiSelectType || item.states?.selected) {
+          // Toggle between Selected and Visited/Normal
+          nextSelected = !item.isSelected;
+          nextState = nextSelected
+            ? 'selected'
+            : item.states?.visited
+            ? 'visited'
+            : 'normal';
+        } else if (item.states?.visited || item.requireVisited) {
+          nextState = 'visited';
+        }
+
+        // Also support inline trigger targetState override
+        if (item.triggerEvent === 'on_click' && item.triggerTargetState) {
+          nextState = item.triggerTargetState;
+        }
+
+        return {
+          ...item,
+          isVisited: nextVisited,
+          isSelected: nextSelected,
+          currentState: nextState
+        };
+      })
+    );
+  };
+
   const handlePointerDownEntity = (e: React.PointerEvent, ent: any) => {
-    if (ent.entityType === 'bg_shape') return;
+    if (ent.entityType === 'bg_shape' || ent.currentState === 'disabled') return;
     e.stopPropagation();
 
     if (ent.entityType === 'connector_node' || ent.connectTargetId) {
@@ -304,12 +405,8 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       return;
     }
 
-    if (ent.entityType === 'multi_select') {
-      setEntities((prev) =>
-        prev.map((item) => (item.id === ent.id ? { ...item, isSelected: !item.isSelected } : item))
-      );
-      return;
-    }
+    // Apply Storyline State & Button Set transitions
+    applyEntityClickStateTransition(ent);
 
     if (ent.triggerEvent === 'on_click' && ent.triggerAction) {
       if (ent.triggerMessage) setStatusBanner(ent.triggerMessage);
@@ -317,6 +414,20 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       if (ent.triggerAction === 'show_layer' && ent.triggerLayerId) {
         const foundL = layers.find((l: any) => l.id === ent.triggerLayerId);
         if (foundL) setActiveLayer(foundL);
+      }
+      if (ent.triggerAction === 'change_state' && ent.triggerTargetEntityId && ent.triggerTargetState) {
+        setEntities((prev) =>
+          prev.map((item) =>
+            item.id === ent.triggerTargetEntityId
+              ? {
+                  ...item,
+                  currentState: ent.triggerTargetState,
+                  isVisited: ent.triggerTargetState === 'visited' ? true : item.isVisited,
+                  isSelected: ent.triggerTargetState === 'selected'
+                }
+              : item
+          )
+        );
       }
     }
 
@@ -330,7 +441,12 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       return;
     }
 
-    if (ent.anchored || ent.draggable === false || ent.entityType === 'static_anchor') {
+    if (
+      ent.anchored ||
+      ent.draggable === false ||
+      ent.entityType === 'static_anchor' ||
+      ent.entityType === 'multi_select'
+    ) {
       return;
     }
 
@@ -444,6 +560,8 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                 x: snapX,
                 y: snapY,
                 placedZoneId: hitZone.id,
+                isVisited: true,
+                currentState: e.states?.visited ? 'visited' : e.currentState,
                 validationStatus: isMatch ? 'correct' : 'incorrect'
               }
             : e
@@ -484,6 +602,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     }
   };
 
+  // Evaluate Draggable Targets + Connectors + Visited States + Button Set Selections
   const checkMastery = () => {
     const draggablesWithTargets = entities.filter(
       (e) =>
@@ -509,13 +628,34 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
         )
       );
 
-    if (allDraggablesRight && allConnectorsRight) {
-      setStatusBanner('All canvas objectives verified!');
+    // Check Require-Visited Hotspots/Cards
+    const requiredVisitedEntities = entities.filter((e) => e.requireVisited);
+    const allVisitedMet =
+      requiredVisitedEntities.length === 0 ||
+      requiredVisitedEntities.every((e) => e.isVisited || e.currentState === 'visited');
+
+    // Check Button Sets / Multi-Select Cards with `isCorrectSelect`
+    const selectableEntities = entities.filter(
+      (e) => e.entityType === 'multi_select' || e.isCorrectSelect !== undefined
+    );
+    const allSelectionsRight =
+      selectableEntities.length === 0 ||
+      selectableEntities.every((e) => Boolean(e.isSelected) === Boolean(e.isCorrectSelect));
+
+    if (allDraggablesRight && allConnectorsRight && allVisitedMet && allSelectionsRight) {
+      setStatusBanner('All canvas states, button sets & objectives verified!');
       if (layers.length > 0 && !activeLayer) {
         setActiveLayer(layers[0]);
       } else if (onComplete) {
         onComplete();
       }
+    } else if (!allVisitedMet) {
+      const remaining = requiredVisitedEntities.filter(
+        (e) => !e.isVisited && e.currentState !== 'visited'
+      ).length;
+      setStatusBanner(`Explore all interactive cards first (${remaining} remaining to visit)!`);
+    } else if (!allSelectionsRight) {
+      setStatusBanner('Check your selected options — one or more choices need adjustment.');
     } else {
       setStatusBanner('Some items or connector lines are still incomplete. Keep going!');
     }
@@ -717,43 +857,55 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
               );
             })}
 
-            {/* 4. INTERACTIVE & ANCHORED ENTITIES */}
+            {/* 4. INTERACTIVE & ANCHORED ENTITIES (WITH ACTIVE STATE RESOLUTION) */}
             {entities
               .filter((e: any) => e.entityType !== 'bg_shape')
-              .map((ent: any) => {
-                if (ent.currentState === 'hidden') return null;
+              .map((rawEnt: any) => {
+                if (rawEnt.currentState === 'hidden') return null;
+
+                // Determine active visual state: Hover takes visual precedence if defined, else currentState
+                const isHovered = hoveredEntityId === rawEnt.id && rawEnt.states?.hover;
+                const activeStateName = isHovered
+                  ? 'hover'
+                  : rawEnt.isSelected && rawEnt.states?.selected
+                  ? 'selected'
+                  : rawEnt.currentState || 'normal';
+
+                const ent = resolveEntityVisualState(rawEnt, activeStateName);
+                const isDisabled = rawEnt.currentState === 'disabled';
+
                 const palette = COLOR_STYLES[ent.color || 'indigo'] || COLOR_STYLES.indigo;
                 const borderStyleClass =
                   BORDER_STYLE_CLASSES[ent.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
                 const radiusClass =
                   SHAPE_RADIUS_CLASSES[ent.shapeVariant || 'banner'] || 'rounded-2xl';
-                const isDragging = draggingId === ent.id;
-                const isAnchored = Boolean(ent.anchored || ent.entityType === 'static_anchor');
+                const isDragging = draggingId === rawEnt.id;
+                const isAnchored = Boolean(rawEnt.anchored || rawEnt.entityType === 'static_anchor');
                 const isConnector = Boolean(
-                  ent.entityType === 'connector_node' || ent.connectTargetId
+                  rawEnt.entityType === 'connector_node' || rawEnt.connectTargetId
                 );
 
                 let ringStyle = '';
-                if (ent.validationStatus === 'correct') {
+                if (rawEnt.validationStatus === 'correct') {
                   ringStyle = 'ring-4 ring-emerald-400 !bg-emerald-600 !border-emerald-300';
-                } else if (ent.validationStatus === 'incorrect') {
+                } else if (rawEnt.validationStatus === 'incorrect') {
                   ringStyle = 'ring-4 ring-rose-500 !bg-rose-600 !border-rose-300';
-                } else if (activeConnectorSourceId === ent.id || ent.isSelected) {
-                  ringStyle = 'ring-4 ring-amber-400 scale-105';
+                } else if (activeConnectorSourceId === rawEnt.id || rawEnt.isSelected) {
+                  ringStyle = 'ring-4 ring-amber-400 scale-105 shadow-[0_0_30px_rgba(251,191,36,0.45)]';
                 }
 
-                if (ent.entityType === 'slider') {
+                if (rawEnt.entityType === 'slider') {
                   const isAtTarget =
-                    Math.abs(Number(ent.sliderValue) - Number(ent.sliderTarget)) <=
-                    Number(ent.sliderTolerance || 0);
+                    Math.abs(Number(rawEnt.sliderValue) - Number(rawEnt.sliderTarget)) <=
+                    Number(rawEnt.sliderTolerance || 0);
                   return (
                     <div
-                      key={ent.id}
+                      key={rawEnt.id}
                       style={{
-                        left: `${ent.x}%`,
-                        top: `${ent.y}%`,
+                        left: `${rawEnt.x}%`,
+                        top: `${rawEnt.y}%`,
                         transform: `translate(-50%, -50%) scale(${ent.scale || 1})`,
-                        zIndex: ent.zOrder ?? 25
+                        zIndex: rawEnt.zOrder ?? 25
                       }}
                       className={`absolute p-5 rounded-3xl bg-slate-900/95 border-2 ${
                         isAtTarget ? 'border-emerald-400' : 'border-slate-700'
@@ -762,27 +914,27 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-black">{ent.label}</span>
                         <span className="font-mono text-base font-black text-amber-400">
-                          {ent.sliderValue}
-                          {ent.sliderUnit || ''}
+                          {rawEnt.sliderValue}
+                          {rawEnt.sliderUnit || ''}
                         </span>
                       </div>
                       <input
                         type="range"
-                        min={ent.sliderMin ?? 0}
-                        max={ent.sliderMax ?? 100}
-                        step={ent.sliderStep ?? 1}
-                        value={ent.sliderValue}
+                        min={rawEnt.sliderMin ?? 0}
+                        max={rawEnt.sliderMax ?? 100}
+                        step={rawEnt.sliderStep ?? 1}
+                        value={rawEnt.sliderValue}
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           setEntities((prev) =>
                             prev.map((item) =>
-                              item.id === ent.id
+                              item.id === rawEnt.id
                                 ? {
                                     ...item,
                                     sliderValue: val,
                                     validationStatus:
-                                      Math.abs(val - Number(ent.sliderTarget)) <=
-                                      Number(ent.sliderTolerance || 0)
+                                      Math.abs(val - Number(rawEnt.sliderTarget)) <=
+                                      Number(rawEnt.sliderTolerance || 0)
                                         ? 'correct'
                                         : 'neutral'
                                   }
@@ -796,18 +948,18 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                   );
                 }
 
-                if (ent.entityType === 'text_input') {
+                if (rawEnt.entityType === 'text_input') {
                   return (
                     <div
-                      key={ent.id}
+                      key={rawEnt.id}
                       style={{
-                        left: `${ent.x}%`,
-                        top: `${ent.y}%`,
+                        left: `${rawEnt.x}%`,
+                        top: `${rawEnt.y}%`,
                         transform: `translate(-50%, -50%) scale(${ent.scale || 1})`,
-                        zIndex: ent.zOrder ?? 25
+                        zIndex: rawEnt.zOrder ?? 25
                       }}
                       className={`absolute p-5 rounded-3xl bg-slate-900/95 border-2 ${
-                        ent.validationStatus === 'correct' ? 'border-emerald-400' : 'border-slate-700'
+                        rawEnt.validationStatus === 'correct' ? 'border-emerald-400' : 'border-slate-700'
                       } text-white shadow-2xl min-w-[320px]`}
                     >
                       <label className="text-xs font-black uppercase tracking-wider text-indigo-300 block mb-2">
@@ -815,18 +967,18 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                       </label>
                       <input
                         type="text"
-                        value={ent.textValue || ''}
-                        placeholder={ent.placeholder || 'Type answer...'}
+                        value={rawEnt.textValue || ''}
+                        placeholder={rawEnt.placeholder || 'Type answer...'}
                         onChange={(e) => {
                           const val = e.target.value;
-                          const accepted = String(ent.expectedText || '')
+                          const accepted = String(rawEnt.expectedText || '')
                             .split(',')
                             .map((s) => s.trim().toLowerCase())
                             .filter(Boolean);
                           const matches = accepted.includes(val.trim().toLowerCase());
                           setEntities((prev) =>
                             prev.map((item) =>
-                              item.id === ent.id
+                              item.id === rawEnt.id
                                 ? {
                                     ...item,
                                     textValue: val,
@@ -842,30 +994,41 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                   );
                 }
 
+                const hasInteractiveStates =
+                  Boolean(rawEnt.buttonSet) ||
+                  Boolean(rawEnt.requireVisited) ||
+                  Boolean(rawEnt.states && Object.keys(rawEnt.states).length > 0);
+
                 return (
                   <div
-                    key={ent.id}
-                    onPointerDown={(e) => handlePointerDownEntity(e, ent)}
+                    key={rawEnt.id}
+                    onPointerEnter={() => setHoveredEntityId(rawEnt.id)}
+                    onPointerLeave={() =>
+                      setHoveredEntityId((prev) => (prev === rawEnt.id ? null : prev))
+                    }
+                    onPointerDown={(e) => handlePointerDownEntity(e, rawEnt)}
                     style={{
-                      left: `${ent.x}%`,
-                      top: `${ent.y}%`,
-                      width: ent.width ? `${ent.width}%` : undefined,
-                      height: ent.height ? `${ent.height}%` : undefined,
+                      left: `${rawEnt.x}%`,
+                      top: `${rawEnt.y}%`,
+                      width: rawEnt.width ? `${rawEnt.width}%` : undefined,
+                      height: rawEnt.height ? `${rawEnt.height}%` : undefined,
                       transform: `translate(-50%, -50%) scale(${
                         (ent.scale || 1) * (isDragging ? 1.08 : 1)
-                      }) rotate(${ent.rotation || 0}deg)`,
-                      zIndex: isDragging ? 75 : ent.zOrder ?? (isAnchored ? 15 : 30)
+                      }) rotate(${rawEnt.rotation || 0}deg)`,
+                      zIndex: isDragging ? 75 : rawEnt.zOrder ?? (isAnchored ? 15 : 30)
                     }}
-                    className={`absolute px-6 py-3.5 ${radiusClass} ${borderStyleClass} shadow-xl transition-shadow select-none touch-none flex items-center justify-center ${
-                      isAnchored
+                    className={`absolute px-6 py-3.5 ${radiusClass} ${borderStyleClass} shadow-xl transition-all duration-200 select-none touch-none flex items-center justify-center ${
+                      isDisabled
+                        ? 'opacity-40 grayscale cursor-not-allowed bg-slate-800 border-slate-700 text-slate-400'
+                        : isAnchored && !hasInteractiveStates
                         ? 'bg-slate-900/90 border-slate-600/80 text-white cursor-default shadow-md'
-                        : isConnector
+                        : isConnector || hasInteractiveStates
                         ? `${palette.bg} ${palette.border} cursor-pointer hover:shadow-2xl`
                         : `${palette.bg} ${palette.border} cursor-grab active:cursor-grabbing hover:shadow-2xl`
                     } ${ringStyle}`}
                   >
                     <div className="flex items-center gap-2.5">
-                      {isAnchored && ent.label && (
+                      {isAnchored && ent.label && !hasInteractiveStates && (
                         <span title="Anchored to Stage" className="inline-flex">
                           <Pin size={14} className="text-amber-400 shrink-0 rotate-45" />
                         </span>
@@ -882,15 +1045,16 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                         {ent.sublabel && (
                           <div
                             className={`text-xs font-bold mt-0.5 ${
-                              isAnchored ? 'text-slate-400' : palette.sub
+                              isAnchored && !hasInteractiveStates ? 'text-slate-400' : palette.sub
                             }`}
                           >
                             {ent.sublabel}
                           </div>
                         )}
                       </div>
-                      {ent.validationStatus === 'correct' && (
-                        <Check size={18} className="text-white shrink-0 ml-1" strokeWidth={3} />
+                      {(rawEnt.validationStatus === 'correct' ||
+                        (rawEnt.requireVisited && rawEnt.isVisited)) && (
+                        <Check size={18} className="text-emerald-300 shrink-0 ml-1" strokeWidth={3} />
                       )}
                     </div>
                   </div>
@@ -985,22 +1149,20 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 };
 
 // ============================================================================
-//  2. INSTRUCTOR VISUAL STUDIO: KINETIC CANVAS BUILDER (DESKTOP + TABLET TOUCH UI)
+//  2. INSTRUCTOR VISUAL STUDIO: KINETIC CANVAS BUILDER
+//  Now with Storyline Object States Tray + Button Sets + Tablet Touch Studio
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const builderRootRef = useRef<HTMLDivElement>(null);
   const outerWrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // Automatic Tablet & Touch Detection + Manual Override
   const isAutoTouchTablet = useTabletTouchDetector();
   const [tabletModeOverride, setTabletModeOverride] = useState<boolean | null>(null);
   const isTabletMode =
     tabletModeOverride !== null ? tabletModeOverride : isAutoTouchTablet;
 
-  // Touch-Friendly Multi-Select Toggle (No Shift key needed on iPad/Android tablets!)
   const [touchMultiSelectActive, setTouchMultiSelectActive] = useState<boolean>(false);
-  // Touch D-Pad Nudge Step (0.5%, 1%, or 5%)
   const [touchNudgeStep, setTouchNudgeStep] = useState<number>(1);
 
   const resKey = block?.canvasResolution || 'fhd_1080';
@@ -1014,12 +1176,22 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     Array<{ kind: 'entity' | 'zone'; id: string }>
   >([]);
 
+  // 🔥 STORYLINE OBJECT STATES TRAY STATE
+  const [showStatesTray, setShowStatesTray] = useState<boolean>(false);
+  const [activeEditingState, setActiveEditingState] = useState<string>('normal');
+  const [customStateInput, setCustomStateInput] = useState<string>('');
+
   const primarySelected = selectedItems[0] || null;
   const isItemSelected = useCallback(
     (kind: 'entity' | 'zone', id: string) =>
       selectedItems.some((s) => s.kind === kind && s.id === id),
     [selectedItems]
   );
+
+  // Reset activeEditingState to 'normal' when switching primary selection
+  useEffect(() => {
+    setActiveEditingState('normal');
+  }, [primarySelected?.id]);
 
   const selectOrToggleItem = (
     kind: 'entity' | 'zone',
@@ -1101,7 +1273,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       ro.disconnect();
       window.removeEventListener('resize', updateScale);
     };
-  }, [resolution.width, showLayerToolbar, taskbarDock]);
+  }, [resolution.width, showLayerToolbar, showStatesTray, taskbarDock]);
 
   const snapCoord = (val: number, minVal = 3, maxVal = 97) => {
     const clamped = Math.max(minVal, Math.min(maxVal, val));
@@ -1110,7 +1282,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   };
 
   // ============================================================================
-  //  BATCH DUPLICATE, DELETE & NUDGE HANDLERS (USED BY TOUCH D-PAD + KEYBOARD)
+  //  BATCH DUPLICATE, DELETE & NUDGE HANDLERS
   // ============================================================================
   const duplicateSelectedItems = useCallback(() => {
     if (selectedItems.length === 0) return;
@@ -1227,7 +1399,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   );
 
   // ============================================================================
-  //  KEYBOARD SHORTCUT LISTENER (ARROWS, DELETE/BACKSPACE, CTRL+D, CTRL+A, ESC)
+  //  KEYBOARD SHORTCUT LISTENER
   // ============================================================================
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1296,7 +1468,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   ]);
 
   // ============================================================================
-  //  1-CLICK AUTO-ALIGN ROW & COLUMN (MULTI-SELECT AWARE)
+  //  1-CLICK AUTO-ALIGN ROW & COLUMN
   // ============================================================================
   const handleAutoAlignRow = () => {
     if (selectedItems.length >= 2) {
@@ -1527,7 +1699,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     notifyBuilder('Tap Multi-Select (or Shift+Click 2+ items) to align vertically.');
   };
 
-  // Start Four-Directions Move (Supports Touch Multi-Select Toggle & Shift+Click)
   const startMoveItem = (
     e: React.PointerEvent,
     kind: 'entity' | 'zone',
@@ -1724,6 +1895,11 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     }
   };
 
+  // ============================================================================
+  //  🔥 STATE-AWARE FIELD UPDATER
+  //  When `activeEditingState !== 'normal'`, visual changes (label, sublabel, color,
+  //  borderStyle, scale) write directly into `ent.states[activeEditingState]`!
+  // ============================================================================
   const updateSelectedFields = (patch: Record<string, any>) => {
     const selEntIds = new Set(
       selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
@@ -1732,9 +1908,36 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       selectedItems.filter((s) => s.kind === 'zone').map((s) => s.id)
     );
 
-    const nextEntities = entities.map((e: any) =>
-      selEntIds.has(e.id) ? { ...e, ...patch } : e
-    );
+    const visualStateKeys = ['label', 'sublabel', 'color', 'borderStyle', 'scale'];
+    const isStateVisualEdit =
+      activeEditingState !== 'normal' &&
+      Object.keys(patch).some((k) => visualStateKeys.includes(k));
+
+    const nextEntities = entities.map((e: any) => {
+      if (!selEntIds.has(e.id)) return e;
+      if (isStateVisualEdit && e.entityType !== 'bg_shape') {
+        const currentStates = e.states || {};
+        const prevThisState = currentStates[activeEditingState] || {
+          label: e.label,
+          sublabel: e.sublabel,
+          color: e.color,
+          borderStyle: e.borderStyle || 'solid',
+          scale: e.scale || 1
+        };
+        return {
+          ...e,
+          states: {
+            ...currentStates,
+            [activeEditingState]: {
+              ...prevThisState,
+              ...patch
+            }
+          }
+        };
+      }
+      return { ...e, ...patch };
+    });
+
     const nextZones = zones.map((z: any) =>
       selZoneIds.has(z.id)
         ? {
@@ -1785,7 +1988,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       draggable: !isAnchoredProp,
       anchored: isAnchoredProp,
       returnToAnchor: !isAnchoredProp,
-      category: ''
+      category: '',
+      states: {}
     };
     onChange({ ...block, entities: [...entities, newEnt] });
     setSelectedItems([{ kind: 'entity', id: newId }]);
@@ -1987,13 +2191,16 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     primarySelected?.kind === 'zone'
       ? zones.find((z: any) => z.id === primarySelected.id)
       : null;
-  const activeTarget = activeSelectedEntity || activeSelectedZone;
+  const rawActiveTarget = activeSelectedEntity || activeSelectedZone;
+  const activeTarget =
+    activeSelectedEntity && activeEditingState !== 'normal'
+      ? resolveEntityVisualState(activeSelectedEntity, activeEditingState)
+      : rawActiveTarget;
   const isMultiSelect = selectedItems.length > 1;
 
   const activeThemeClass =
     THEME_BACKGROUNDS[block?.backgroundTheme || 'physics_lab'] || THEME_BACKGROUNDS.physics_lab;
 
-  // Dynamic Handle Sizing for Tablet Touch vs Desktop Pointer
   const handleBtnSize = isTabletMode
     ? 'w-12 h-12 -top-5 -left-5'
     : 'w-8 h-8 -top-3.5 -left-3.5';
@@ -2005,8 +2212,71 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     : 'w-8 h-8 -bottom-3.5 -right-3.5';
   const handleIconPx = isTabletMode ? 18 : 13;
 
+  // Create or Activate a State on Selected Entities
+  const handleActivateOrCreateState = (stateKey: string) => {
+    if (stateKey === 'normal') {
+      setActiveEditingState('normal');
+      return;
+    }
+    const selEntIds = new Set(
+      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
+    );
+    const defaultColors: Record<string, string> = {
+      hover: 'cyan',
+      selected: 'amber',
+      visited: 'emerald',
+      disabled: 'slate'
+    };
+
+    const nextEntities = entities.map((e: any) => {
+      if (!selEntIds.has(e.id) || e.entityType === 'bg_shape') return e;
+      const existingStates = e.states || {};
+      if (existingStates[stateKey]) return e;
+      return {
+        ...e,
+        states: {
+          ...existingStates,
+          [stateKey]: {
+            label: e.label,
+            sublabel:
+              stateKey === 'visited'
+                ? '✓ Explored'
+                : stateKey === 'selected'
+                ? '★ Selected'
+                : e.sublabel,
+            color: defaultColors[stateKey] || e.color || 'indigo',
+            borderStyle: stateKey === 'selected' ? 'glow' : e.borderStyle || 'solid',
+            scale: stateKey === 'hover' ? 1.06 : e.scale || 1
+          }
+        }
+      };
+    });
+
+    onChange({ ...block, entities: nextEntities });
+    setActiveEditingState(stateKey);
+    notifyBuilder(
+      `Editing "${stateKey.toUpperCase()}" state — any color, text, or border changes apply to this state!`
+    );
+  };
+
+  const handleDeleteStateOverride = (stateKey: string) => {
+    if (stateKey === 'normal') return;
+    const selEntIds = new Set(
+      selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
+    );
+    const nextEntities = entities.map((e: any) => {
+      if (!selEntIds.has(e.id) || !e.states?.[stateKey]) return e;
+      const nextStates = { ...e.states };
+      delete nextStates[stateKey];
+      return { ...e, states: nextStates };
+    });
+    onChange({ ...block, entities: nextEntities });
+    setActiveEditingState('normal');
+    notifyBuilder(`Removed "${stateKey}" state override.`);
+  };
+
   // ============================================================================
-  //  PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER (WITH TOUCH D-PAD)
+  //  PHOTOSHOP / FIGMA CONTEXTUAL TASK BAR RENDERER
   // ============================================================================
   const renderContextualTaskBar = (isFloatingInstance = false) => {
     if (!activeTarget) {
@@ -2018,24 +2288,22 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 <>
                   <Tablet size={16} className="text-emerald-400" />
                   <span>
-                    <strong className="text-emerald-300">Tablet Touch Studio Active:</strong> Tap any box to edit — or toggle{' '}
-                    <strong className="text-cyan-300">Multi-Select</strong> to tap multiple items with your finger!
+                    <strong className="text-emerald-300">Tablet Touch Studio:</strong> Tap any box to edit States & Button Sets — or toggle{' '}
+                    <strong className="text-cyan-300">Multi-Select</strong>!
                   </span>
                 </>
               ) : (
                 <>
                   <Keyboard size={14} className="text-indigo-400" />
                   <span>
-                    Click to select (<strong className="text-cyan-300">Shift+Click</strong> multi-select) •{' '}
-                    <strong className="text-amber-300">Arrow Keys</strong> nudge 1% •{' '}
-                    <strong className="text-emerald-300">Ctrl+D</strong> duplicate •{' '}
-                    <strong className="text-rose-400">Del</strong> remove
+                    Select a box to edit <strong className="text-amber-300">Object States & Button Sets</strong> •{' '}
+                    <strong className="text-cyan-300">Shift+Click</strong> multi-select •{' '}
+                    <strong className="text-emerald-300">Ctrl+D</strong> duplicate
                   </span>
                 </>
               )}
             </span>
             <div className="flex items-center gap-1.5">
-              {/* Touch Multi-Select Toggle */}
               <button
                 type="button"
                 onClick={() => setTouchMultiSelectActive((m) => !m)}
@@ -2103,8 +2371,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
     const floatX = isTaskbarPinned
       ? pinnedPos.x
-      : Math.min(76, Math.max(24, Number(activeTarget.x ?? 50)));
-    const rawTargetY = Number(activeTarget.y ?? 50);
+      : Math.min(76, Math.max(24, Number(rawActiveTarget.x ?? 50)));
+    const rawTargetY = Number(rawActiveTarget.y ?? 50);
     const floatY = isTaskbarPinned
       ? pinnedPos.y
       : rawTargetY > 32
@@ -2139,7 +2407,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             isVertical ? 'flex-col gap-3.5' : 'flex-wrap items-center gap-2.5'
           }`}
         >
-          {/* 1. Drag Grip + Pin Toggle + Multi-Select Toggle + Count Badge */}
+          {/* 1. Drag Grip + Pin Toggle + Multi-Select Badge + Active State Indicator */}
           <div className="flex items-center gap-1.5 pr-2 border-r border-slate-700/80">
             {isFloatingInstance && (
               <button
@@ -2167,7 +2435,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <button
               type="button"
               onClick={() => setTouchMultiSelectActive((m) => !m)}
-              title="Toggle Touch Multi-Select Mode (Tap multiple items without holding Shift)"
+              title="Toggle Touch Multi-Select Mode"
               className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider flex items-center gap-1 whitespace-nowrap transition-all ${
                 touchMultiSelectActive || isMultiSelect
                   ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow'
@@ -2185,6 +2453,23 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 ? 'Card / Box'
                 : 'Drop Bucket'}
             </button>
+
+            {/* 🔥 TOGGLE STORYLINE STATES TRAY BUTTON */}
+            {isEntity && !isBgShape && (
+              <button
+                type="button"
+                onClick={() => setShowStatesTray((s) => !s)}
+                title="Open Storyline Object States & Button Set Editor"
+                className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider flex items-center gap-1 whitespace-nowrap transition-all ${
+                  showStatesTray || activeEditingState !== 'normal'
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md'
+                    : 'bg-slate-800 text-amber-300 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                <Sparkles size={12} />
+                States ({activeEditingState.toUpperCase()})
+              </button>
+            )}
 
             {isFloatingInstance && (
               <button
@@ -2211,7 +2496,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             )}
           </div>
 
-          {/* 2. Primary Text & Sublabel Inline Inputs */}
+          {/* 2. Primary Text & Sublabel Inline Inputs (Writes to Active State!) */}
           <div className={`flex ${isVertical ? 'flex-col' : 'items-center'} gap-1.5`}>
             {!isMultiSelect && (
               <input
@@ -2220,7 +2505,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 placeholder="(Empty Box — No Text)"
                 onChange={(e) => updateSelectedFields({ label: e.target.value })}
                 className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-400 text-xs font-black text-white outline-none w-40"
-                title="Primary Label"
+                title={`Label for "${activeEditingState}" state`}
               />
             )}
             <input
@@ -2229,7 +2514,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               placeholder={isMultiSelect ? 'Batch subtitle...' : 'Subtitle / hint...'}
               onChange={(e) => updateSelectedFields({ sublabel: e.target.value })}
               className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-400 text-xs font-bold text-slate-300 outline-none w-32"
-              title="Subtitle / Hint"
+              title={`Subtitle for "${activeEditingState}" state`}
             />
             <button
               type="button"
@@ -2238,8 +2523,8 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 updateSelectedFields({
                   label: '',
                   sublabel: '',
-                  width: activeTarget.width ?? 24,
-                  height: activeTarget.height ?? 16,
+                  width: rawActiveTarget.width ?? 24,
+                  height: rawActiveTarget.height ?? 16,
                   resizeMode: 'box'
                 })
               }
@@ -2249,7 +2534,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </button>
           </div>
 
-          {/* 3. 6-Color Palette Swatches (Larger Touch Targets in Tablet Mode) */}
+          {/* 3. 6-Color Palette Swatches */}
           <div className="flex items-center gap-1.5 px-2 border-l border-r border-slate-800">
             {Object.entries(COLOR_STYLES).map(([colorKey, cObj]) => {
               const isPicked = (activeTarget.color || 'indigo') === colorKey;
@@ -2257,7 +2542,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 <button
                   key={colorKey}
                   type="button"
-                  title={`Apply ${colorKey} to selected`}
+                  title={`Apply ${colorKey} to "${activeEditingState}" state`}
                   onClick={() => updateSelectedFields({ color: colorKey })}
                   style={{ backgroundColor: cObj.hex }}
                   className={`${
@@ -2290,7 +2575,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
             {isEntity && (
               <select
-                value={activeTarget.shapeVariant || 'banner'}
+                value={rawActiveTarget.shapeVariant || 'banner'}
                 onChange={(e) => updateSelectedFields({ shapeVariant: e.target.value })}
                 title="Corner Geometry"
                 className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[10px] font-black uppercase text-slate-200 outline-none"
@@ -2311,12 +2596,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 type="number"
                 min={5}
                 max={96}
-                value={activeTarget.width ?? (isEntity ? 20 : 28)}
+                value={rawActiveTarget.width ?? (isEntity ? 20 : 28)}
                 onChange={(e) => {
                   const w = Math.max(5, Math.min(96, Number(e.target.value) || 15));
                   updateSelectedFields({
                     width: w,
-                    height: activeTarget.height ?? 14,
+                    height: rawActiveTarget.height ?? 14,
                     resizeMode: 'box'
                   });
                 }}
@@ -2330,12 +2615,12 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 type="number"
                 min={5}
                 max={96}
-                value={activeTarget.height ?? (isEntity ? 12 : 24)}
+                value={rawActiveTarget.height ?? (isEntity ? 12 : 24)}
                 onChange={(e) => {
                   const h = Math.max(5, Math.min(96, Number(e.target.value) || 12));
                   updateSelectedFields({
                     height: h,
-                    width: activeTarget.width ?? 20,
+                    width: rawActiveTarget.width ?? 20,
                     resizeMode: 'box'
                   });
                 }}
@@ -2354,7 +2639,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   min={5}
                   max={95}
                   step={5}
-                  value={activeTarget.opacity ?? 22}
+                  value={rawActiveTarget.opacity ?? 22}
                   onChange={(e) =>
                     updateSelectedFields({
                       opacity: Math.max(5, Math.min(95, Number(e.target.value) || 20))
@@ -2366,7 +2651,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             )}
           </div>
 
-          {/* 🔥 6. ON-SCREEN TOUCH D-PAD NUDGE CLUSTER (4-WAY ARROWS + STEP SELECTOR) */}
+          {/* 6. ON-SCREEN TOUCH D-PAD NUDGE CLUSTER */}
           <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-950 border border-slate-800">
             <select
               value={touchNudgeStep}
@@ -2412,43 +2697,55 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </button>
           </div>
 
-          {/* 7. Category / Sequence / Connector Target Controls */}
+          {/* 7. Category / Button Set / Sequence / Connector Target Controls */}
           <div className="flex items-center gap-1.5">
             {isEntity && !isBgShape ? (
               <>
                 <input
                   type="text"
                   placeholder="Category (e.g. ed)"
-                  value={activeTarget.category || ''}
+                  value={rawActiveTarget.category || ''}
                   onChange={(e) => updateSelectedFields({ category: e.target.value })}
                   title="Category Match Tag"
-                  className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-28"
+                  className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-24"
                 />
+                {/* 🔥 BUTTON SET QUICK SELECTOR (Radio-Group Mutual Exclusivity) */}
+                <select
+                  value={rawActiveTarget.buttonSet || ''}
+                  onChange={(e) => updateSelectedFields({ buttonSet: e.target.value || undefined })}
+                  title="Assign to a Storyline Button Set (Only 1 card in a set can be Selected at a time)"
+                  className="px-2 py-2 rounded-xl bg-slate-950 border border-amber-500/40 text-[10px] font-black text-amber-300 outline-none"
+                >
+                  <option value="">Btn Set: None</option>
+                  <option value="set_a">Btn Set: Group A</option>
+                  <option value="set_b">Btn Set: Group B</option>
+                  <option value="set_c">Btn Set: Group C</option>
+                </select>
                 {!isMultiSelect && (
                   <>
                     <input
                       type="number"
                       placeholder="Seq #"
-                      value={activeTarget.sequenceIndex ?? ''}
+                      value={rawActiveTarget.sequenceIndex ?? ''}
                       onChange={(e) =>
-                        updateEntityField(activeTarget.id, {
+                        updateEntityField(rawActiveTarget.id, {
                           sequenceIndex: e.target.value ? Number(e.target.value) : undefined
                         })
                       }
                       title="Sequence Order Slot #"
-                      className="px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-amber-300 outline-none w-16"
+                      className="px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-amber-300 outline-none w-14"
                     />
                     <select
-                      value={activeTarget.connectTargetId || ''}
-                      onChange={(e) => handleLinkConnectorTarget(activeTarget.id, e.target.value)}
+                      value={rawActiveTarget.connectTargetId || ''}
+                      onChange={(e) => handleLinkConnectorTarget(rawActiveTarget.id, e.target.value)}
                       title="Link SVG Connector Line Target"
-                      className="px-2 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-[10px] font-bold text-cyan-300 outline-none max-w-[140px]"
+                      className="px-2 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-[10px] font-bold text-cyan-300 outline-none max-w-[130px]"
                     >
                       <option value="">Link Line: None</option>
                       {entities
                         .filter(
                           (other: any) =>
-                            other.id !== activeTarget.id && other.entityType !== 'bg_shape'
+                            other.id !== rawActiveTarget.id && other.entityType !== 'bg_shape'
                         )
                         .map((other: any) => (
                           <option key={other.id} value={other.id}>
@@ -2464,7 +2761,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 <input
                   type="text"
                   placeholder="Accepts Cat (e.g. ed)"
-                  value={activeTarget.acceptedCategory || ''}
+                  value={rawActiveTarget.acceptedCategory || ''}
                   onChange={(e) => updateSelectedFields({ acceptedCategory: e.target.value })}
                   className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-32"
                 />
@@ -2474,7 +2771,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     type="number"
                     min={1}
                     max={12}
-                    value={activeTarget.capacity ?? 2}
+                    value={rawActiveTarget.capacity ?? 2}
                     onChange={(e) =>
                       updateSelectedFields({
                         capacity: Math.max(1, Number(e.target.value) || 1)
@@ -2523,9 +2820,9 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     updateSelectedFields({
                       entityType: isBgShape ? 'draggable' : 'bg_shape',
                       zOrder: isBgShape ? 30 : 2,
-                      width: activeTarget.width ?? 42,
-                      height: activeTarget.height ?? 34,
-                      opacity: activeTarget.opacity ?? 20,
+                      width: rawActiveTarget.width ?? 42,
+                      height: rawActiveTarget.height ?? 34,
+                      opacity: rawActiveTarget.opacity ?? 20,
                       anchored: !isBgShape,
                       draggable: isBgShape
                     })
@@ -2542,18 +2839,18 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 <button
                   type="button"
                   title={
-                    activeTarget.anchored
+                    rawActiveTarget.anchored
                       ? 'Anchored on Student Stage (Students Cannot Drag)'
                       : 'Draggable by Students (Tap to Anchor in Place)'
                   }
                   onClick={() =>
                     updateSelectedFields({
-                      anchored: !activeTarget.anchored,
-                      draggable: Boolean(activeTarget.anchored)
+                      anchored: !rawActiveTarget.anchored,
+                      draggable: Boolean(rawActiveTarget.anchored)
                     })
                   }
                   className={`p-2 rounded-lg border ${
-                    activeTarget.anchored
+                    rawActiveTarget.anchored
                       ? 'bg-amber-500 text-slate-950 border-amber-300'
                       : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                   }`}
@@ -2561,21 +2858,21 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   <Pin size={13} />
                 </button>
 
-                {!activeTarget.anchored && (
+                {!rawActiveTarget.anchored && (
                   <button
                     type="button"
                     title={
-                      activeTarget.returnToAnchor
+                      rawActiveTarget.returnToAnchor
                         ? 'Magnetic Home Return: ON'
                         : 'Magnetic Home Return: OFF'
                     }
                     onClick={() =>
                       updateSelectedFields({
-                        returnToAnchor: !activeTarget.returnToAnchor
+                        returnToAnchor: !rawActiveTarget.returnToAnchor
                       })
                     }
                     className={`p-2 rounded-lg border ${
-                      activeTarget.returnToAnchor
+                      rawActiveTarget.returnToAnchor
                         ? 'bg-cyan-600 text-white border-cyan-400'
                         : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                     }`}
@@ -2592,7 +2889,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               onClick={() =>
                 isMultiSelect
                   ? adjustBatchZOrder('back')
-                  : adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'back')
+                  : adjustLayerZOrder(isEntity ? 'entity' : 'zone', rawActiveTarget.id, 'back')
               }
               className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
             >
@@ -2604,7 +2901,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               onClick={() =>
                 isMultiSelect
                   ? adjustBatchZOrder('front')
-                  : adjustLayerZOrder(isEntity ? 'entity' : 'zone', activeTarget.id, 'front')
+                  : adjustLayerZOrder(isEntity ? 'entity' : 'zone', rawActiveTarget.id, 'front')
               }
               className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white"
             >
@@ -2614,22 +2911,22 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <button
               type="button"
               title={
-                activeTarget.lockInBuilder
+                rawActiveTarget.lockInBuilder
                   ? 'Locked in Editor (Tap to Unlock)'
                   : 'Lock Position in Editor'
               }
               onClick={() =>
                 updateSelectedFields({
-                  lockInBuilder: !activeTarget.lockInBuilder
+                  lockInBuilder: !rawActiveTarget.lockInBuilder
                 })
               }
               className={`p-2 rounded-lg ${
-                activeTarget.lockInBuilder
+                rawActiveTarget.lockInBuilder
                   ? 'bg-rose-500 text-white'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              {activeTarget.lockInBuilder ? <Lock size={14} /> : <Unlock size={14} />}
+              {rawActiveTarget.lockInBuilder ? <Lock size={14} /> : <Unlock size={14} />}
             </button>
 
             <button
@@ -2731,7 +3028,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
               {isTabletMode
                 ? `Tablet Touch Studio Active • 48px Handles • Touch D-Pad (${selectedItems.length} Selected)`
-                : `HD Stage Studio • Shift+Click Multi-Select • Arrows Nudge • Ctrl+D Duplicate (${selectedItems.length} Selected)`}
+                : `HD Stage Studio • Storyline States & Button Sets • Shift+Click Multi-Select (${selectedItems.length} Selected)`}
             </span>
             {builderToast && (
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase animate-in fade-in">
@@ -2749,11 +3046,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* 🔥 TABLET TOUCH MODE AUTO-DETECT + MANUAL OVERRIDE BUTTON */}
           <button
             type="button"
             onClick={() => setTabletModeOverride(isTabletMode ? false : true)}
-            title="Toggle Tablet Touch-Friendly Interface (48px handles, Touch Multi-Select & On-Screen D-Pad)"
+            title="Toggle Tablet Touch-Friendly Interface"
             className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border transition-all ${
               isTabletMode
                 ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/20'
@@ -2764,7 +3060,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             {isTabletMode ? 'Tablet UI: ON' : 'Tablet UI: Auto'}
           </button>
 
-          {/* Touch Multi-Select Quick Toggle in Header */}
           <button
             type="button"
             onClick={() => setTouchMultiSelectActive((m) => !m)}
@@ -2862,6 +3157,18 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
           <button
             type="button"
+            onClick={() => setShowStatesTray((s) => !s)}
+            className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border transition-all ${
+              showStatesTray
+                ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <Sparkles size={13} /> States Tray
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowLayerToolbar((l) => !l)}
             className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border transition-all ${
               showLayerToolbar
@@ -2887,6 +3194,223 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
       {/* DOCK POSITION 1: TOP PHOTOSHOP OPTIONS RIBBON */}
       {taskbarDock === 'top' && renderContextualTaskBar(false)}
+
+      {/* ============================================================================ */}
+      {/* 🔥 ARTICULATE STORYLINE OBJECT STATES & BUTTON SETS TRAY                     */}
+      {/* ============================================================================ */}
+      {showStatesTray && (
+        <div className="p-4 rounded-3xl bg-slate-950 text-white border-2 border-amber-500/40 shadow-2xl space-y-4 animate-in slide-in-from-top-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <Sparkles size={16} className="text-amber-400" />
+              <span className="text-xs font-black uppercase tracking-widest text-amber-300">
+                Storyline Object States & Button Set Studio
+              </span>
+              {activeSelectedEntity ? (
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-black">
+                  Target: {activeSelectedEntity.label || activeSelectedEntity.id}
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400 font-bold">
+                  Select any card on the canvas to configure its interactive states
+                </span>
+              )}
+            </div>
+
+            {activeSelectedEntity && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Initial State Selector */}
+                <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Initial State:</span>
+                  <select
+                    value={activeSelectedEntity.initialState || 'normal'}
+                    onChange={(e) => updateSelectedFields({ initialState: e.target.value })}
+                    className="bg-transparent text-xs font-black text-amber-300 outline-none"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="hidden">Hidden</option>
+                    <option value="disabled">Disabled</option>
+                    <option value="selected">Selected</option>
+                    <option value="visited">Visited</option>
+                  </select>
+                </div>
+
+                {/* Require Visited Mastery Gate Toggle */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateSelectedFields({
+                      requireVisited: !activeSelectedEntity.requireVisited,
+                      anchored: !activeSelectedEntity.requireVisited
+                        ? true
+                        : activeSelectedEntity.anchored,
+                      draggable: !activeSelectedEntity.requireVisited
+                        ? false
+                        : activeSelectedEntity.draggable
+                    })
+                  }
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border flex items-center gap-1.5 ${
+                    activeSelectedEntity.requireVisited
+                      ? 'bg-emerald-600 text-white border-emerald-400'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Eye size={12} />
+                  {activeSelectedEntity.requireVisited ? 'Must Visit: ON' : 'Must Visit: OFF'}
+                </button>
+
+                {/* Correct Choice in Button Set Toggle */}
+                {activeSelectedEntity.buttonSet && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSelectedFields({
+                        isCorrectSelect: !activeSelectedEntity.isCorrectSelect
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border flex items-center gap-1.5 ${
+                      activeSelectedEntity.isCorrectSelect
+                        ? 'bg-amber-500 text-slate-950 border-amber-300'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Radio size={12} />
+                    {activeSelectedEntity.isCorrectSelect
+                      ? 'Correct Set Choice ✓'
+                      : 'Mark as Correct Choice'}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowStatesTray(false)}
+                  className="p-1.5 text-slate-400 hover:text-white"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {activeSelectedEntity && activeSelectedEntity.entityType !== 'bg_shape' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                {BUILTIN_STATE_KEYS.map((st) => {
+                  const isEditingThis = activeEditingState === st.id;
+                  const isConfigured =
+                    st.id === 'normal' || Boolean(activeSelectedEntity.states?.[st.id]);
+                  const previewEnt = resolveEntityVisualState(activeSelectedEntity, st.id);
+                  const previewPalette =
+                    COLOR_STYLES[previewEnt.color || 'indigo'] || COLOR_STYLES.indigo;
+
+                  return (
+                    <div
+                      key={st.id}
+                      onClick={() => handleActivateOrCreateState(st.id)}
+                      className={`p-3 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-2 ${
+                        isEditingThis
+                          ? 'bg-indigo-950/70 border-amber-400 ring-2 ring-amber-400/40'
+                          : isConfigured
+                          ? 'bg-slate-900 border-slate-700 hover:border-indigo-400'
+                          : 'bg-slate-900/40 border-dashed border-slate-800 opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-white">
+                          {st.label}
+                        </span>
+                        {st.id !== 'normal' && isConfigured && (
+                          <button
+                            type="button"
+                            title="Remove State Override"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteStateOverride(st.id);
+                            }}
+                            className="text-slate-500 hover:text-rose-400"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Mini Visual Preview of the Card in This State */}
+                      <div
+                        className={`px-3 py-2 rounded-xl text-center truncate text-xs font-black border ${previewPalette.bg} ${previewPalette.border}`}
+                      >
+                        {previewEnt.label || '(Empty)'}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[9px] font-bold text-slate-400">
+                        <span>{isConfigured ? 'Configured ✓' : '+ Tap to Create'}</span>
+                        {isEditingThis && (
+                          <span className="text-amber-400 font-black uppercase">Editing</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Add Custom Named State Row */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    Custom States:
+                  </span>
+                  {Object.keys(activeSelectedEntity.states || {})
+                    .filter((k) => !BUILTIN_STATE_KEYS.some((b) => b.id === k))
+                    .map((customKey) => (
+                      <button
+                        key={customKey}
+                        type="button"
+                        onClick={() => setActiveEditingState(customKey)}
+                        className={`px-3 py-1 rounded-xl text-xs font-black uppercase border flex items-center gap-1.5 ${
+                          activeEditingState === customKey
+                            ? 'bg-amber-400 text-slate-950 border-amber-300'
+                            : 'bg-slate-900 text-indigo-300 border-slate-700'
+                        }`}
+                      >
+                        <span>{customKey}</span>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStateOverride(customKey);
+                          }}
+                          className="hover:text-rose-500"
+                        >
+                          ×
+                        </span>
+                      </button>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={customStateInput}
+                    onChange={(e) => setCustomStateInput(e.target.value)}
+                    placeholder="New custom state (e.g. translated)..."
+                    className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white outline-none w-52"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const clean = customStateInput.trim().toLowerCase().replace(/\s+/g, '_');
+                      if (!clean) return;
+                      handleActivateOrCreateState(clean);
+                      setCustomStateInput('');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase"
+                  >
+                    + Add State
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* VISUAL LAYER & Z-ORDER TOOLBAR PANEL */}
       {showLayerToolbar && (
@@ -3275,33 +3799,40 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             {/* 4. DRAGGABLE & ANCHORED ENTITIES ON BUILDER STAGE */}
             {entities
               .filter((e: any) => e.entityType !== 'bg_shape')
-              .map((ent: any) => {
-                const isSelected = isItemSelected('entity', ent.id);
+              .map((rawEnt: any) => {
+                const isSelected = isItemSelected('entity', rawEnt.id);
+                // If this entity is selected and we are editing a non-normal state, preview that state live on stage!
+                const ent =
+                  isSelected && activeEditingState !== 'normal'
+                    ? resolveEntityVisualState(rawEnt, activeEditingState)
+                    : rawEnt;
+
                 const palette = COLOR_STYLES[ent.color || 'indigo'] || COLOR_STYLES.indigo;
                 const borderStyleClass =
                   BORDER_STYLE_CLASSES[ent.borderStyle || 'solid'] || BORDER_STYLE_CLASSES.solid;
                 const radiusClass =
                   SHAPE_RADIUS_CLASSES[ent.shapeVariant || 'banner'] || 'rounded-2xl';
+                const stateCount = Object.keys(rawEnt.states || {}).length;
 
                 return (
                   <div
-                    key={ent.id}
+                    key={rawEnt.id}
                     onPointerDown={(e) => {
                       builderRootRef.current?.focus();
-                      startMoveItem(e, 'entity', ent);
+                      startMoveItem(e, 'entity', rawEnt);
                     }}
                     style={{
-                      left: `${ent.x}%`,
-                      top: `${ent.y}%`,
-                      width: ent.width ? `${ent.width}%` : undefined,
-                      height: ent.height ? `${ent.height}%` : undefined,
+                      left: `${rawEnt.x}%`,
+                      top: `${rawEnt.y}%`,
+                      width: rawEnt.width ? `${rawEnt.width}%` : undefined,
+                      height: rawEnt.height ? `${rawEnt.height}%` : undefined,
                       transform: `translate(-50%, -50%) scale(${ent.scale || 1}) rotate(${
-                        ent.rotation || 0
+                        rawEnt.rotation || 0
                       }deg)`,
-                      zIndex: ent.zOrder ?? (isSelected ? 55 : 35)
+                      zIndex: rawEnt.zOrder ?? (isSelected ? 55 : 35)
                     }}
                     className={`group absolute px-7 py-4 ${radiusClass} ${borderStyleClass} shadow-xl cursor-move flex items-center justify-center touch-none ${
-                      ent.anchored
+                      rawEnt.anchored && stateCount === 0 && !rawEnt.buttonSet
                         ? 'bg-slate-900 border-amber-400 text-white'
                         : `${palette.bg} ${palette.border}`
                     } ${
@@ -3312,13 +3843,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         : ''
                     }`}
                   >
-                    {!ent.lockInBuilder && (
+                    {!rawEnt.lockInBuilder && (
                       <button
                         type="button"
                         title="Drag in 4 Directions to Move"
                         onPointerDown={(e) => {
                           builderRootRef.current?.focus();
-                          startMoveItem(e, 'entity', ent);
+                          startMoveItem(e, 'entity', rawEnt);
                         }}
                         className={`absolute ${handleBtnSize} rounded-full bg-slate-900 hover:bg-indigo-600 text-white border-2 border-white/80 flex items-center justify-center shadow-lg cursor-move z-30 touch-none`}
                       >
@@ -3333,7 +3864,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       onClick={(e) => {
                         e.stopPropagation();
                         builderRootRef.current?.focus();
-                        selectOrToggleItem('entity', ent.id, e.shiftKey);
+                        selectOrToggleItem('entity', rawEnt.id, e.shiftKey);
                       }}
                       className={`absolute ${menuBtnSize} rounded-full border-2 flex items-center justify-center shadow-lg transition-colors z-30 touch-none ${
                         isSelected
@@ -3344,13 +3875,13 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                       <MoreHorizontal size={handleIconPx} />
                     </button>
 
-                    {!ent.lockInBuilder && (
+                    {!rawEnt.lockInBuilder && (
                       <button
                         type="button"
                         title="Pull Diagonally to Resize Box"
                         onPointerDown={(e) => {
                           builderRootRef.current?.focus();
-                          startResizeItem(e, 'entity', ent);
+                          startResizeItem(e, 'entity', rawEnt);
                         }}
                         className={`absolute ${resizeBtnSize} rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-white flex items-center justify-center shadow-lg cursor-nwse-resize z-30 touch-none`}
                       >
@@ -3359,27 +3890,38 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                     )}
 
                     <div className="flex items-center gap-2">
-                      {ent.anchored && (
+                      {rawEnt.anchored && (
                         <span title="Anchored to Stage" className="inline-flex">
                           <Pin size={15} className="text-amber-400 rotate-45" />
                         </span>
                       )}
-                      {ent.connectTargetId && (
+                      {rawEnt.connectTargetId && (
                         <span title="Linked Connector Node" className="inline-flex">
                           <Link2 size={15} className="text-cyan-200" />
                         </span>
                       )}
-                      {ent.returnToAnchor && !ent.anchored && !ent.connectTargetId && (
-                        <span title="Magnetic Return to Home Anchor" className="inline-flex">
-                          <Magnet size={14} className="text-cyan-200" />
+                      {rawEnt.buttonSet && (
+                        <span
+                          title={`Button Set: ${rawEnt.buttonSet}`}
+                          className="px-1.5 py-0.5 rounded bg-black/30 text-[9px] font-black uppercase text-amber-300"
+                        >
+                          {rawEnt.buttonSet}
+                        </span>
+                      )}
+                      {stateCount > 0 && (
+                        <span
+                          title={`${stateCount + 1} States Configured`}
+                          className="px-1.5 py-0.5 rounded bg-black/30 text-[9px] font-black uppercase text-cyan-200"
+                        >
+                          {stateCount + 1} States
                         </span>
                       )}
                       <div className="text-center">
                         <div className="text-lg font-black">{ent.label || '(Empty Block)'}</div>
                         <div className="text-[11px] font-bold opacity-80">
                           {ent.sublabel}{' '}
-                          {ent.width
-                            ? `• (${ent.width}% × ${ent.height || 10}%)`
+                          {rawEnt.width
+                            ? `• (${rawEnt.width}% × ${rawEnt.height || 10}%)`
                             : `• ${Math.round((ent.scale || 1) * 100)}%`}
                         </div>
                       </div>
