@@ -10,7 +10,7 @@ import {
   ChevronsUp, ChevronsDown, Layers, GripVertical,
   PanelTop, PanelBottom, PanelRight,
   CheckSquare, Columns, Keyboard, Tablet,
-  Sparkles, Radio, Eye
+  Sparkles, Radio, Eye, Database, Zap, GitBranch
 } from 'lucide-react';
 
 // ============================================================================
@@ -143,6 +143,50 @@ const THEME_BACKGROUNDS: Record<string, string> = {
 };
 
 // ============================================================================
+//  TYPES FOR VARIABLES & CONDITIONAL TRIGGERS
+// ============================================================================
+export interface CanvasVariable {
+  id: string;
+  name: string;
+  type: 'text' | 'number' | 'boolean';
+  defaultValue: string | number | boolean;
+}
+
+export interface ConditionalTriggerRule {
+  id: string;
+  event: 'on_click' | 'on_drop' | 'on_variable_change' | 'on_timeline_reach';
+  entityId?: string;
+  zoneId?: string;
+  watchVariable?: string;
+  timelineThreshold?: number;
+  // IF Condition
+  conditionType?: 'none' | 'variable' | 'state';
+  conditionVariable?: string;
+  conditionOperator?: '==' | '!=' | '>=' | '<=' | '>' | '<';
+  conditionValue?: string;
+  conditionEntityId?: string;
+  conditionStateIs?: string;
+  // THEN Action
+  action: 'adjust_variable' | 'change_state' | 'show_layer' | 'show_toast' | 'complete_block';
+  targetVariable?: string;
+  variableOp?: 'set' | 'add' | 'subtract' | 'toggle';
+  variableAmount?: string | number;
+  targetEntityId?: string;
+  targetState?: string;
+  targetLayerId?: string;
+  message?: string;
+  // ELSE Action (Optional)
+  elseAction?: 'none' | 'adjust_variable' | 'change_state' | 'show_layer' | 'show_toast';
+  elseTargetVariable?: string;
+  elseVariableOp?: 'set' | 'add' | 'subtract' | 'toggle';
+  elseVariableAmount?: string | number;
+  elseTargetEntityId?: string;
+  elseTargetState?: string;
+  elseTargetLayerId?: string;
+  elseMessage?: string;
+}
+
+// ============================================================================
 //  TABLET / TOUCH ENVIRONMENT DETECTOR HOOK
 // ============================================================================
 function useTabletTouchDetector() {
@@ -197,10 +241,32 @@ function resolveEntityVisualState(ent: any, stateName: string) {
   };
 }
 
+// Helper: Interpolate `%VariableName%` tokens in any string with live runtime values
+export function interpolateVariables(
+  rawText: string | undefined | null,
+  varMap: Record<string, any>
+): string {
+  if (!rawText) return '';
+  return String(rawText).replace(/%([a-zA-Z0-9_]+)%/g, (fullMatch, varName) => {
+    if (varMap && varMap[varName] !== undefined) {
+      return String(varMap[varName]);
+    }
+    const lowerKey = Object.keys(varMap || {}).find(
+      (k) => k.toLowerCase() === String(varName).toLowerCase()
+    );
+    if (lowerKey !== undefined) {
+      return String(varMap[lowerKey]);
+    }
+    return fullMatch;
+  });
+}
+
 // ============================================================================
 //  1. STUDENT & SMARTBOARD PLAYER: KINETIC CANVAS BLOCK
-//  Now with Full Storyline Object States Engine (Normal, Hover, Selected, Visited, Disabled)
-//  and Button Sets (Radio-Group Mutual Exclusivity)
+//  Features:
+//   - Live `%Variable%` Text Replacement Engine
+//   - Conditional Trigger Evaluator (`WHEN / IF / THEN / ELSE`)
+//   - Object States (`Normal`, `Hover`, `Selected`, `Visited`, `Disabled`) & Button Sets
 // ============================================================================
 export const KineticCanvasBlock = ({ block, onComplete }: any) => {
   const outerWrapRef = useRef<HTMLDivElement>(null);
@@ -211,6 +277,28 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [stageScale, setStageScale] = useState(0.55);
+
+  // Build Initial Variable Map (User-defined + Built-in System Variables)
+  const initialVariableMap = useMemo(() => {
+    const map: Record<string, any> = {
+      Score: 0,
+      MistakeCount: 0,
+      CorrectCount: 0,
+      VisitedCount: 0,
+      LearnerName: 'Discipulus'
+    };
+    const definedVars: CanvasVariable[] = Array.isArray(block?.variables) ? block.variables : [];
+    definedVars.forEach((v) => {
+      if (!v?.name) return;
+      if (v.type === 'number') map[v.name] = Number(v.defaultValue ?? 0);
+      else if (v.type === 'boolean')
+        map[v.name] = v.defaultValue === true || String(v.defaultValue).toLowerCase() === 'true';
+      else map[v.name] = String(v.defaultValue ?? '');
+    });
+    return map;
+  }, [block?.variables]);
+
+  const [runtimeVars, setRuntimeVars] = useState<Record<string, any>>(initialVariableMap);
 
   const initialEntities = useMemo(() => {
     return (Array.isArray(block?.entities) ? block.entities : []).map((e: any) => ({
@@ -249,10 +337,25 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 
   useEffect(() => {
     setEntities(initialEntities);
+    setRuntimeVars(initialVariableMap);
     setConnections([]);
     setTimelineProgress(0);
     setActiveLayer(null);
-  }, [initialEntities]);
+  }, [initialEntities, initialVariableMap]);
+
+  // Keep Built-In System Variables (`CorrectCount` & `VisitedCount`) synced automatically
+  useEffect(() => {
+    const correctCount = entities.filter((e) => e.validationStatus === 'correct').length;
+    const visitedCount = entities.filter((e) => e.isVisited || e.currentState === 'visited').length;
+    setRuntimeVars((prev) => {
+      if (prev.CorrectCount === correctCount && prev.VisitedCount === visitedCount) return prev;
+      return {
+        ...prev,
+        CorrectCount: correctCount,
+        VisitedCount: visitedCount
+      };
+    });
+  }, [entities]);
 
   useEffect(() => {
     const updateScale = () => {
@@ -274,6 +377,192 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       window.removeEventListener('resize', updateScale);
     };
   }, [resolution.width, resolution.height, isFullscreen]);
+
+  // ============================================================================
+  //  🔥 CONDITIONAL TRIGGER EVALUATOR (`WHEN / IF / THEN / ELSE`)
+  // ============================================================================
+  const evaluateRuleCondition = useCallback(
+    (rule: ConditionalTriggerRule, currentVars: Record<string, any>, currentEnts: any[]) => {
+      if (!rule.conditionType || rule.conditionType === 'none') return true;
+
+      if (rule.conditionType === 'variable' && rule.conditionVariable) {
+        const actualVal = currentVars[rule.conditionVariable];
+        const expectedRaw = rule.conditionValue ?? '';
+        const op = rule.conditionOperator || '==';
+
+        const numActual = Number(actualVal);
+        const numExpected = Number(expectedRaw);
+        const bothNumeric =
+          !Number.isNaN(numActual) && !Number.isNaN(numExpected) && String(expectedRaw).trim() !== '';
+
+        if (bothNumeric) {
+          if (op === '==') return numActual === numExpected;
+          if (op === '!=') return numActual !== numExpected;
+          if (op === '>=') return numActual >= numExpected;
+          if (op === '<=') return numActual <= numExpected;
+          if (op === '>') return numActual > numExpected;
+          if (op === '<') return numActual < numExpected;
+        }
+
+        const strActual = String(actualVal ?? '').trim().toLowerCase();
+        const strExpected = String(expectedRaw).trim().toLowerCase();
+        if (op === '!=') return strActual !== strExpected;
+        return strActual === strExpected;
+      }
+
+      if (rule.conditionType === 'state' && rule.conditionEntityId) {
+        const targetEnt = currentEnts.find((e) => e.id === rule.conditionEntityId);
+        if (!targetEnt) return false;
+        const desiredState = rule.conditionStateIs || 'visited';
+        if (desiredState === 'visited') return Boolean(targetEnt.isVisited || targetEnt.currentState === 'visited');
+        if (desiredState === 'selected') return Boolean(targetEnt.isSelected || targetEnt.currentState === 'selected');
+        return (targetEnt.currentState || 'normal') === desiredState;
+      }
+
+      return true;
+    },
+    []
+  );
+
+  const executeTriggerAction = useCallback(
+    (
+      actionType: string | undefined,
+      params: {
+        targetVariable?: string;
+        variableOp?: string;
+        variableAmount?: any;
+        targetEntityId?: string;
+        targetState?: string;
+        targetLayerId?: string;
+        message?: string;
+      },
+      currentVars: Record<string, any>
+    ) => {
+      if (!actionType || actionType === 'none') return currentVars;
+      let updatedVars = { ...currentVars };
+
+      if (actionType === 'adjust_variable' && params.targetVariable) {
+        const varName = params.targetVariable;
+        const op = params.variableOp || 'set';
+        const prevVal = updatedVars[varName];
+        const rawAmt = params.variableAmount;
+
+        if (op === 'toggle') {
+          updatedVars[varName] = !prevVal;
+        } else if (op === 'add') {
+          updatedVars[varName] = Number(prevVal || 0) + Number(rawAmt || 1);
+        } else if (op === 'subtract') {
+          updatedVars[varName] = Number(prevVal || 0) - Number(rawAmt || 1);
+        } else {
+          // 'set'
+          if (typeof prevVal === 'number') {
+            updatedVars[varName] = Number(rawAmt ?? 0);
+          } else if (typeof prevVal === 'boolean') {
+            updatedVars[varName] = String(rawAmt).toLowerCase() === 'true';
+          } else {
+            updatedVars[varName] = String(rawAmt ?? '');
+          }
+        }
+        setRuntimeVars(updatedVars);
+      }
+
+      if (actionType === 'change_state' && params.targetEntityId && params.targetState) {
+        setEntities((prev) =>
+          prev.map((item) =>
+            item.id === params.targetEntityId
+              ? {
+                  ...item,
+                  currentState: params.targetState,
+                  isVisited: params.targetState === 'visited' ? true : item.isVisited,
+                  isSelected: params.targetState === 'selected'
+                }
+              : item
+          )
+        );
+      }
+
+      if (actionType === 'show_layer' && params.targetLayerId) {
+        const foundLayer = layers.find((l: any) => l.id === params.targetLayerId);
+        if (foundLayer) setActiveLayer(foundLayer);
+      }
+
+      if (actionType === 'show_toast' && params.message) {
+        setStatusBanner(interpolateVariables(params.message, updatedVars));
+      }
+
+      if (actionType === 'complete_block' && onComplete) {
+        onComplete();
+      }
+
+      if (params.message && actionType !== 'show_toast') {
+        setStatusBanner(interpolateVariables(params.message, updatedVars));
+      }
+
+      return updatedVars;
+    },
+    [layers, onComplete]
+  );
+
+  const runMatchingRules = useCallback(
+    (
+      eventType: 'on_click' | 'on_drop' | 'on_variable_change' | 'on_timeline_reach',
+      context: { entityId?: string; zoneId?: string; variableName?: string; progress?: number },
+      latestVars: Record<string, any>,
+      latestEnts: any[]
+    ) => {
+      let workingVars = { ...latestVars };
+
+      rules.forEach((rule: ConditionalTriggerRule) => {
+        const rEvent = rule.event || (rule.zoneId ? 'on_drop' : 'on_click');
+        if (rEvent !== eventType) return;
+
+        if (eventType === 'on_click' && rule.entityId && rule.entityId !== context.entityId) return;
+        if (eventType === 'on_drop') {
+          if (rule.entityId && rule.entityId !== context.entityId) return;
+          if (rule.zoneId && rule.zoneId !== context.zoneId) return;
+        }
+        if (
+          eventType === 'on_variable_change' &&
+          rule.watchVariable &&
+          rule.watchVariable !== context.variableName
+        ) {
+          return;
+        }
+
+        const conditionPassed = evaluateRuleCondition(rule, workingVars, latestEnts);
+        if (conditionPassed) {
+          workingVars = executeTriggerAction(
+            rule.action || (rule.targetLayerId ? 'show_layer' : 'show_toast'),
+            {
+              targetVariable: rule.targetVariable,
+              variableOp: rule.variableOp,
+              variableAmount: rule.variableAmount,
+              targetEntityId: rule.targetEntityId,
+              targetState: rule.targetState,
+              targetLayerId: rule.targetLayerId,
+              message: rule.message
+            },
+            workingVars
+          );
+        } else if (rule.elseAction && rule.elseAction !== 'none') {
+          workingVars = executeTriggerAction(
+            rule.elseAction,
+            {
+              targetVariable: rule.elseTargetVariable,
+              variableOp: rule.elseVariableOp,
+              variableAmount: rule.elseVariableAmount,
+              targetEntityId: rule.elseTargetEntityId,
+              targetState: rule.elseTargetState,
+              targetLayerId: rule.elseTargetLayerId,
+              message: rule.elseMessage
+            },
+            workingVars
+          );
+        }
+      });
+    },
+    [rules, evaluateRuleCondition, executeTriggerAction]
+  );
 
   useEffect(() => {
     if (!block?.enableTimeline || keyframes.length === 0) return;
@@ -302,10 +591,11 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 
   const handleResetLab = () => {
     setEntities(initialEntities);
+    setRuntimeVars(initialVariableMap);
     setConnections([]);
     setTimelineProgress(0);
     setActiveLayer(null);
-    setStatusBanner('Canvas reset to initial states and anchored positions.');
+    setStatusBanner('Canvas reset to initial states, variables, and anchored positions.');
     setTimeout(() => setStatusBanner(null), 2500);
   };
 
@@ -318,13 +608,10 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     const buttonSetName = (clickedEnt.buttonSet || '').trim();
     const isMultiSelectType = clickedEnt.entityType === 'multi_select';
 
-    if (!hasStates && !buttonSetName && !isMultiSelectType && !clickedEnt.requireVisited) {
-      return;
-    }
+    let nextEntsSnapshot = entities;
 
-    setEntities((prev) =>
-      prev.map((item) => {
-        // 1. If clickedEnt belongs to a Button Set, deselect all other members in that same Button Set
+    if (hasStates || buttonSetName || isMultiSelectType || clickedEnt.requireVisited) {
+      nextEntsSnapshot = entities.map((item) => {
         if (
           buttonSetName &&
           item.id !== clickedEnt.id &&
@@ -341,13 +628,11 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 
         if (item.id !== clickedEnt.id) return item;
 
-        // 2. Transition the clicked entity itself
         const nextVisited = true;
         let nextSelected = item.isSelected;
         let nextState = item.currentState || 'normal';
 
         if (buttonSetName) {
-          // In a radio Button Set, clicking selects this item
           nextSelected = true;
           nextState = item.states?.selected
             ? 'selected'
@@ -355,7 +640,6 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
             ? 'visited'
             : 'selected';
         } else if (isMultiSelectType || item.states?.selected) {
-          // Toggle between Selected and Visited/Normal
           nextSelected = !item.isSelected;
           nextState = nextSelected
             ? 'selected'
@@ -366,7 +650,6 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
           nextState = 'visited';
         }
 
-        // Also support inline trigger targetState override
         if (item.triggerEvent === 'on_click' && item.triggerTargetState) {
           nextState = item.triggerTargetState;
         }
@@ -377,8 +660,11 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
           isSelected: nextSelected,
           currentState: nextState
         };
-      })
-    );
+      });
+      setEntities(nextEntsSnapshot);
+    }
+
+    return nextEntsSnapshot;
   };
 
   const handlePointerDownEntity = (e: React.PointerEvent, ent: any) => {
@@ -388,7 +674,9 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     if (ent.entityType === 'connector_node' || ent.connectTargetId) {
       if (!activeConnectorSourceId) {
         setActiveConnectorSourceId(ent.id);
-        setStatusBanner(`Selected "${ent.label}" — now tap its matching target box!`);
+        setStatusBanner(
+          `Selected "${interpolateVariables(ent.label, runtimeVars)}" — now tap its matching target box!`
+        );
       } else if (activeConnectorSourceId !== ent.id) {
         const sourceEnt = entities.find((item) => item.id === activeConnectorSourceId);
         const isCorrect =
@@ -405,41 +693,27 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       return;
     }
 
-    // Apply Storyline State & Button Set transitions
-    applyEntityClickStateTransition(ent);
+    const updatedEnts = applyEntityClickStateTransition(ent);
 
+    // Inline entity click trigger
     if (ent.triggerEvent === 'on_click' && ent.triggerAction) {
-      if (ent.triggerMessage) setStatusBanner(ent.triggerMessage);
-      if (ent.triggerAction === 'complete_block' && onComplete) onComplete();
-      if (ent.triggerAction === 'show_layer' && ent.triggerLayerId) {
-        const foundL = layers.find((l: any) => l.id === ent.triggerLayerId);
-        if (foundL) setActiveLayer(foundL);
-      }
-      if (ent.triggerAction === 'change_state' && ent.triggerTargetEntityId && ent.triggerTargetState) {
-        setEntities((prev) =>
-          prev.map((item) =>
-            item.id === ent.triggerTargetEntityId
-              ? {
-                  ...item,
-                  currentState: ent.triggerTargetState,
-                  isVisited: ent.triggerTargetState === 'visited' ? true : item.isVisited,
-                  isSelected: ent.triggerTargetState === 'selected'
-                }
-              : item
-          )
-        );
-      }
+      executeTriggerAction(
+        ent.triggerAction,
+        {
+          targetVariable: ent.triggerTargetVariable,
+          variableOp: ent.triggerVariableOp,
+          variableAmount: ent.triggerVariableAmount,
+          targetEntityId: ent.triggerTargetEntityId,
+          targetState: ent.triggerTargetState,
+          targetLayerId: ent.triggerLayerId,
+          message: ent.triggerMessage
+        },
+        runtimeVars
+      );
     }
 
-    const clickRule = rules.find((r: any) => r.event === 'on_click' && r.entityId === ent.id);
-    if (clickRule) {
-      if (clickRule.message) setStatusBanner(clickRule.message);
-      if (clickRule.action === 'show_layer' && clickRule.targetLayerId) {
-        const foundLayer = layers.find((l: any) => l.id === clickRule.targetLayerId);
-        if (foundLayer) setActiveLayer(foundLayer);
-      }
-      return;
-    }
+    // Evaluate Conditional Trigger Wizard rules for `on_click`
+    runMatchingRules('on_click', { entityId: ent.id }, runtimeVars, updatedEnts);
 
     if (
       ent.anchored ||
@@ -502,7 +776,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
             )
           );
         }
-        setStatusBanner(`"${hitZone.label}" is at full capacity (${maxCap}/${maxCap}).`);
+        setStatusBanner(`"${interpolateVariables(hitZone.label, runtimeVars)}" is at full capacity (${maxCap}/${maxCap}).`);
         return;
       }
 
@@ -534,12 +808,18 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       }
 
       if (!isMatch && dragged.returnToAnchor) {
+        const nextMistakes = Number(runtimeVars.MistakeCount || 0) + 1;
+        const nextVars = { ...runtimeVars, MistakeCount: nextMistakes };
+        setRuntimeVars(nextVars);
+
         setEntities((prev) =>
           prev.map((e) =>
             e.id === dragged.id ? { ...e, x: snapX, y: snapY, validationStatus: 'incorrect' } : e
           )
         );
-        setStatusBanner(`Not quite! "${dragged.label}" does not belong in "${hitZone.label}".`);
+        setStatusBanner(
+          `Not quite! "${interpolateVariables(dragged.label, nextVars)}" does not belong in "${interpolateVariables(hitZone.label, nextVars)}".`
+        );
         setTimeout(() => {
           setEntities((prev) =>
             prev.map((e) =>
@@ -552,39 +832,40 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
         return;
       }
 
-      setEntities((prev) =>
-        prev.map((e) =>
-          e.id === dragged.id
-            ? {
-                ...e,
-                x: snapX,
-                y: snapY,
-                placedZoneId: hitZone.id,
-                isVisited: true,
-                currentState: e.states?.visited ? 'visited' : e.currentState,
-                validationStatus: isMatch ? 'correct' : 'incorrect'
-              }
-            : e
-        )
+      const nextScore = isMatch
+        ? Number(runtimeVars.Score || 0) + 10
+        : Number(runtimeVars.Score || 0);
+      const nextVars = {
+        ...runtimeVars,
+        Score: nextScore,
+        ...(isMatch ? {} : { MistakeCount: Number(runtimeVars.MistakeCount || 0) + 1 })
+      };
+      setRuntimeVars(nextVars);
+
+      const nextEnts = entities.map((e) =>
+        e.id === dragged.id
+          ? {
+              ...e,
+              x: snapX,
+              y: snapY,
+              placedZoneId: hitZone.id,
+              isVisited: true,
+              currentState: e.states?.visited ? 'visited' : e.currentState,
+              validationStatus: (isMatch ? 'correct' : 'incorrect') as 'correct' | 'incorrect'
+            }
+          : e
       );
+      setEntities(nextEnts);
 
       if (isMatch && dragged.triggerMessage) {
-        setStatusBanner(dragged.triggerMessage);
+        setStatusBanner(interpolateVariables(dragged.triggerMessage, nextVars));
       }
       if (isMatch && dragged.triggerAction === 'complete_block' && onComplete) {
         onComplete();
       }
 
-      const matchedRule = rules.find(
-        (r: any) => r.entityId === dragged.id && r.zoneId === hitZone.id
-      );
-      if (matchedRule) {
-        if (matchedRule.message) setStatusBanner(matchedRule.message);
-        if (matchedRule.action === 'show_layer' && matchedRule.targetLayerId) {
-          const targetL = layers.find((l: any) => l.id === matchedRule.targetLayerId);
-          if (targetL) setActiveLayer(targetL);
-        }
-      }
+      // Run Conditional Trigger Wizard rules for `on_drop`
+      runMatchingRules('on_drop', { entityId: dragged.id, zoneId: hitZone.id }, nextVars, nextEnts);
     } else {
       setEntities((prev) =>
         prev.map((e) =>
@@ -602,7 +883,6 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
     }
   };
 
-  // Evaluate Draggable Targets + Connectors + Visited States + Button Set Selections
   const checkMastery = () => {
     const draggablesWithTargets = entities.filter(
       (e) =>
@@ -628,13 +908,11 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
         )
       );
 
-    // Check Require-Visited Hotspots/Cards
     const requiredVisitedEntities = entities.filter((e) => e.requireVisited);
     const allVisitedMet =
       requiredVisitedEntities.length === 0 ||
       requiredVisitedEntities.every((e) => e.isVisited || e.currentState === 'visited');
 
-    // Check Button Sets / Multi-Select Cards with `isCorrectSelect`
     const selectableEntities = entities.filter(
       (e) => e.entityType === 'multi_select' || e.isCorrectSelect !== undefined
     );
@@ -643,7 +921,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
       selectableEntities.every((e) => Boolean(e.isSelected) === Boolean(e.isCorrectSelect));
 
     if (allDraggablesRight && allConnectorsRight && allVisitedMet && allSelectionsRight) {
-      setStatusBanner('All canvas states, button sets & objectives verified!');
+      setStatusBanner('All canvas states, variables, button sets & objectives verified!');
       if (layers.length > 0 && !activeLayer) {
         setActiveLayer(layers[0]);
       } else if (onComplete) {
@@ -683,10 +961,22 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
         {/* Top HD Canvas Bar */}
         <div className="px-6 py-4 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-black uppercase tracking-widest">
                 Kinetic Canvas HD • {resolution.badge}
               </span>
+              {Array.isArray(block?.variables) && block.variables.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  {block.variables.slice(0, 4).map((v: CanvasVariable) => (
+                    <span
+                      key={v.id || v.name}
+                      className="px-2.5 py-0.5 rounded-full bg-slate-800 text-amber-300 border border-slate-700 text-[10px] font-mono font-black"
+                    >
+                      {v.name}: {String(runtimeVars[v.name] ?? v.defaultValue)}
+                    </span>
+                  ))}
+                </div>
+              )}
               {statusBanner && (
                 <span className="px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider animate-in fade-in">
                   {statusBanner}
@@ -694,10 +984,12 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
               )}
             </div>
             <h3 className="text-lg sm:text-xl font-black text-white mt-1">
-              {block?.title || 'Interactive Kinetic Lab'}
+              {interpolateVariables(block?.title || 'Interactive Kinetic Lab', runtimeVars)}
             </h3>
             {block?.subtitle && (
-              <p className="text-xs font-bold text-slate-400 mt-0.5">{block.subtitle}</p>
+              <p className="text-xs font-bold text-slate-400 mt-0.5">
+                {interpolateVariables(block.subtitle, runtimeVars)}
+              </p>
             )}
           </div>
 
@@ -780,12 +1072,12 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                   >
                     {shape.label && (
                       <span className="text-sm font-black uppercase tracking-widest text-white/90 bg-black/25 px-3 py-1 rounded-full">
-                        {shape.label}
+                        {interpolateVariables(shape.label, runtimeVars)}
                       </span>
                     )}
                     {shape.sublabel && (
                       <span className="text-xs font-bold text-white/60 mt-1.5 px-1">
-                        {shape.sublabel}
+                        {interpolateVariables(shape.sublabel, runtimeVars)}
                       </span>
                     )}
                   </div>
@@ -845,25 +1137,24 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                       </span>
                     )}
                     <span className="text-lg font-black uppercase tracking-wider text-center drop-shadow-sm">
-                      {z.label}
+                      {interpolateVariables(z.label, runtimeVars)}
                     </span>
                   </div>
                   {z.sublabel && (
                     <span className="text-xs font-bold opacity-70 mt-1 text-center">
-                      {z.sublabel} ({occupants.length}/{z.capacity || 1})
+                      {interpolateVariables(z.sublabel, runtimeVars)} ({occupants.length}/{z.capacity || 1})
                     </span>
                   )}
                 </div>
               );
             })}
 
-            {/* 4. INTERACTIVE & ANCHORED ENTITIES (WITH ACTIVE STATE RESOLUTION) */}
+            {/* 4. INTERACTIVE & ANCHORED ENTITIES (WITH ACTIVE STATE & %VARIABLE% INTERPOLATION) */}
             {entities
               .filter((e: any) => e.entityType !== 'bg_shape')
               .map((rawEnt: any) => {
                 if (rawEnt.currentState === 'hidden') return null;
 
-                // Determine active visual state: Hover takes visual precedence if defined, else currentState
                 const isHovered = hoveredEntityId === rawEnt.id && rawEnt.states?.hover;
                 const activeStateName = isHovered
                   ? 'hover'
@@ -912,7 +1203,9 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                       } text-white shadow-2xl min-w-[300px]`}
                     >
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-black">{ent.label}</span>
+                        <span className="text-sm font-black">
+                          {interpolateVariables(ent.label, runtimeVars)}
+                        </span>
                         <span className="font-mono text-base font-black text-amber-400">
                           {rawEnt.sliderValue}
                           {rawEnt.sliderUnit || ''}
@@ -926,21 +1219,33 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                         value={rawEnt.sliderValue}
                         onChange={(e) => {
                           const val = Number(e.target.value);
-                          setEntities((prev) =>
-                            prev.map((item) =>
-                              item.id === rawEnt.id
-                                ? {
-                                    ...item,
-                                    sliderValue: val,
-                                    validationStatus:
-                                      Math.abs(val - Number(rawEnt.sliderTarget)) <=
-                                      Number(rawEnt.sliderTolerance || 0)
-                                        ? 'correct'
-                                        : 'neutral'
-                                  }
-                                : item
-                            )
+                          const boundVarName = rawEnt.bindVariable || rawEnt.variableName;
+                          const nextVars = boundVarName
+                            ? { ...runtimeVars, [boundVarName]: val }
+                            : runtimeVars;
+                          if (boundVarName) setRuntimeVars(nextVars);
+
+                          const nextEnts = entities.map((item) =>
+                            item.id === rawEnt.id
+                              ? {
+                                  ...item,
+                                  sliderValue: val,
+                                  validationStatus: (Math.abs(val - Number(rawEnt.sliderTarget)) <=
+                                  Number(rawEnt.sliderTolerance || 0)
+                                    ? 'correct'
+                                    : 'neutral') as 'correct' | 'neutral'
+                                }
+                              : item
                           );
+                          setEntities(nextEnts);
+                          if (boundVarName) {
+                            runMatchingRules(
+                              'on_variable_change',
+                              { variableName: boundVarName },
+                              nextVars,
+                              nextEnts
+                            );
+                          }
                         }}
                         className="w-full accent-indigo-500 cursor-pointer"
                       />
@@ -963,7 +1268,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                       } text-white shadow-2xl min-w-[320px]`}
                     >
                       <label className="text-xs font-black uppercase tracking-wider text-indigo-300 block mb-2">
-                        {ent.label}
+                        {interpolateVariables(ent.label, runtimeVars)}
                       </label>
                       <input
                         type="text"
@@ -971,22 +1276,37 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                         placeholder={rawEnt.placeholder || 'Type answer...'}
                         onChange={(e) => {
                           const val = e.target.value;
+                          const boundVarName = rawEnt.bindVariable || rawEnt.variableName;
+                          const nextVars = boundVarName
+                            ? { ...runtimeVars, [boundVarName]: val }
+                            : runtimeVars;
+                          if (boundVarName) setRuntimeVars(nextVars);
+
                           const accepted = String(rawEnt.expectedText || '')
                             .split(',')
                             .map((s) => s.trim().toLowerCase())
                             .filter(Boolean);
                           const matches = accepted.includes(val.trim().toLowerCase());
-                          setEntities((prev) =>
-                            prev.map((item) =>
-                              item.id === rawEnt.id
-                                ? {
-                                    ...item,
-                                    textValue: val,
-                                    validationStatus: matches ? 'correct' : 'neutral'
-                                  }
-                                : item
-                            )
+                          const nextEnts = entities.map((item) =>
+                            item.id === rawEnt.id
+                              ? {
+                                  ...item,
+                                  textValue: val,
+                                  validationStatus: (matches ? 'correct' : 'neutral') as
+                                    | 'correct'
+                                    | 'neutral'
+                                }
+                              : item
                           );
+                          setEntities(nextEnts);
+                          if (boundVarName) {
+                            runMatchingRules(
+                              'on_variable_change',
+                              { variableName: boundVarName },
+                              nextVars,
+                              nextEnts
+                            );
+                          }
                         }}
                         className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-bold text-sm outline-none focus:border-indigo-500"
                       />
@@ -1040,7 +1360,9 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                       )}
                       <div className="text-center">
                         {ent.label && (
-                          <div className="text-lg font-black leading-tight">{ent.label}</div>
+                          <div className="text-lg font-black leading-tight">
+                            {interpolateVariables(ent.label, runtimeVars)}
+                          </div>
                         )}
                         {ent.sublabel && (
                           <div
@@ -1048,7 +1370,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                               isAnchored && !hasInteractiveStates ? 'text-slate-400' : palette.sub
                             }`}
                           >
-                            {ent.sublabel}
+                            {interpolateVariables(ent.sublabel, runtimeVars)}
                           </div>
                         )}
                       </div>
@@ -1071,7 +1393,9 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                 Interactive Timeline Scrubber ({timelineProgress}%)
               </span>
               {activeKeyframeInfo && (
-                <span className="text-xs font-black text-amber-400">{activeKeyframeInfo.title}</span>
+                <span className="text-xs font-black text-amber-400">
+                  {interpolateVariables(activeKeyframeInfo.title, runtimeVars)}
+                </span>
               )}
             </div>
             <input
@@ -1079,12 +1403,16 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
               min={0}
               max={100}
               value={timelineProgress}
-              onChange={(e) => setTimelineProgress(Number(e.target.value))}
+              onChange={(e) => {
+                const nextVal = Number(e.target.value);
+                setTimelineProgress(nextVal);
+                runMatchingRules('on_timeline_reach', { progress: nextVal }, runtimeVars, entities);
+              }}
               className="w-full accent-indigo-500 cursor-pointer h-2.5 bg-slate-800 rounded-lg"
             />
             {activeKeyframeInfo?.description && (
               <p className="text-xs font-medium text-slate-300 leading-relaxed">
-                {activeKeyframeInfo.description}
+                {interpolateVariables(activeKeyframeInfo.description, runtimeVars)}
               </p>
             )}
           </div>
@@ -1095,15 +1423,19 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
           <div className="fixed inset-0 z-[9995] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-slate-900 border-2 border-indigo-500/40 rounded-[2.5rem] max-w-lg w-full p-8 text-white shadow-2xl space-y-5 animate-in zoom-in-95">
               <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-widest">
-                {activeLayer.name || 'Verification Layer'}
+                {interpolateVariables(activeLayer.name || 'Verification Layer', runtimeVars)}
               </span>
-              <h4 className="text-2xl font-black">{activeLayer.title}</h4>
-              <p className="text-sm text-slate-300 leading-relaxed">{activeLayer.body}</p>
+              <h4 className="text-2xl font-black">
+                {interpolateVariables(activeLayer.title, runtimeVars)}
+              </h4>
+              <p className="text-sm text-slate-300 leading-relaxed">
+                {interpolateVariables(activeLayer.body, runtimeVars)}
+              </p>
 
               {activeLayer.hasQuiz && Array.isArray(activeLayer.quizOptions) && (
                 <div className="space-y-2.5 pt-2">
                   <p className="text-xs font-black uppercase tracking-wider text-indigo-300">
-                    {activeLayer.quizQuestion}
+                    {interpolateVariables(activeLayer.quizQuestion, runtimeVars)}
                   </p>
                   {activeLayer.quizOptions.map((opt: any) => (
                     <button
@@ -1116,7 +1448,7 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
                           : 'bg-slate-950 border-slate-800 text-slate-300'
                       }`}
                     >
-                      {opt.text}
+                      {interpolateVariables(opt.text, runtimeVars)}
                     </button>
                   ))}
                 </div>
@@ -1150,7 +1482,10 @@ export const KineticCanvasBlock = ({ block, onComplete }: any) => {
 
 // ============================================================================
 //  2. INSTRUCTOR VISUAL STUDIO: KINETIC CANVAS BUILDER
-//  Now with Storyline Object States Tray + Button Sets + Tablet Touch Studio
+//  Now with:
+//   - Variables Manager (`%Variable%` Dynamic Interpolation)
+//   - Conditional Trigger Wizard (`WHEN / IF / THEN / ELSE` Rules)
+//   - Storyline Object States Tray + Button Sets + Tablet Touch Studio
 // ============================================================================
 export const KineticCanvasBuilder = ({ block, onChange }: any) => {
   const builderRootRef = useRef<HTMLDivElement>(null);
@@ -1176,10 +1511,17 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     Array<{ kind: 'entity' | 'zone'; id: string }>
   >([]);
 
-  // 🔥 STORYLINE OBJECT STATES TRAY STATE
+  // STORYLINE OBJECT STATES TRAY STATE
   const [showStatesTray, setShowStatesTray] = useState<boolean>(false);
   const [activeEditingState, setActiveEditingState] = useState<string>('normal');
   const [customStateInput, setCustomStateInput] = useState<string>('');
+
+  // 🔥 VARIABLES MANAGER & CONDITIONAL TRIGGER WIZARD DRAWERS
+  const [showVariablesPanel, setShowVariablesPanel] = useState<boolean>(false);
+  const [showTriggerWizard, setShowTriggerWizard] = useState<boolean>(false);
+  const [newVarName, setNewVarName] = useState<string>('');
+  const [newVarType, setNewVarType] = useState<'text' | 'number' | 'boolean'>('number');
+  const [newVarDefault, setNewVarDefault] = useState<string>('0');
 
   const primarySelected = selectedItems[0] || null;
   const isItemSelected = useCallback(
@@ -1188,7 +1530,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     [selectedItems]
   );
 
-  // Reset activeEditingState to 'normal' when switching primary selection
   useEffect(() => {
     setActiveEditingState('normal');
   }, [primarySelected?.id]);
@@ -1251,6 +1592,32 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     () => (Array.isArray(block?.zones) ? block.zones : []),
     [block?.zones]
   );
+  const variables: CanvasVariable[] = useMemo(
+    () => (Array.isArray(block?.variables) ? block.variables : []),
+    [block?.variables]
+  );
+  const rules: ConditionalTriggerRule[] = useMemo(
+    () => (Array.isArray(block?.rules) ? block.rules : []),
+    [block?.rules]
+  );
+  const layers = useMemo(
+    () => (Array.isArray(block?.layers) ? block.layers : []),
+    [block?.layers]
+  );
+
+  const allVariableNames = useMemo(() => {
+    const names = new Set<string>([
+      'Score',
+      'MistakeCount',
+      'CorrectCount',
+      'VisitedCount',
+      'LearnerName'
+    ]);
+    variables.forEach((v) => {
+      if (v?.name) names.add(v.name);
+    });
+    return Array.from(names);
+  }, [variables]);
 
   const notifyBuilder = useCallback((msg: string) => {
     setBuilderToast(msg);
@@ -1273,7 +1640,14 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       ro.disconnect();
       window.removeEventListener('resize', updateScale);
     };
-  }, [resolution.width, showLayerToolbar, showStatesTray, taskbarDock]);
+  }, [
+    resolution.width,
+    showLayerToolbar,
+    showStatesTray,
+    showVariablesPanel,
+    showTriggerWizard,
+    taskbarDock
+  ]);
 
   const snapCoord = (val: number, minVal = 3, maxVal = 97) => {
     const clamped = Math.max(minVal, Math.min(maxVal, val));
@@ -1895,11 +2269,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     }
   };
 
-  // ============================================================================
-  //  🔥 STATE-AWARE FIELD UPDATER
-  //  When `activeEditingState !== 'normal'`, visual changes (label, sublabel, color,
-  //  borderStyle, scale) write directly into `ent.states[activeEditingState]`!
-  // ============================================================================
+  // State-Aware Field Updater
   const updateSelectedFields = (patch: Record<string, any>) => {
     const selEntIds = new Set(
       selectedItems.filter((s) => s.kind === 'entity').map((s) => s.id)
@@ -2075,6 +2445,55 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     setSelectedItems([{ kind: 'zone', id: newId }]);
   };
 
+  // Add Custom Variable
+  const handleAddVariable = () => {
+    const cleanName = newVarName.trim().replace(/[^a-zA-Z0-9_]/g, '');
+    if (!cleanName) return;
+    const defaultVal =
+      newVarType === 'number'
+        ? Number(newVarDefault || 0)
+        : newVarType === 'boolean'
+        ? String(newVarDefault).toLowerCase() === 'true'
+        : newVarDefault;
+    const nextVars: CanvasVariable[] = [
+      ...variables.filter((v) => v.name !== cleanName),
+      { id: `var_${Date.now()}`, name: cleanName, type: newVarType, defaultValue: defaultVal }
+    ];
+    onChange({ ...block, variables: nextVars });
+    setNewVarName('');
+    setNewVarDefault(newVarType === 'number' ? '0' : '');
+    notifyBuilder(`Created variable %${cleanName}%! Type %${cleanName}% inside any card or title.`);
+  };
+
+  // Add Conditional Trigger Rule
+  const handleAddConditionalRule = () => {
+    const defaultEntityId = primarySelected?.kind === 'entity' ? primarySelected.id : entities[0]?.id || '';
+    const newRule: ConditionalTriggerRule = {
+      id: `rule_${Date.now()}`,
+      event: 'on_click',
+      entityId: defaultEntityId,
+      conditionType: 'none',
+      conditionVariable: allVariableNames[0] || 'Score',
+      conditionOperator: '>=',
+      conditionValue: '10',
+      action: 'adjust_variable',
+      targetVariable: allVariableNames[0] || 'Score',
+      variableOp: 'add',
+      variableAmount: 10,
+      message: 'Score is now %Score%!',
+      elseAction: 'none'
+    };
+    onChange({ ...block, rules: [...rules, newRule] });
+    notifyBuilder('Added new Conditional Trigger Rule!');
+  };
+
+  const updateRuleById = (ruleId: string, patch: Partial<ConditionalTriggerRule>) => {
+    onChange({
+      ...block,
+      rules: rules.map((r) => (r.id === ruleId ? { ...r, ...patch } : r))
+    });
+  };
+
   const adjustLayerZOrder = (
     kind: 'entity' | 'zone',
     id: string,
@@ -2212,7 +2631,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
     : 'w-8 h-8 -bottom-3.5 -right-3.5';
   const handleIconPx = isTabletMode ? 18 : 13;
 
-  // Create or Activate a State on Selected Entities
   const handleActivateOrCreateState = (stateKey: string) => {
     if (stateKey === 'normal') {
       setActiveEditingState('normal');
@@ -2288,17 +2706,16 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 <>
                   <Tablet size={16} className="text-emerald-400" />
                   <span>
-                    <strong className="text-emerald-300">Tablet Touch Studio:</strong> Tap any box to edit States & Button Sets — or toggle{' '}
-                    <strong className="text-cyan-300">Multi-Select</strong>!
+                    <strong className="text-emerald-300">Tablet Touch Studio:</strong> Tap any box to edit States, Variables & Triggers!
                   </span>
                 </>
               ) : (
                 <>
                   <Keyboard size={14} className="text-indigo-400" />
                   <span>
-                    Select a box to edit <strong className="text-amber-300">Object States & Button Sets</strong> •{' '}
-                    <strong className="text-cyan-300">Shift+Click</strong> multi-select •{' '}
-                    <strong className="text-emerald-300">Ctrl+D</strong> duplicate
+                    Use <strong className="text-emerald-300">%VarName%</strong> in any label •{' '}
+                    <strong className="text-amber-300">States & Triggers</strong> in top bar •{' '}
+                    <strong className="text-cyan-300">Shift+Click</strong> multi-select
                   </span>
                 </>
               )}
@@ -2407,7 +2824,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             isVertical ? 'flex-col gap-3.5' : 'flex-wrap items-center gap-2.5'
           }`}
         >
-          {/* 1. Drag Grip + Pin Toggle + Multi-Select Badge + Active State Indicator */}
+          {/* 1. Drag Grip + Pin Toggle + Multi-Select Badge + States Button */}
           <div className="flex items-center gap-1.5 pr-2 border-r border-slate-700/80">
             {isFloatingInstance && (
               <button
@@ -2454,7 +2871,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 : 'Drop Bucket'}
             </button>
 
-            {/* 🔥 TOGGLE STORYLINE STATES TRAY BUTTON */}
             {isEntity && !isBgShape && (
               <button
                 type="button"
@@ -2496,26 +2912,48 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             )}
           </div>
 
-          {/* 2. Primary Text & Sublabel Inline Inputs (Writes to Active State!) */}
+          {/* 2. Primary Text, Sublabel & Quick %Variable% Token Inserter */}
           <div className={`flex ${isVertical ? 'flex-col' : 'items-center'} gap-1.5`}>
             {!isMultiSelect && (
               <input
                 type="text"
                 value={activeTarget.label || ''}
-                placeholder="(Empty Box — No Text)"
+                placeholder="Label (or %Score%)"
                 onChange={(e) => updateSelectedFields({ label: e.target.value })}
                 className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-400 text-xs font-black text-white outline-none w-40"
-                title={`Label for "${activeEditingState}" state`}
+                title={`Label for "${activeEditingState}" state (Supports %VarName%)`}
               />
             )}
             <input
               type="text"
               value={activeTarget.sublabel || ''}
-              placeholder={isMultiSelect ? 'Batch subtitle...' : 'Subtitle / hint...'}
+              placeholder={isMultiSelect ? 'Batch subtitle...' : 'Subtitle / %Var%...'}
               onChange={(e) => updateSelectedFields({ sublabel: e.target.value })}
               className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-400 text-xs font-bold text-slate-300 outline-none w-32"
-              title={`Subtitle for "${activeEditingState}" state`}
+              title="Subtitle / Hint (Supports %VarName%)"
             />
+            {/* 1-Click Insert %Variable% Token Dropdown */}
+            {!isMultiSelect && (
+              <select
+                value=""
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  const token = `%${e.target.value}%`;
+                  updateSelectedFields({
+                    label: `${activeTarget.label || ''} ${token}`.trim()
+                  });
+                }}
+                title="Insert a Dynamic %Variable% Reference into Label"
+                className="px-2 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 text-[10px] font-black text-emerald-300 outline-none"
+              >
+                <option value="">+%Var%</option>
+                {allVariableNames.map((vn) => (
+                  <option key={vn} value={vn}>
+                    %{vn}%
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
               title="Clear Text on Selected (Convert to Empty Resizable Box)"
@@ -2709,11 +3147,10 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   title="Category Match Tag"
                   className="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-[11px] font-bold text-emerald-300 outline-none w-24"
                 />
-                {/* 🔥 BUTTON SET QUICK SELECTOR (Radio-Group Mutual Exclusivity) */}
                 <select
                   value={rawActiveTarget.buttonSet || ''}
                   onChange={(e) => updateSelectedFields({ buttonSet: e.target.value || undefined })}
-                  title="Assign to a Storyline Button Set (Only 1 card in a set can be Selected at a time)"
+                  title="Assign to a Storyline Button Set"
                   className="px-2 py-2 rounded-xl bg-slate-950 border border-amber-500/40 text-[10px] font-black text-amber-300 outline-none"
                 >
                   <option value="">Btn Set: None</option>
@@ -2784,7 +3221,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             ) : null}
           </div>
 
-          {/* 8. Quick Toggles: Align Row/Col, Background Shape, Anchor, Lock, Z-Order, Duplicate & Delete */}
+          {/* 8. Quick Toggles */}
           <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
             {isMultiSelect && (
               <>
@@ -3028,7 +3465,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
               {isTabletMode
                 ? `Tablet Touch Studio Active • 48px Handles • Touch D-Pad (${selectedItems.length} Selected)`
-                : `HD Stage Studio • Storyline States & Button Sets • Shift+Click Multi-Select (${selectedItems.length} Selected)`}
+                : `HD Stage Studio • %Variables% • Conditional Triggers • Object States (${selectedItems.length} Selected)`}
             </span>
             {builderToast && (
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase animate-in fade-in">
@@ -3040,7 +3477,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             type="text"
             value={block?.title || ''}
             onChange={(e) => onChange({ ...block, title: e.target.value })}
-            placeholder="Canvas Slide Title..."
+            placeholder="Canvas Slide Title (Supports %Variable%)..."
             className="text-lg font-black bg-transparent text-slate-900 dark:text-white outline-none border-b border-transparent focus:border-indigo-500 mt-0.5"
           />
         </div>
@@ -3089,20 +3526,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
             </select>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
-            <Grid size={14} className="text-emerald-500" />
-            <select
-              value={gridSnap}
-              onChange={(e) => setGridSnap(Number(e.target.value))}
-              className="bg-transparent text-xs font-black text-slate-800 dark:text-white outline-none"
-            >
-              <option value={0}>Snap: Free (0.1%)</option>
-              <option value={1}>Snap: Fine HD (1%)</option>
-              <option value={2}>Snap: Standard (2%)</option>
-              <option value={5}>Snap: Coarse Grid (5%)</option>
-            </select>
-          </div>
-
           <button
             type="button"
             onClick={handleAutoAlignRow}
@@ -3124,8 +3547,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
           <button
             type="button"
             onClick={addBackgroundShape}
-            title="Add a resizable background shape to visually group cards and buckets"
-            className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+            className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"
           >
             <Square size={12} /> + Group Shape
           </button>
@@ -3140,19 +3562,36 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
           <button
             type="button"
-            onClick={() => addEntity(true)}
-            className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm"
-            title="Add a Resizable Empty/Text Frame or Fixed Diagram Label"
-          >
-            <Pin size={12} /> + Empty / Text Box
-          </button>
-
-          <button
-            type="button"
             onClick={addZone}
             className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm"
           >
             <Plus size={12} /> Drop Bucket
+          </button>
+
+          {/* 🔥 STORYLINE VARIABLES (%VAR%) DRAWER BUTTON */}
+          <button
+            type="button"
+            onClick={() => setShowVariablesPanel((v) => !v)}
+            className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border transition-all ${
+              showVariablesPanel
+                ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <Database size={13} /> %Variables% ({variables.length})
+          </button>
+
+          {/* 🔥 CONDITIONAL TRIGGER WIZARD (IF / ELSE) BUTTON */}
+          <button
+            type="button"
+            onClick={() => setShowTriggerWizard((t) => !t)}
+            className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border transition-all ${
+              showTriggerWizard
+                ? 'bg-rose-600 text-white border-rose-400 shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <GitBranch size={13} /> Triggers ({rules.length})
           </button>
 
           <button
@@ -3164,7 +3603,7 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
             }`}
           >
-            <Sparkles size={13} /> States Tray
+            <Sparkles size={13} /> States
           </button>
 
           <button
@@ -3196,7 +3635,491 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
       {taskbarDock === 'top' && renderContextualTaskBar(false)}
 
       {/* ============================================================================ */}
-      {/* 🔥 ARTICULATE STORYLINE OBJECT STATES & BUTTON SETS TRAY                     */}
+      {/* 🔥 PANEL A: ARTICULATE STORYLINE VARIABLES MANAGER (`%VarName%`)             */}
+      {/* ============================================================================ */}
+      {showVariablesPanel && (
+        <div className="p-5 rounded-3xl bg-slate-950 text-white border-2 border-emerald-500/40 shadow-2xl space-y-4 animate-in slide-in-from-top-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Database size={16} className="text-emerald-400" />
+              <span className="text-xs font-black uppercase tracking-widest text-emerald-300">
+                Project Variables Studio (%Variable% Dynamic Text Replacement)
+              </span>
+              <span className="text-[10px] font-bold text-slate-400">
+                Built-in: %Score%, %MistakeCount%, %CorrectCount%, %VisitedCount%, %LearnerName%
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowVariablesPanel(false)}
+              className="p-1 text-slate-400 hover:text-white"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          {/* Create New Variable Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800">
+            <div className="sm:col-span-4">
+              <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                Variable Name (No Spaces)
+              </label>
+              <input
+                type="text"
+                value={newVarName}
+                onChange={(e) => setNewVarName(e.target.value)}
+                placeholder="e.g. LegionMorale or ClueFound"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono font-black text-emerald-300 outline-none"
+              />
+            </div>
+            <div className="sm:col-span-3">
+              <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                Data Type
+              </label>
+              <select
+                value={newVarType}
+                onChange={(e) => {
+                  const t = e.target.value as 'text' | 'number' | 'boolean';
+                  setNewVarType(t);
+                  setNewVarDefault(t === 'number' ? '0' : t === 'boolean' ? 'false' : '');
+                }}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-black text-white outline-none"
+              >
+                <option value="number">Number (Counter / Math)</option>
+                <option value="text">Text (String / Name)</option>
+                <option value="boolean">True / False (Flag)</option>
+              </select>
+            </div>
+            <div className="sm:col-span-3">
+              <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                Initial Default Value
+              </label>
+              <input
+                type="text"
+                value={newVarDefault}
+                onChange={(e) => setNewVarDefault(e.target.value)}
+                placeholder="Default value..."
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-white outline-none"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <button
+                type="button"
+                onClick={handleAddVariable}
+                className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest"
+              >
+                + Add Variable
+              </button>
+            </div>
+          </div>
+
+          {/* Active Custom Variables Table */}
+          {variables.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              {variables.map((v) => (
+                <div
+                  key={v.id || v.name}
+                  className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-black text-emerald-400">
+                        %{v.name}%
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-800 text-[9px] font-black uppercase text-slate-400">
+                        {v.type}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-300 mt-0.5">
+                      Default: <strong className="text-white">{String(v.defaultValue)}</strong>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onChange({
+                        ...block,
+                        variables: variables.filter((item) => item.name !== v.name)
+                      })
+                    }
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================================ */}
+      {/* 🔥 PANEL B: CONDITIONAL TRIGGER WIZARD (`WHEN / IF / THEN / ELSE`)           */}
+      {/* ============================================================================ */}
+      {showTriggerWizard && (
+        <div className="p-5 rounded-3xl bg-slate-950 text-white border-2 border-rose-500/40 shadow-2xl space-y-4 animate-in slide-in-from-top-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <GitBranch size={16} className="text-rose-400" />
+              <span className="text-xs font-black uppercase tracking-widest text-rose-300">
+                Conditional Trigger Wizard (Storyline WHEN ➔ IF ➔ THEN ➔ ELSE Rules)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAddConditionalRule}
+                className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1"
+              >
+                <Plus size={12} /> + Add Conditional Trigger
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTriggerWizard(false)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+
+          {rules.length === 0 ? (
+            <p className="text-xs text-slate-400 font-bold py-2">
+              No custom triggers yet. Click "+ Add Conditional Trigger" to build IF/ELSE rules (e.g., When User Clicks Verify ➔ If Score &gt;= 20 ➔ Show Success Layer ➔ Else Show Remediation Toast).
+            </p>
+          ) : (
+            <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+              {rules.map((rule, rIdx) => (
+                <div
+                  key={rule.id || rIdx}
+                  className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-black uppercase">
+                      Trigger Rule #{rIdx + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          ...block,
+                          rules: rules.filter((r) => r.id !== rule.id)
+                        })
+                      }
+                      className="text-slate-500 hover:text-rose-400"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+
+                  {/* ROW 1: WHEN EVENT + IF CONDITION */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div className="md:col-span-2">
+                      <span className="text-[9px] font-black uppercase text-indigo-400 block">
+                        1. WHEN Event
+                      </span>
+                      <select
+                        value={rule.event || 'on_click'}
+                        onChange={(e) =>
+                          updateRuleById(rule.id, { event: e.target.value as any })
+                        }
+                        className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-white"
+                      >
+                        <option value="on_click">User Clicks Box</option>
+                        <option value="on_drop">Box Dropped on Zone</option>
+                        <option value="on_variable_change">Variable Changes</option>
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <span className="text-[9px] font-black uppercase text-slate-400 block">
+                        Target Object / Variable
+                      </span>
+                      {rule.event === 'on_variable_change' ? (
+                        <select
+                          value={rule.watchVariable || 'Score'}
+                          onChange={(e) =>
+                            updateRuleById(rule.id, { watchVariable: e.target.value })
+                          }
+                          className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-emerald-300"
+                        >
+                          {allVariableNames.map((vn) => (
+                            <option key={vn} value={vn}>
+                              %{vn}%
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          value={rule.entityId || ''}
+                          onChange={(e) =>
+                            updateRuleById(rule.id, { entityId: e.target.value })
+                          }
+                          className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-white"
+                        >
+                          <option value="">Any Box</option>
+                          {entities.map((ent: any) => (
+                            <option key={ent.id} value={ent.id}>
+                              {ent.label || ent.id}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <span className="text-[9px] font-black uppercase text-amber-400 block">
+                        2. IF Condition
+                      </span>
+                      <select
+                        value={rule.conditionType || 'none'}
+                        onChange={(e) =>
+                          updateRuleById(rule.id, { conditionType: e.target.value as any })
+                        }
+                        className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-amber-300"
+                      >
+                        <option value="none">Always (No IF)</option>
+                        <option value="variable">If Variable...</option>
+                        <option value="state">If Object State...</option>
+                      </select>
+                    </div>
+
+                    {rule.conditionType === 'variable' && (
+                      <>
+                        <div className="md:col-span-2">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Check Variable
+                          </span>
+                          <select
+                            value={rule.conditionVariable || 'Score'}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { conditionVariable: e.target.value })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-emerald-300"
+                          >
+                            {allVariableNames.map((vn) => (
+                              <option key={vn} value={vn}>
+                                %{vn}%
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-1">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Op
+                          </span>
+                          <select
+                            value={rule.conditionOperator || '>='}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { conditionOperator: e.target.value as any })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-1.5 py-1.5 text-xs font-mono font-black text-white"
+                          >
+                            <option value="==">==</option>
+                            <option value="!=">!=</option>
+                            <option value=">=">&gt;=</option>
+                            <option value="<=">&lt;=</option>
+                            <option value=">">&gt;</option>
+                            <option value="<">&lt;</option>
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Value
+                          </span>
+                          <input
+                            type="text"
+                            value={rule.conditionValue ?? ''}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { conditionValue: e.target.value })
+                            }
+                            placeholder="e.g. 20"
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-white"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {rule.conditionType === 'state' && (
+                      <>
+                        <div className="md:col-span-3">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Check Object
+                          </span>
+                          <select
+                            value={rule.conditionEntityId || ''}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { conditionEntityId: e.target.value })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-white"
+                          >
+                            {entities.map((ent: any) => (
+                              <option key={ent.id} value={ent.id}>
+                                {ent.label || ent.id}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Is State
+                          </span>
+                          <select
+                            value={rule.conditionStateIs || 'visited'}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { conditionStateIs: e.target.value })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-amber-300"
+                          >
+                            <option value="visited">Visited</option>
+                            <option value="selected">Selected</option>
+                            <option value="normal">Normal</option>
+                            <option value="disabled">Disabled</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* ROW 2: THEN DO ACTION + OPTIONAL ELSE MESSAGE */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div className="md:col-span-3">
+                      <span className="text-[9px] font-black uppercase text-emerald-400 block">
+                        3. THEN Do Action
+                      </span>
+                      <select
+                        value={rule.action || 'adjust_variable'}
+                        onChange={(e) =>
+                          updateRuleById(rule.id, { action: e.target.value as any })
+                        }
+                        className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-emerald-300"
+                      >
+                        <option value="adjust_variable">Adjust Variable</option>
+                        <option value="change_state">Change Object State</option>
+                        <option value="show_layer">Show Slide Layer</option>
+                        <option value="show_toast">Show Banner Toast</option>
+                        <option value="complete_block">Complete Slide</option>
+                      </select>
+                    </div>
+
+                    {rule.action === 'adjust_variable' && (
+                      <>
+                        <div className="md:col-span-2">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Target Variable
+                          </span>
+                          <select
+                            value={rule.targetVariable || 'Score'}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { targetVariable: e.target.value })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-emerald-300"
+                          >
+                            {allVariableNames.map((vn) => (
+                              <option key={vn} value={vn}>
+                                %{vn}%
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Operation
+                          </span>
+                          <select
+                            value={rule.variableOp || 'add'}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { variableOp: e.target.value as any })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-white"
+                          >
+                            <option value="add">Add (+)</option>
+                            <option value="subtract">Subtract (-)</option>
+                            <option value="set">Set (=)</option>
+                            <option value="toggle">Toggle Bool</option>
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Amount / Value
+                          </span>
+                          <input
+                            type="text"
+                            value={rule.variableAmount ?? 10}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { variableAmount: e.target.value })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-white"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {rule.action === 'change_state' && (
+                      <>
+                        <div className="md:col-span-3">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            Target Object
+                          </span>
+                          <select
+                            value={rule.targetEntityId || ''}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { targetEntityId: e.target.value })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-white"
+                          >
+                            {entities.map((ent: any) => (
+                              <option key={ent.id} value={ent.id}>
+                                {ent.label || ent.id}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-3">
+                          <span className="text-[9px] font-black uppercase text-slate-400 block">
+                            New State
+                          </span>
+                          <select
+                            value={rule.targetState || 'visited'}
+                            onChange={(e) =>
+                              updateRuleById(rule.id, { targetState: e.target.value })
+                            }
+                            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-amber-300"
+                          >
+                            <option value="normal">Normal</option>
+                            <option value="visited">Visited</option>
+                            <option value="selected">Selected</option>
+                            <option value="disabled">Disabled</option>
+                            <option value="hidden">Hidden</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="md:col-span-3">
+                      <span className="text-[9px] font-black uppercase text-slate-400 block">
+                        Toast Banner (Supports %Var%)
+                      </span>
+                      <input
+                        type="text"
+                        value={rule.message || ''}
+                        onChange={(e) =>
+                          updateRuleById(rule.id, { message: e.target.value })
+                        }
+                        placeholder="e.g. Score: %Score%!"
+                        className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================================ */}
+      {/* PANEL C: ARTICULATE STORYLINE OBJECT STATES & BUTTON SETS TRAY               */}
       {/* ============================================================================ */}
       {showStatesTray && (
         <div className="p-4 rounded-3xl bg-slate-950 text-white border-2 border-amber-500/40 shadow-2xl space-y-4 animate-in slide-in-from-top-2">
@@ -3219,7 +4142,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
 
             {activeSelectedEntity && (
               <div className="flex flex-wrap items-center gap-2">
-                {/* Initial State Selector */}
                 <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
                   <span className="text-[10px] font-black uppercase text-slate-400">Initial State:</span>
                   <select
@@ -3235,7 +4157,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   </select>
                 </div>
 
-                {/* Require Visited Mastery Gate Toggle */}
                 <button
                   type="button"
                   onClick={() =>
@@ -3259,7 +4180,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                   {activeSelectedEntity.requireVisited ? 'Must Visit: ON' : 'Must Visit: OFF'}
                 </button>
 
-                {/* Correct Choice in Button Set Toggle */}
                 {activeSelectedEntity.buttonSet && (
                   <button
                     type="button"
@@ -3334,7 +4254,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                         )}
                       </div>
 
-                      {/* Mini Visual Preview of the Card in This State */}
                       <div
                         className={`px-3 py-2 rounded-xl text-center truncate text-xs font-black border ${previewPalette.bg} ${previewPalette.border}`}
                       >
@@ -3352,7 +4271,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
                 })}
               </div>
 
-              {/* Add Custom Named State Row */}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
@@ -3801,7 +4719,6 @@ export const KineticCanvasBuilder = ({ block, onChange }: any) => {
               .filter((e: any) => e.entityType !== 'bg_shape')
               .map((rawEnt: any) => {
                 const isSelected = isItemSelected('entity', rawEnt.id);
-                // If this entity is selected and we are editing a non-normal state, preview that state live on stage!
                 const ent =
                   isSelected && activeEditingState !== 'normal'
                     ? resolveEntityVisualState(rawEnt, activeEditingState)
